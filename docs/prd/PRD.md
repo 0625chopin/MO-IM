@@ -681,10 +681,14 @@
 
 ### 8.1 이미 설치됨 (`package.json` 실측)
 
-런타임 의존성은 **세 개뿐**이다.
+런타임 의존성은 **다섯 개**다.
 
 - **Next.js 16.2.11** — App Router, Turbopack이 dev·build 기본 번들러, React Compiler 활성화(`reactCompiler: true`)
 - **React 19.2.4** / **react-dom 19.2.4**
+- **`@supabase/supabase-js` 2.110.8** / **`@supabase/ssr` 0.12.3**(Task 026, 20일차) — 인증·DB·Realtime
+  클라이언트. `src/lib/data/supabase/`(`server.ts`·`client.ts`)와 `src/lib/realtime/`(구현체 파일)에서만
+  직접 import한다(ESLint zone 3·6으로 강제, D-036·R-015). 스키마·RLS는 아직 없다 — Task 028·029A·029B
+  이후 실제로 쓰인다
 - **TypeScript**(strict, 개발 의존성) — 경로 별칭 `@/*` → `./src/*`
 - **Tailwind CSS v4**(개발 의존성) — CSS-first, `tailwind.config.*` 없음. 토큰은 `src/app/globals.css`의 `@theme inline`
 
@@ -694,7 +698,6 @@
 
 | 항목 | 용도 | 시점 | 근거 |
 | --- | --- | --- | --- |
-| **Supabase JS 클라이언트** | 인증·DB·Realtime | v0.2 | CON-01 |
 | **shadcn/ui** | 컴포넌트 기반 (MCP는 이미 설정됨) | v0.1 | 공통 기반 48인일 중 10~15인일 단축 여지 |
 | **커스텀 SMTP 공급자** | 인증 메일 발송 | v0.2 | **D-021** — 공급자 미정(**I-016**) |
 
