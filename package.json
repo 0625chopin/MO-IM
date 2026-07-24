@@ -13,6 +13,8 @@
     "@schedule-x/calendar": "^4.6.1",
     "@schedule-x/react": "^4.1.0",
     "@schedule-x/theme-default": "^4.6.1",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.26.0",

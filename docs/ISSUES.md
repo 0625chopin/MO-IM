@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-045** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-046** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
 
@@ -566,3 +566,30 @@
   ③ 라우트 핸들러·프록시 층에서 상태를 갈아 끼움(D-011로 `proxy.ts`가 v0.1 범위 밖이라 v0.2 이후).
   Task 029A(RLS 정책)·031(읽기 경로 실데이터 교체) 착수 전에 정하는 것이 좋다 — 그때 같은 판단이
   RLS 403 경로에도 필요해지고, 두 경로가 갈리면 되돌리기 어렵다.
+
+### I-045 · `npm install`(플래그 없이)이 `@schedule-x/calendar`의 peer 충돌로 항상 ERESOLVE 실패한다
+
+- **상태**: 열림
+- **영역**: 빌드 / 의존성
+- **제보**: CORE (2026-07-24, 12일차 — Task 026 `@supabase/supabase-js`·`@supabase/ssr` 설치 중, `node_modules` 삭제 후 재설치하며 발견)
+- **내용**: `package.json`의 루트 `temporal-polyfill@^1.0.1`과 `@schedule-x/calendar@4.6.1`이 요구하는
+  peer `temporal-polyfill@0.3.0`(정확히 이 버전)이 충돌한다. 이 환경(npm 11.16.0)에서는 플래그 없는
+  `npm install`·`npm ci` 둘 다 **커밋된 `package-lock.json`을 그대로 써도** ERESOLVE로 실패한다 —
+  즉 이 lockfile은 이 npm 버전에서 처음부터 재현 불가능했다(재현: `rm -rf node_modules && npm ci`).
+  `--legacy-peer-deps`로 우회하면 설치는 되지만 **legacy 모드가 peerDependencies 자동 설치를 하지
+  않아** `@schedule-x/calendar`가 필요로 하는 `preact`·`@preact/signals`가 통째로 빠지고, 그 상태로
+  빌드하면 `/calendar`에서 `Module not found: Can't resolve 'preact/hooks'`로 즉시 깨진다(실제로
+  이 회차 초반에 이 순서로 한 번 깨뜨렸다가 복구했다). `--force`는 두 문제를 다 피한다 — peer
+  자동 설치를 유지한 채 버전 충돌만 경고로 낮춘다(`npm install --force` 후 `package-lock.json`이
+  HEAD와 바이트 단위로 동일함을 확인했다).
+- **영향**: **Vercel 등 CI 환경이 플래그 없는 기본 설치 커맨드(`npm install`/`npm ci`)를 쓰면 빌드
+  자체가 시작도 못 하고 ERESOLVE로 실패할 가능성이 높다** — Task 025(v0.1 빌드·배포 검증, 11일차)의
+  로컬 빌드 확인은 이미 채워진 `node_modules`에서 돌았을 것이라 이 경로를 통과하지 못했다. 지금은
+  로컬에 `--force`로 설치된 `node_modules`가 남아 있어 `npm run build`가 통과하지만, 이 저장소를
+  새로 클론하는 사람(다음 회차 CI 도입·다른 팀원의 새 환경)은 그대로 막힌다.
+- **후속**: 근본 해결은 `temporal-polyfill` 버전 충돌 자체를 없애는 것이다 — 후보로 ① 루트
+  `temporal-polyfill`을 `@schedule-x/calendar`가 요구하는 `0.3.0`으로 낮추고 두 버전 API 차이를
+  검토, ② `package.json`에 `overrides`로 `temporal-polyfill`을 강제 단일화, ③ Vercel 빌드 커맨드에
+  `--force`(또는 필요한 최소 플래그)를 명시. 어느 쪽이든 `@schedule-x` 캘린더(Task 021·022, DESIGN
+  담당)를 건드리므로 CORE 단독으로 결정하지 않는다 — 이 이슈는 발견만 하고 고치지 않았다(Task 026
+  범위 밖). 다음 배포 검증 전에 반드시 확인할 것.
