@@ -4,8 +4,7 @@ import { redirect } from "next/navigation";
 
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { setOnboardingCompleteCookie } from "@/components/shell/onboarding-flag-cookie";
-import { updateProfile } from "@/lib/data";
+import { completeProfileOnboarding, updateProfile } from "@/lib/data";
 import { validateDisplayName } from "@/lib/rules/display-name-validation";
 import { strings } from "@/lib/strings";
 
@@ -20,15 +19,13 @@ import { strings } from "@/lib/strings";
  *
  * **Task 030(17일차)부터 세션은 실 Supabase Auth다.** `setMockSessionCookie`/
  * `patchMockSessionCookie`는 제거됐다 — 세션 자체(`@supabase/ssr`의 httpOnly 쿠키)는 이제
- * 이 액션이 건드리지 않는다(로그인/가입 액션만 다룬다). 이 액션이 쓰는 건 "온보딩을
- * 마쳤는가"만 근사하는 보조 쿠키(`onboarding-flag-cookie.ts`)뿐이다 — `profiles` 스키마에
- * 이 사실을 담을 컬럼이 없는 전환기 한계는 그 파일 docstring 참고.
+ * 이 액션이 건드리지 않는다(로그인/가입 액션만 다룬다).
  *
- * **알려진 한계**: `updateProfile`(`@/lib/data`)의 쓰기 경로는 아직 mock 저장소다(Task 032가
- * 실데이터로 옮긴다, `docs/decisions/read-path-realdata-031.md`). 그래서 mock 시드에 없는
- * 실 계정(예: Task 030이 만든 테스트 계정 2개)이 온보딩을 제출하면 `not_found`로 실패한다 —
- * 이 액션의 버그가 아니라 쓰기 경로 전환이 아직 안 끝난 상태다. `docs/decisions/
- * auth-integration-030.md` §5에 남겼다.
+ * **I-046 해소(Task 032, 18일차)**: `updateProfile`이 실 Supabase 쓰기로 옮겨졌고,
+ * "온보딩을 마쳤는가"는 이제 보조 쿠키가 아니라 `profiles.onboarding_completed_at` 컬럼이
+ * 직접 담는다(`completeProfileOnboarding`). 표시 이름·검색 노출 갱신과 온보딩 완료 표시를
+ * 별도 호출로 나눈 이유는 `src/lib/data/supabase/profile.ts`의 `completeProfileOnboarding`
+ * docstring 참고 — 시스템이 시점을 결정하는 필드를 사용자 patch와 같은 경로로 받지 않는다.
  */
 export interface OnboardingFieldErrors {
   displayName?: string;
@@ -72,7 +69,10 @@ export async function completeOnboardingAction(
     return { fieldErrors: {}, formError: strings.error.conflict.description };
   }
 
-  await setOnboardingCompleteCookie(session.profileId);
+  const completed = await completeProfileOnboarding(session.profileId);
+  if (!completed.ok) {
+    return { fieldErrors: {}, formError: strings.error.conflict.description };
+  }
 
   redirect("/home");
 }

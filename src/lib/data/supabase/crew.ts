@@ -1,12 +1,12 @@
 import "server-only";
 
-import type { Crew, CrewMembership, CrewVisibility, Id } from "@/lib/types";
+import { crewColorIndex } from "@/lib/rules/crew-color-hash";
+import type { Crew, CrewMembership, CrewMembershipRole, CrewVisibility, Id } from "@/lib/types";
 
+import { type CursorPage, type DataResult, err, ok } from "../contracts";
 
 import { escapeForIlikeOr, toCrew, toCrewMembership } from "./mappers";
 import { createSupabaseServerClient } from "./server";
-
-import type { CursorPage } from "../contracts";
 
 /**
  * Crew·CrewMembership 읽기 전용 실데이터 구현 (Task 031, FR-010~012·014·022~024·026·028).
@@ -168,4 +168,137 @@ export async function getCrewMembership(
     .maybeSingle();
   if (error) throw error;
   return data ? toCrewMembership(data) : null;
+}
+
+export interface CreateCrewInput {
+  name: string;
+  description: string;
+  category: string;
+  visibility: CrewVisibility;
+  ownerId: Id;
+}
+
+/**
+ * 크루 개설(FR-010 AC1·AC2, D-008, D-016). `crews.id`는 기본값이 `gen_random_uuid()`이지만
+ * D-016("색 = hash(crewId) mod 12")을 만족하려면 INSERT **전에** id를 알아야 한다 — 그래서
+ * `crypto.randomUUID()`로 이 레이어가 직접 id를 생성해 넘긴다(Mock의 `generateId` 자리를
+ * 대신한다). 오너 멤버십·게시판·채팅방 자동 생성은 `crews_provision_owner_bootstrap`
+ * (AFTER INSERT 트리거)이 단일 INSERT 안에서 원자적으로 처리한다 — Mock처럼 이 함수가 4단계를
+ * 手동으로 묶을 필요가 없다.
+ */
+export async function createCrew(input: CreateCrewInput): Promise<Crew> {
+  const supabase = await createSupabaseServerClient();
+  const id = crypto.randomUUID();
+  const { data, error } = await supabase
+    .from("crews")
+    .insert({
+      id,
+      name: input.name,
+      description: input.description,
+      category: input.category,
+      visibility: input.visibility,
+      color_key: crewColorIndex(id),
+      owner_id: input.ownerId,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return toCrew(data);
+}
+
+export type UpdateCrewInfoInput = Partial<Pick<Crew, "name" | "description" | "category" | "colorKey">>;
+
+/** 크루 정보 수정(FR-011). `crews_update_staff_or_owner` RLS가 임원 이상만 허용한다. */
+export async function updateCrewInfo(
+  id: Id,
+  patch: UpdateCrewInfoInput,
+): Promise<DataResult<Crew>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("crews")
+    .update({
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.category !== undefined ? { category: patch.category } : {}),
+      ...(patch.colorKey !== undefined ? { color_key: patch.colorKey } : {}),
+    })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
+  return ok(toCrew(data));
+}
+
+/**
+ * 크루 공개 범위 변경(FR-012, D-007). RLS는 임원 이상까지 UPDATE를 허용하지만
+ * `crews_guard_owner_only_fields` 트리거가 `visibility`·`status`·`owner_id` 변경을 오너로
+ * 다시 좁힌다 — 호출자(Server Action)가 이미 `crew:update_visibility`(오너 전용) 권한을
+ * 확인했다는 전제이며, 이 트리거는 그 판정이 이미 실패했어야 할 상황의 2차 방어선이다.
+ */
+export async function updateCrewVisibility(
+  id: Id,
+  visibility: CrewVisibility,
+): Promise<DataResult<Crew>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("crews")
+    .update({ visibility })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
+  return ok(toCrew(data));
+}
+
+/**
+ * 임원 임명·해임(FR-024) — role만 바꾼다. `crew_memberships_guard_self_transition`(§029B)이
+ * "오너만 임명/해임 가능·대상은 active 멤버·role은 staff/member만"을 이미 강제한다 — 호출자
+ * (`set-crew-member-role.ts`)가 대상 상태(E1·E2)를 먼저 확인했다는 전제다.
+ */
+export async function setCrewMembershipRole(
+  crewId: Id,
+  profileId: Id,
+  role: Extract<CrewMembershipRole, "staff" | "member">,
+): Promise<DataResult<CrewMembership>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("crew_memberships")
+    .update({ role })
+    .eq("crew_id", crewId)
+    .eq("profile_id", profileId)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return err("not_found", `crew ${crewId} 의 멤버십(${profileId})을 찾을 수 없다.`);
+  return ok(toCrewMembership(data));
+}
+
+/**
+ * 크루 탈퇴(FR-026, 본인)·강퇴(FR-027, v0.2, 오너/임원)를 함께 받는다 — 둘 다 같은 상태 전이
+ * (`crew_memberships_guard_self_transition`이 `active→left`는 본인, `active→removed`는
+ * 오너/임원 자격을 각각 검사한다). 조건부 UPDATE(`.eq("status","active")`)로 이미 탈퇴·강퇴된
+ * 행에 중복 적용하지 않는다.
+ */
+export async function updateCrewMembershipStatus(
+  crewId: Id,
+  profileId: Id,
+  status: Extract<CrewMembership["status"], "left" | "removed">,
+  removedReason: string | null = null,
+): Promise<DataResult<CrewMembership>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("crew_memberships")
+    .update({ status, removed_reason: status === "removed" ? removedReason : null })
+    .eq("crew_id", crewId)
+    .eq("profile_id", profileId)
+    .eq("status", "active")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    return err("conflict", `crew ${crewId} 의 멤버십(${profileId})은 활성 상태가 아니다.`);
+  }
+  return ok(toCrewMembership(data));
 }

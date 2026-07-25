@@ -292,6 +292,96 @@ DESIGN이 추가로 판정한 것(수정 불필요, 근거만 문서화):
 - **타이밍 사이드채널은 실측 불가 판정** — §7에 "구조적 추론이며 실측되지 않았다, 실질 방어선은 NFR-016" 문구를 추가했다(위 §7 참고).
 - **README.md FR-020 인용 오프셋** — `:516`으로 적었던 줄번호가 실제로는 511 근방이었다(사소한 오프셋, 이슈로 잡히지 않음). 줄번호는 문서가 바뀌면 다시 어긋나므로 "FR-020 정상 흐름 ②" 같은 절 참조로 바꿨다(§7·README.md 갱신).
 
+## 14. 18일차 후속 — `profile_search`에 레이트 리밋을 SQL 강제 경계로 이전(구조적 결함 수정)
+
+**배경**: 18일차 Task 032·038 교차검증에서 같은 패턴의 구조적 문제가 세 번 발견됐다 —
+`respond_meetup_attendance`의 정원 판정이 RPC 밖(앱 레이어)에만 있었던 것(수정: DESIGN),
+`crew_memberships` 강퇴자 재신청 차단이 앱 레이어에만 있었던 것(수정: CORE, §13.1 아님 —
+`crew_memberships_block_removed_self_reapply` 마이그레이션), 그리고 `profile_search`의
+D-005 레이트 리밋(계정당 분당 20회)이 `search-user-by-handle.ts` Server Action에만 있고
+RPC 자체에는 없었던 것 — `authenticated`에게 이미 `EXECUTE` 권한이 있어(§7) publishable
+key로 이 RPC를 앱을 거치지 않고 직접 호출하면 리밋이 전혀 적용되지 않았다(Task 038 교차검증
+실측 확인).
+
+**수정**(마이그레이션 `profile_search_enforce_rate_limit_in_rpc`): `private.profile_search`
+(SECURITY DEFINER, 원래 조회 로직 그대로 + `handle_search_attempts` 카운트 체크·기록) +
+`public.profile_search`(얇은 SECURITY INVOKER 래퍼) 2단 구조로 바꿨다 — §5(`crew_directory_
+summary`)·§4(`poll_vote_tally`)와 정확히 같은 패턴이다. SECURITY DEFINER가 필요한 유일한
+이유는 `handle_search_attempts`가 `anon`/`authenticated` 완전 거부 RLS라 invoker 컨텍스트
+에서는 그 INSERT 자체가 막히기 때문이다(조회 로직 자체는 `profiles_select_authenticated`가
+이미 `qual=true`라 애초에 RLS 우회가 필요 없었다). `public` 래퍼는 원래 `STABLE`이었으나
+이제 내부에서 부수효과(INSERT)가 있어 `VOLATILE`(기본값)로 바꿨다 — STABLE로 잘못 선언하면
+옵티마이저가 호출을 생략해 리밋 기록이 누락될 수 있다.
+
+**역할 분담(팀장 지시로 명시)**: **SQL(`private.profile_search`)이 강제 경계**다 — 호출
+경로(Server Action이든 publishable key 직접 호출이든)와 무관하게 20회를 넘기면 예외로
+거부된다. **`src/lib/rules/rate-limit.ts` + `search-user-by-handle.ts`(앱 레이어)는 UX만
+담당**한다 — SQL까지 왕복하지 않고 429 안내·`retryAfterSeconds`를 먼저 보여주는 선제 체크일
+뿐, 이게 없어도 SQL이 최종적으로 막는다. 두 곳의 숫자(`{limit:20, windowSeconds:60}`)는
+반드시 같은 값으로 유지해야 한다 — 어긋나면 다음 회차가 어느 쪽을 신뢰할지 모른다.
+
+**실측(트랜잭션 롤백)**: `authenticated`로 `profile_search`를 21회 연속 호출 → 1~20회
+정상 응답(3필드: `handle`·`display_name`·`avatar_url`), **21회째 정확히 예외로 차단**.
+부분 일치(`'seed_owner'`로 `'seed_owner02'` 검색) → 0건(정확 일치 유지 확인). `anon`
+EXECUTE 없음(`grantee` 목록에 `authenticated`·`postgres`·`service_role`만). `get_advisors
+(security)` — WARN 1건(`auth_leaked_password_protection`, 기존과 동일)뿐, 신규 0건.
+`database.types.ts`는 함수 시그니처·반환형이 원래와 동일해 재생성 불필요(대조 확인).
+
+**⚠️ 이 리밋은 `profile_search` 경로만 보호하며, 앱의 실제 검색 경로와 `profiles` 직접
+조회는 보호하지 않는다(18일차, 팀장 재실측으로 발견 — `I-058`).** `src/lib/actions/
+search-user-by-handle.ts`(FR-006 실제 UI 경로)는 이 RPC를 호출하지 않고 `getProfileByHandle`
+(`profiles` 직접 `select("*")`, 3필드 제한도 옵트아웃 필터도 없음)을 쓴다 — RPC를 경유하는
+`searchProfilesByHandle`은 소비자가 없다. 게다가 `profiles_select_authenticated`(qual=true,
+Task 029A)가 이미 전 컬럼·전 행을 인증 사용자 전체에 공개하고 있어, 이 리밋이 막는 것은
+"RPC를 직접 호출하는 경로"뿐이고 "핸들 검색 리밋은 끝났다"고 오독하면 안 된다. 상세·영향·
+후속 두 갈래는 `I-058`이 단일 소스다.
+
+**`audit_logs`를 아무도 못 읽는 것에 대한 판단(팀장 채택)**: NFR-015 원문("100% 기록")은
+조회 가능성을 요구하지 않고, 감사 로그 열람 UI는 D-008로 이미 v0.1 범위 밖이다 — 결함이
+아니다. 관리자 콘솔(Task 042B 등 후속)이 실제로 만들어지는 시점에 읽기 정책을 추가하면
+된다. 이 판단을 다음 회차가 다시 조사하지 않도록 여기 남긴다.
+
+## 15. 18일차 후속(2) — `invitations` INSERT WITH CHECK에 `requested` 대상 차단 추가
+
+**배경**: Task 032 major 2(`requested` 상태 사용자 초대 차단)는 `src/lib/rules/invite-
+eligibility.ts`(앱 레이어)에서만 막혀 있었다. `invitations_insert_staff_or_owner`(029A)의
+WITH CHECK는 초대 대상(invitee)의 현재 `crew_memberships.status`를 전혀 보지 않아, 앱을
+거치지 않고(스크립트·향후 다른 클라이언트) `invitations`에 직접 INSERT하면 그 차단이
+우회됐다(실측 확인) — 대상자가 초대를 수락해도 `invitations_provision_membership()`의
+`ON CONFLICT WHERE` 목록에 `requested`가 없어 `crew_memberships`가 `requested`에 멈춘 채
+UI·DB 양쪽이 "성공"으로 보이는 조용한 실패가 재현됐다.
+
+**팀장 판정 — 트리거를 건드리지 않는 이전 결정과 모순이 아닌 이유**: 이전에 기각한 안은
+`invitations_provision_membership()`의 `ON CONFLICT WHERE` 목록에 `requested`를 **추가**해
+2.4절 상태도에 없는 `requested → invited` 전이를 **새로 만드는** 것이었다. 이번 조치는
+정반대로 그 전이를 RLS `WITH CHECK`로 **금지**하는 것이라 같은 상태도를 근거로 하되
+일관된 결정이다. 트리거는 이번에도 손대지 않았다.
+
+**수정**(마이그레이션 `invitations_block_requested_target_at_rls`): `invitations_insert_
+staff_or_owner` 정책을 `drop` + `create`로 재정의해 세 번째 조건 `not exists (select 1 from
+crew_memberships cm2 where cm2.crew_id = invitations.crew_id and cm2.profile_id =
+invitations.invitee_id and cm2.status = 'requested')`를 추가했다. `private` SECURITY
+DEFINER 헬퍼 없이 직접 서브쿼리로 처리했다 — 이 정책을 통과하려면 호출자가 이미 그 크루의
+활성 staff/owner여야 하고, `crew_memberships_select_self_or_fellow_member`(§3.1)의 qual이
+활성 크루원에게 같은 크루 다른 사람 행의 SELECT를 이미 허용하므로 우회가 필요 없다. 재귀
+걱정도 없다 — `crew_memberships`의 정책은 `invitations`를 참조하지 않아 정책 A→B→A 순환이
+생기지 않는다(029A §2와 같은 논증). 서브쿼리 안에서 바깥 행을 가리킬 때
+`invitations.crew_id`/`invitations.invitee_id`로 테이블 한정해, 서브쿼리 자체 별칭(`cm2`)과
+이름이 겹쳐 스코프가 안쪽으로 잘못 잡히는(자기 자신과 비교하는 항진명제가 되는) 사고를
+피했다.
+
+**실측(트랜잭션 롤백, 5개 시나리오 전부 기대와 일치)**:
+- (a) `requested` 상태 대상에게 오너가 직접 INSERT → **거부**(`new row violates row-level
+  security policy`).
+- (b) 비멤버(관계 행 자체가 없는) 대상 초대 → **성공**(FR-020 AC1 회귀 없음).
+- (c) `declined` 대상 재초대 → **성공**(FR-021 AC2 회귀 없음).
+- (c2) `removed` 대상 재초대 → **성공**(FR-020이 강퇴 이력에 재초대 제한을 두지 않는다는
+  원래 판단 유지).
+- (d) 일반 크루원(`role=member`)의 초대 INSERT 시도 → **거부**(FR-020 AC3, 기존 그대로).
+- `pg_policies`로 `invitations` 정책 재확인 — 여전히 4건(중복 생성 없음).
+- `get_advisors(security)` — WARN 1건(`auth_leaked_password_protection`, 기존과 동일)뿐,
+  신규 0건.
+
 ## 12. 산출물
 
 - `supabase/migrations/2026072501{5228,5307,5601,5614,5631,5645,5801}_*.sql` — 마이그레이션 7건(최초 구현).

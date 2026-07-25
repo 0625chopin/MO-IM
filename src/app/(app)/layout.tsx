@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { RedirectToLogin } from "@/components/auth/RedirectToLogin";
@@ -39,9 +40,21 @@ import type { ReactNode } from "react";
  * (`RedirectToLogin.tsx` 모듈 docstring에 근거를 남겼다 — Next.js 공식 문서 확인,
  * `proxy.ts`가 유일한 서버 측 대안이나 D-011로 범위 밖). `useSearchParams()`를 쓰는 클라이언트
  * 컴포넌트라 `<Suspense>`로 감싼다(Next.js 프로덕션 빌드 요구사항).
+ *
+ * **18일차(Task 039, FR-005) 추가 — `reason: "deactivated"`는 `/login`이 아니라
+ * `/account/restore`로 보낸다.** 그 계정은 Supabase Auth 세션 자체는 유효하다(30일 유예
+ * 중이라 로그인 자체는 통과한다, `docs/decisions/account-lifecycle-039.md` 참고) — 그래서
+ * `RedirectToLogin`처럼 "원래 요청 경로로 복귀"할 필요가 없어(로그인 다이얼로그를 다시 거치지
+ * 않는다) 클라이언트 컴포넌트 우회 없이 서버 `redirect()`를 바로 쓴다. 이 분기는 세션이
+ * 완전히 없는 경우(`isAuthenticated`가 이미 false)보다 먼저 검사해야 한다 — `deactivated`도
+ * `isAuthenticated(session)`은 false이므로, 먼저 걸러내지 않으면 `RedirectToLogin`으로
+ * 떨어져 복구 진입점을 잃는다.
  */
 export default async function AuthenticatedAppLayout({ children }: { children: ReactNode }) {
   const session = await getAuthSession();
+  if (session.status === "error" && session.reason === "deactivated") {
+    redirect("/account/restore");
+  }
   if (!isAuthenticated(session)) {
     return (
       <Suspense fallback={null}>

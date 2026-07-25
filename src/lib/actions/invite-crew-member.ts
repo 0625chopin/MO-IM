@@ -3,13 +3,7 @@
 import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import {
-  createInvitation,
-  getCrewById,
-  getCrewMembership,
-  getProfileByHandle,
-  initiateCrewMembership,
-} from "@/lib/data";
+import { createInvitation, getCrewById, getCrewMembership, getProfileByHandle } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
 import { evaluateInviteEligibility } from "@/lib/rules/invite-eligibility";
 import { checkPermission } from "@/lib/rules/permission";
@@ -33,6 +27,12 @@ const INVITATION_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
  * `projectHandleSearchResult` 쪽에만 있다) 여기서는 옵트아웃이라도 초대 자체는 통과시킨다 —
  * "검색에는 안 뜨지만 핸들을 정확히 아는 사람의 초대는 받을 수 있다"는 3.6절 옵트아웃의
  * 원래 취지(검색 노출 차단이지 초대 수신 차단이 아니다)와 맞다.
+ *
+ * **Task 032(18일차) — `initiateCrewMembership` 호출을 제거했다.** 실 DB는
+ * `trg_invitations_provision_membership`(AFTER INSERT on invitations)이 `invited` 멤버십을
+ * 자동 생성한다(`docs/decisions/write-path-realdata-032.md`) — Mock 시절에는 이 동기화를
+ * 이 액션이 직접 호출해야 했지만, 지금 호출하면 트리거가 이미 만든 행에 다시 INSERT를
+ * 시도해 충돌한다.
  */
 export interface InviteCrewMemberFormState {
   success?: boolean;
@@ -87,7 +87,6 @@ export async function inviteCrewMemberAction(
     inviterId: session.profileId,
     expiresAt: new Date(Date.now() + INVITATION_EXPIRY_MS).toISOString(),
   });
-  await initiateCrewMembership(crewId, invitee.id, "invite");
 
   refresh();
   return { success: true };

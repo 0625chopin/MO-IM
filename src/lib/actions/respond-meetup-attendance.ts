@@ -21,8 +21,14 @@ import type { AttendanceStatus } from "@/lib/types";
  * 버튼을 숨기거나 비활성화하지만, 이 액션은 그 판정을 서버에서 **다시** 한다 — 크루원
  * 여부(FR-066 E5)·모임 상태와 예정일(E3·E4)을 순서대로 재확인한 뒤에야
  * `respondAttendance`(`lib/data`)를 호출한다. 정원 초과 방지의 실제 원자성은
- * `respondAttendance` 내부(D-019 — Mock은 단일 스레드 순차 실행이 조건부 UPDATE와 동등한
- * 보장을 준다)가 맡고, 여기서는 그 결과(`AttendanceJoinResult`)만 문구로 옮긴다.
+ * `respondAttendance` 내부(D-019 — `respond_meetup_attendance` RPC가 조건부 UPDATE를 단일
+ * 트랜잭션으로 보장한다)가 맡고, 여기서는 그 결과(`AttendanceJoinResult`)만 문구로 옮긴다.
+ *
+ * **Task 032 교차검증(CORE, 18일차) major 1 수정** — `result.reason === "forbidden"`도
+ * 처리한다(RPC의 2차 방어선, 위 활성 멤버십 확인과 호출 사이의 TOCTOU나 publishable key로
+ * RPC를 직접 호출하는 경로에서만 도달한다). `notMember`와 같은 문구를 재사용한다 — 사용자
+ * 관점에서는 같은 사실("이 크루의 크루원만 응답할 수 있다")이고, 이미 위에서 같은 문구를 쓰고
+ * 있어 새 문자열을 만들지 않았다.
  */
 export interface RespondMeetupAttendanceFormState {
   success?: boolean;
@@ -74,7 +80,12 @@ export async function respondMeetupAttendanceAction(
     status: statusRaw,
   });
   if (!result.success) {
-    return { formError: strings.meetup.attendance.errors.full };
+    return {
+      formError:
+        result.reason === "forbidden"
+          ? strings.meetup.attendance.errors.notMember
+          : strings.meetup.attendance.errors.full,
+    };
   }
 
   refresh();

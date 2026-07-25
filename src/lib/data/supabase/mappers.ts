@@ -207,7 +207,9 @@ export function toProfile(row: Tables<"profiles">): Profile {
     status: row.status as ProfileStatus,
     searchOptOut: row.search_opt_out,
     anonymizedAt: row.anonymized_at,
+    deactivatedAt: row.deactivated_at,
     handleChangedAt: row.handle_changed_at,
+    onboardingCompletedAt: row.onboarding_completed_at,
   };
 }
 

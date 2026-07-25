@@ -23,28 +23,45 @@ export function generateProfiles(
     const displayName = `${pick(rng, SURNAMES)}${pick(rng, GIVEN_NAMES)}`;
     const handle = `${pick(rng, HANDLE_THEMES)}_${String(seq).padStart(3, "0")}`;
 
-    // 대부분 active. withdrawn(탈퇴 익명화 대상, D-010)·suspended(제재)는 소수만 —
-    // 화면이 아직 없어도 타입/렌더링이 이 두 상태를 다뤄야 한다는 걸 시드가 보여준다.
+    // 대부분 active. withdrawn(탈퇴 파기 완료, D-010)·deactivated(탈퇴 30일 유예 중,
+    // Task 039)·suspended(제재)는 소수만 — 화면이 아직 없어도 타입/렌더링이 이 상태들을
+    // 다뤄야 한다는 걸 시드가 보여준다.
     const statusRoll = rng();
     const status: Profile["status"] =
-      statusRoll < 0.01 ? "withdrawn" : statusRoll < 0.03 ? "suspended" : "active";
+      statusRoll < 0.01
+        ? "withdrawn"
+        : statusRoll < 0.02
+          ? "deactivated"
+          : statusRoll < 0.04
+            ? "suspended"
+            : "active";
 
     const isWithdrawn = status === "withdrawn";
+    const isDeactivated = status === "deactivated";
 
     profiles.push({
       id: generateId("profile"),
       handle,
       // D-010 익명화 규칙 자체는 Task 039(v0.2) 구현 대상이라 이 시드는 "이미 익명화된
-      // 상태"의 최종 모습만 흉내낸다 — 실제 익명화 변환 로직은 여기 없다.
+      // 상태"의 최종 모습만 흉내낸다 — 실제 익명화 변환 로직은 여기 없다. `deactivated`는
+      // 아직 파기 전(유예 중)이라 실명·실아바타를 그대로 유지한다 — 그게 이 상태의 정의다
+      // (18일차 교차검증 minor 1이 정확히 이 구분을 앱 검색 경로에 반영시켰다).
       displayName: isWithdrawn ? "탈퇴한 사용자" : displayName,
       avatarUrl: null,
       bio: isWithdrawn ? null : chance(rng, 0.55) ? pick(rng, BIO_TEMPLATES) : null,
       status,
       searchOptOut: !isWithdrawn && chance(rng, 0.08),
       anonymizedAt: isWithdrawn ? "2026-06-01T00:00:00.000Z" : null,
+      // Task 039 — withdrawn은 "30일 유예가 끝나 파기까지 완료된" 종착 상태다(profile.types.ts
+      // ProfileStatus 참고). 시드는 그 유예가 시작된 시각만 근사로 채운다(파기 시각보다 30일 전).
+      // `deactivated`는 유예가 아직 끝나지 않은 중간 지점(15일 전, 이 저장소 기준일
+      // 2026-07-25로부터 절반 지점)을 근사한다 — 그레이스 카운트다운 화면을 Mock으로도
+      // 시연할 수 있어야 한다(18일차 교차검증 minor 2).
+      deactivatedAt: isWithdrawn ? "2026-05-02T00:00:00.000Z" : isDeactivated ? "2026-07-10T00:00:00.000Z" : null,
       // FR-004 AC1(30일 쿨다운, Task 015B)의 근거 필드. 대량 시드는 "핸들을 바꾼 적 없는"
       // 기본 상태만 표현한다 — 쿨다운 잠김 상태는 /sample 정적 데모로 별도 시연한다.
       handleChangedAt: null,
+      onboardingCompletedAt: isWithdrawn ? null : "2026-06-01T00:00:00.000Z",
     });
   }
   return profiles;

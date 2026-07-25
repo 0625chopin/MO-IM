@@ -240,3 +240,34 @@ export function sanitizeRedirectTarget(candidate: string): string {
     return REDIRECT_TARGET_FALLBACK;
   }
 }
+
+/** FR-005 정상 흐름 ④·NFR-031 — 탈퇴 요청(`deactivated` 전이) 후 개인정보 파기까지의 유예. */
+export const DEACTIVATION_GRACE_PERIOD_DAYS = 30;
+
+export interface DeactivationGraceState {
+  /** true면 AC3(복구) 대상 — `deactivated_at` 기준 30일이 아직 지나지 않았다. */
+  withinGrace: boolean;
+  /** 유예가 끝나는(=파기 배치 대상이 되는) 시각. */
+  graceEndsAt: ISODateTimeString;
+}
+
+/**
+ * `request_account_deactivation`/`restore_deactivated_account` RPC(Task 039)가 SQL의
+ * `now() - deactivated_at <= interval '30 days'`로 이미 원자적으로 판정하므로, 이 함수는
+ * **서버가 최종 승인 여부를 결정하는 자리가 아니다** — `/account/restore` 화면이 "며칠 남았는지"
+ * 안내 문구를 렌더하기 위한 표시용 판정이다(D-030 ③, 도메인 오류를 값으로). RPC와 이 함수가
+ * 서로 다른 결론을 낼 수 있는 유일한 경우는 화면이 조회한 시점과 실제 RPC 호출 시점 사이의
+ * 시간차뿐이고, 그 경우도 RPC의 조건부 UPDATE가 최종 판정을 내린다(TOCTOU 없음).
+ */
+export function evaluateDeactivationGracePeriod(
+  deactivatedAt: ISODateTimeString,
+  now: ISODateTimeString,
+): DeactivationGraceState {
+  const graceEndsAt = new Date(
+    Date.parse(deactivatedAt) + DEACTIVATION_GRACE_PERIOD_DAYS * 24 * 60 * 60_000,
+  ).toISOString();
+  return {
+    withinGrace: Date.parse(now) < Date.parse(graceEndsAt),
+    graceEndsAt,
+  };
+}

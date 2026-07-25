@@ -4,6 +4,7 @@ import { useEffect } from "react";
 
 import type { RouteErrorKind } from "@/components/errors/route-error-kind";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
+import { reportClientErrorAction } from "@/lib/actions/report-client-error";
 import type { DataErrorCode } from "@/lib/data/contracts";
 
 const DATA_ERROR_CODES: readonly DataErrorCode[] = [
@@ -49,6 +50,14 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    // NFR-028 오류 수집(Task 038). `error.digest`가 요청 식별자 역할을 한다(모듈 docstring
+    // 참고) — 없으면(개발 모드 등) 새 상관 id를 만든다. 실패해도(네트워크 등) 화면에 영향을
+    // 주지 않도록 fire-and-forget으로 둔다.
+    void reportClientErrorAction({
+      message: error.message,
+      requestId: error.digest ?? crypto.randomUUID(),
+      stack: error.stack,
+    });
   }, [error]);
 
   return (

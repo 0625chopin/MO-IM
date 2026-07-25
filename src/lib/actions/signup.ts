@@ -23,17 +23,13 @@ import { strings } from "@/lib/strings";
  * `pending_verification` 의미론이 문자 그대로 성립한다 — 이 액션은 성공 시 `/onboarding`으로
  * 리다이렉트하지 않고 "메일함을 확인해 주세요" 상태를 반환한다.
  *
- * **알려진 한계 — `createProfile`의 `id` 매개변수 부재**: `public.profiles.id`는 DB 스키마상
- * `auth.users.id`를 참조하는 FK이고 **기본값이 없다**(`gen_random_uuid()` 없음, `list_tables`
- * 실측) — 즉 실 프로필 행을 만들려면 호출자가 `auth.uid()`를 명시적으로 넘겨야 한다. 그런데
- * `createProfile`(`@/lib/data`, 이번 회차 DESIGN 소유·mock 구현)의 시그니처는 `{handle,
- * displayName}`뿐이라 `id`를 받지 않는다 — mock 저장소에만 (인증 결과와 무관한) 임의 id로
- * 쓰인다. **이 파일을 고치지 않고 팀장에게 보고한다**(작업 지시 원칙) — `docs/decisions/
- * auth-integration-030.md` §5에 근거와 함께 남겼다. Task 031이 `supabase/profile.ts`를
- * 만들 때 이 매개변수를 추가해야 실 가입자의 프로필이 실 DB에 만들어진다. 그 전까지 아래
- * `createProfile` 호출은 (세션이 생기는 예외 경로에서만) mock 저장소에 쓰일 뿐 실 데이터와
- * 연결되지 않는다 — 화면 흐름 자체는 깨지지 않는다(이메일 인증 대기 화면은 세션과 무관하게
- * 항상 보여준다).
+ * **I-046 해소(Task 032, 18일차)**: `createProfile`이 이제 `id`(= `signUpWithPassword`가 반환한
+ * 실 `auth.users.id`)를 받는다(`docs/decisions/auth-integration-030.md` §5가 남긴 인계 항목).
+ * "Confirm email"이 켜져 있어 가입 직후에는 세션이 없는 것이 정상 흐름이라(§3) `auth.uid()`
+ * 기반 RLS로는 이 시점에 프로필을 만들 수 없다 — `createProfile`(`src/lib/data/supabase/
+ * profile.ts`)이 그 경우만 예외적으로 service-role 클라이언트를 쓴다. 이 액션은 세션 유무와
+ * 무관하게 `signUpWithPassword` 성공 직후 곧바로 프로필을 만든다 — 사용자가 나중에 메일
+ * 링크로 인증하고 로그인하면 `getAuthSession()`이 이미 존재하는 이 프로필 행을 찾는다.
  */
 export interface SignupFieldErrors {
   email?: string;
@@ -110,18 +106,20 @@ export async function signupAction(
     return { fieldErrors: {}, formError: strings.auth.signup.errors.unknown };
   }
 
+  // I-046 해소 — 세션 유무와 무관하게 auth.users 행이 생긴 직후 곧바로 프로필을 만든다
+  // (createProfile이 이 경우 service-role로 RLS를 우회한다, 위 docstring 참고). 핸들 중복은
+  // 위에서 이미 검사했지만 그 사이 경쟁(같은 핸들 동시 가입)이 있으면 여기서 conflict로 잡힌다.
+  const created = await createProfile({ id: signedUp.userId, handle, displayName });
+  if (!created.ok) {
+    return { fieldErrors: { handle: strings.auth.signup.errors.handleTaken } };
+  }
+
   if (!signedUp.sessionCreated) {
     // 정상 경로(대시보드 "Confirm email" 켜짐, 17일차 실측) — 세션 없이 인증 대기 화면.
     return { fieldErrors: {}, status: "pendingVerification", email };
   }
 
   // 대시보드 설정이 이메일 확인을 요구하지 않는 경우의 대비 경로 — 세션이 즉시 생겼으므로
-  // 기존 Mock First 흐름과 동일하게 온보딩으로 보낸다. `createProfile`의 알려진 한계는 위
-  // docstring 참고(id 불일치로 실 DB 프로필과는 아직 연결되지 않는다).
-  const created = await createProfile({ handle, displayName });
-  if (!created.ok) {
-    return { fieldErrors: { handle: strings.auth.signup.errors.handleTaken } };
-  }
-
+  // 기존 Mock First 흐름과 동일하게 온보딩으로 보낸다.
   redirect("/onboarding");
 }

@@ -279,5 +279,125 @@ export const authSection = defineSection({
         ),
       },
     },
+    {
+      name: "RequestPasswordResetForm",
+      note: "FR-003 정상 흐름 ①·②(Task 039). 실제 라우트는 /reset-password — AC1(계정 열거 방지)에 따라 성공 패널 문구는 가입 여부와 무관하게 항상 동일합니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={260}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="sample-reset-request-email">
+                    {strings.auth.resetPassword.request.fields.email}
+                  </FieldLabel>
+                  <Input id="sample-reset-request-email" type="email" />
+                </Field>
+              </FieldGroup>
+              <Button className="mt-6 w-full">{strings.auth.resetPassword.request.submit}</Button>
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={140}>
+            <div className="mx-auto flex w-full max-w-sm justify-center p-4">
+              <Button disabled className="w-full">
+                <Loader2Icon aria-hidden="true" className="animate-spin" />
+                {strings.auth.resetPassword.request.submitPending}
+              </Button>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={200}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <Alert variant="destructive">
+                <AlertTriangleIcon aria-hidden="true" />
+                <AlertDescription>{strings.auth.resetPassword.request.errors.unknown}</AlertDescription>
+              </Alert>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "ConfirmPasswordResetForm",
+      note: "FR-003 정상 흐름 ④~⑥. 실제 라우트는 /reset-password/confirm — /auth/confirm 토큰 교환이 성공해야 도달합니다. '오류' 패널은 E2(링크 만료·재사용)입니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={220}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="sample-reset-confirm-password">
+                    {strings.auth.resetPassword.confirm.fields.password}
+                  </FieldLabel>
+                  <Input id="sample-reset-confirm-password" type="password" />
+                  <FieldDescription>{strings.auth.resetPassword.confirm.fields.passwordDescription}</FieldDescription>
+                </Field>
+              </FieldGroup>
+              <Button className="mt-6 w-full">{strings.auth.resetPassword.confirm.submit}</Button>
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={140}>
+            <div className="mx-auto flex w-full max-w-sm justify-center p-4">
+              <Button disabled className="w-full">
+                <Loader2Icon aria-hidden="true" className="animate-spin" />
+                {strings.auth.resetPassword.confirm.submitPending}
+              </Button>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={200}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <Alert variant="destructive">
+                <AlertTriangleIcon aria-hidden="true" />
+                <AlertDescription>{strings.auth.resetPassword.confirm.errors.linkExpired}</AlertDescription>
+              </Alert>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "RestoreAccountForm",
+      note: "FR-005 AC3(Task 039). 실제 라우트는 /account/restore — 탈퇴 후 30일 유예 중인 계정이 로그인하면 도달합니다. '오류' 패널은 유예 종료(파기 완료, 복구 불가) 상태입니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={220}>
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-4 p-4 text-center">
+              <AlertTriangleIcon aria-hidden="true" className="size-10 text-destructive" />
+              <p className="text-sm text-muted-foreground">
+                {t((s) => s.account.restore.description, { date: "2026-08-24" })}
+              </p>
+              <Button className="w-full">{strings.account.restore.restore}</Button>
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={140}>
+            <div className="mx-auto flex w-full max-w-sm justify-center p-4">
+              <Button disabled className="w-full">
+                <Loader2Icon aria-hidden="true" className="animate-spin" />
+                {strings.account.restore.restorePending}
+              </Button>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={180}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <Alert variant="destructive">
+                <AlertTriangleIcon aria-hidden="true" />
+                <AlertDescription>{strings.account.restore.errors.graceExpired}</AlertDescription>
+              </Alert>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
   ],
 });

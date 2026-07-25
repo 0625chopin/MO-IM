@@ -133,3 +133,114 @@ export async function resendSignupConfirmationEmail(
   }
   return { ok: true };
 }
+
+/**
+ * FR-003 비밀번호 재설정 + FR-001 E4 인증 메일의 공용 PKCE 토큰 교환 타입(Task 039).
+ * `@supabase/supabase-js`의 `EmailOtpType`은 이 프로젝트가 쓰지 않는 값(`magiclink`·`invite`·
+ * `email_change` 등)까지 포함하는 더 넓은 유니온이라, zone 7 밖(`src/app/auth/confirm/route.ts`)
+ * 이 `@supabase/supabase-js`를 직접 import하지 않도록 실제로 쓰는 2개만 좁혀 재노출한다.
+ */
+export type EmailConfirmType = "signup" | "recovery";
+
+export type VerifyEmailOtpResult = { ok: true } | { ok: false };
+
+/**
+ * `/auth/confirm` 라우트 핸들러(PKCE 토큰 교환, Supabase 공식 Next.js 패턴)가 쓰는 유일한
+ * 진입점 — `route.ts`는 `src/app/**`라 zone 6(일반 규칙)에 걸려 Supabase 클라이언트를 직접
+ * import할 수 없다(`docs/CONVENTIONS.md` ESLint 표). 성공하면 `createSupabaseServerClient()`의
+ * 쿠키 어댑터가 세션(가입 확인 또는 재설정용 임시 세션)을 httpOnly 쿠키로 즉시 쓴다.
+ */
+export async function verifyEmailOtp(
+  type: EmailConfirmType,
+  tokenHash: string,
+): Promise<VerifyEmailOtpResult> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+  return error ? { ok: false } : { ok: true };
+}
+
+/** FR-003 정상 흐름 ①·② — 이메일 형식 검사는 호출자(Server Action)가 먼저 끝낸다. Supabase
+ *  Auth는 미가입 이메일에도 에러 없이 성공을 반환한다(계정 열거 방지 관례, `auth.resend`와
+ *  동일) — FR-003 AC1("구분 불가능한 응답")을 이 API 자체가 만족시켜 별도 처리가 필요 없다. */
+export async function requestPasswordReset(
+  email: string,
+  redirectTo: string,
+): Promise<{ ok: true } | { ok: false }> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+  return error ? { ok: false } : { ok: true };
+}
+
+export type ConfirmPasswordResetFailureCode = "session_expired" | "weak_password" | "unknown";
+
+export type ConfirmPasswordResetResult =
+  | { ok: true }
+  | { ok: false; code: ConfirmPasswordResetFailureCode };
+
+/**
+ * FR-003 정상 흐름 ④ — `/auth/confirm`이 `verifyEmailOtp("recovery", ...)`로 이미 발급해 둔
+ * 임시 세션(쿠키)을 이 함수가 그대로 이어받아 `updateUser`를 호출한다. 세션이 없거나 만료됐으면
+ * Supabase가 `session_not_found` 계열 오류를 반환한다 — E2(링크 만료)를 이 오류로 구분한다.
+ * ⑤(기존 세션 전부 폐기)는 Supabase Auth의 문서화된 동작이다: "비밀번호 변경은 보안 민감
+ * 작업이라 세션을 종료시킨다"(User sessions 가이드) — 이 함수가 별도로 다른 세션을 폐기하는
+ * 코드를 두지 않는다. 이 브라우저 자신의 세션은 호출자(`confirmPasswordResetAction`)가
+ * `signOutSupabaseSession()`으로 명시적으로 끝내 ⑥(로그인 화면)까지 이어간다.
+ */
+export async function confirmPasswordReset(
+  newPassword: string,
+): Promise<ConfirmPasswordResetResult> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) {
+    if (error.code === "session_not_found" || error.status === 401) {
+      return { ok: false, code: "session_expired" };
+    }
+    if (error.code === "weak_password") {
+      return { ok: false, code: "weak_password" };
+    }
+    return { ok: false, code: "unknown" };
+  }
+  return { ok: true };
+}
+
+/**
+ * FR-005 정상 흐름 ③ — 탈퇴·계정 관련 파괴적 조작 전 비밀번호 재확인. 현재 세션 이메일로
+ * `signInWithPassword`를 다시 호출하는 것이 재인증의 가장 단순한 형태다(Supabase는 별도
+ * "reauthenticate" API를 이메일+비밀번호 로그인에 두지 않는다 — MFA/전화번호 변경 전용
+ * `reauthenticate()`와는 다른 시나리오). 현재 로그인 사용자가 없으면 즉시 실패한다.
+ */
+export async function reauthenticateWithPassword(password: string): Promise<SignInResult> {
+  const authUser = await getSupabaseAuthUser();
+  if (!authUser || !authUser.email) {
+    return { ok: false, code: "unknown" };
+  }
+  return signInWithPassword(authUser.email, password);
+}
+
+export type AccountLifecycleRpcResult = {
+  ok: boolean;
+  changed: boolean;
+  reason: string | null;
+};
+
+/** FR-005 — `request_account_deactivation` RPC(security invoker, `auth.uid()`로 본인만
+ *  건드림) 호출부. RPC 계약(`ok`/`changed`/`reason`)은
+ *  `supabase/migrations/20260725071600_account_deactivation_restore_functions.sql` 참고. */
+export async function deactivateOwnAccount(): Promise<AccountLifecycleRpcResult> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("request_account_deactivation").single();
+  if (error || !data) {
+    return { ok: false, changed: false, reason: "unknown" };
+  }
+  return data;
+}
+
+/** FR-005 AC3 — `restore_deactivated_account` RPC 호출부(30일 유예 이내만 성공). */
+export async function restoreOwnAccount(): Promise<AccountLifecycleRpcResult> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("restore_deactivated_account").single();
+  if (error || !data) {
+    return { ok: false, changed: false, reason: "unknown" };
+  }
+  return data;
+}

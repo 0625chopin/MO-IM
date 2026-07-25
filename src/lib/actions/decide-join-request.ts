@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { approveCrewMembership, decideJoinRequest, getCrewMembership, rejectCrewMembership } from "@/lib/data";
+import { decideJoinRequest, getCrewMembership } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
@@ -17,9 +17,16 @@ import type { JoinRequestStatus } from "@/lib/types";
  * 실어 보낸 `crewId`가 실제 그 신청의 크루와 다르면(다른 크루 관리 화면에서 조작된 요청)
  * `decided.data.crewId !== crewId` 검사로 걸러낸다.
  *
- * **동시성(FR-023 E1 "다른 임원이 먼저 처리")은 `decideJoinRequest`의 `status !== "pending"`
- * 검사가 1차 방어, `approveCrewMembership`/`rejectCrewMembership`의 상태 전이 검증이 2차
- * 방어다** — 둘 다 `conflict`를 반환하면 그대로 화면 오류로 보여준다(D-030 ③).
+ * **동시성(FR-023 E1 "다른 임원이 먼저 처리")은 `decideJoinRequest`의 조건부 UPDATE
+ * (`.eq("status","pending")`)가 막는다** — 행 락 획득 후 WHERE 재평가라 두 임원이 동시에
+ * 승인/반려해도 먼저 커밋한 쪽만 성공하고 나머지는 `conflict`를 받는다(D-019와 같은 원리,
+ * `docs/decisions/write-path-realdata-032.md`).
+ *
+ * **Task 032(18일차) — `approveCrewMembership`/`rejectCrewMembership` 호출을 제거했다.**
+ * `trg_join_requests_sync_membership_on_decision`(AFTER UPDATE on join_requests)이
+ * `requested→active`/`requested→rejected` 멤버십 전이를 `decideJoinRequest`와 같은
+ * 트랜잭션에서 이미 끝낸다 — Mock 시절처럼 이 액션이 다시 호출하면 트리거가 이미 마친
+ * 전이를 재시도하다 상태 불일치로 막힌다.
  */
 export interface DecideJoinRequestFormState {
   success?: boolean;
@@ -61,14 +68,6 @@ export async function decideJoinRequestAction(
   const decided = await decideJoinRequest(joinRequestId, decisionRaw, session.profileId);
   if (!decided.ok || decided.data.crewId !== crewId) {
     return { formError: strings.crew.members.requests.errors.alreadyDecided };
-  }
-
-  const membershipResult =
-    decisionRaw === "approved"
-      ? await approveCrewMembership(crewId, decided.data.requesterId)
-      : await rejectCrewMembership(crewId, decided.data.requesterId);
-  if (!membershipResult.ok) {
-    return { formError: strings.crew.members.requests.errors.decideFailed };
   }
 
   refresh();

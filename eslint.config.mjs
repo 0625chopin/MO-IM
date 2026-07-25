@@ -164,6 +164,36 @@ const eslintConfig = defineConfig([
     },
   },
 
+  // zone 8: src/lib/audit/** — 감사 로그·레이트 리밋·오류 추적 (Task 038, BOARD, 18일차).
+  // zone 7(`src/lib/auth/**`)과 대칭이다 — `lib/data/contracts.ts`의 CON-05·CON-06이
+  // "이 레이어의 어떤 함수도 쿠키·세션·요청 객체를 직접 읽지 않는다"고 못박아 데이터 배럴에
+  // 섞을 수 없고, 감사 로그·레이트 리밋 카운터 둘 다 `anon`/`authenticated` 완전 거부 RLS라
+  // service-role 클라이언트가 필요하다(`audit_logs`·`handle_search_attempts` 둘 다 동일 패턴).
+  // 인프라 3개(server·client·env)만 재사용하고 도메인 구현 딥 임포트는 zone 7과 같은 이유로 막는다.
+  {
+    files: ["src/lib/audit/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noMockImpl,
+            {
+              group: [
+                "@/lib/data/supabase/*",
+                "!@/lib/data/supabase/server",
+                "!@/lib/data/supabase/client",
+                "!@/lib/data/supabase/env",
+              ],
+              message:
+                "src/lib/audit/**는 Supabase 클라이언트 팩터리(server·client·env)만 재사용한다 — 도메인 구현(database.types 포함)은 직접 참조하지 않는다.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // zone 4: src/components/** 중 표현 컴포넌트(ui/, *Container.tsx 제외) — D-030 ①.
   {
     files: ["src/components/**/*.tsx"],
@@ -219,6 +249,7 @@ const eslintConfig = defineConfig([
       "src/lib/data/**",
       "src/lib/realtime/**",
       "src/lib/auth/**",
+      "src/lib/audit/**",
       "src/components/**/*.tsx",
     ],
     rules: {

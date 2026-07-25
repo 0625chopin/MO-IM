@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import { getCrewMembership, setCrewMembershipRole } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { checkPermission } from "@/lib/rules/permission";
@@ -74,6 +75,14 @@ export async function setCrewMemberRoleAction(
   if (!result.ok) {
     return { formError: strings.crew.members.appoint.errors.failed };
   }
+
+  // NFR-015 감사 로그(Task 038) — 권한 변경(임원 임명·해임)의 근거를 남긴다.
+  await recordAuditLog({
+    actorId: session.profileId,
+    crewId,
+    action: targetRoleRaw === "staff" ? "crew.staff_appointed" : "crew.staff_dismissed",
+    targetId: targetProfileId,
+  });
 
   refresh();
   return { success: true };

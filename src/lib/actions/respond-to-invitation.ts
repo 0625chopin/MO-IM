@@ -5,14 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getCrewHomeHref } from "@/components/crews/crew-links";
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import {
-  acceptCrewInvitationMembership,
-  declineCrewInvitationMembership,
-  getCrewById,
-  getCrewMembership,
-  getInvitationById,
-  respondToInvitation,
-} from "@/lib/data";
+import { getCrewById, getCrewMembership, getInvitationById, respondToInvitation } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
 import { evaluateInvitationResponseEligibility } from "@/lib/rules/invitation-response-eligibility";
 import { checkPermission } from "@/lib/rules/permission";
@@ -33,9 +26,15 @@ import { strings } from "@/lib/strings";
  * 가능한 상태인가"(만료·크루 해산·이미 처리됨, FR-021 E1·E2)를 본다 — `invite-crew-member.ts`가
  * `crew:invite_member`(역할)와 `evaluateInviteEligibility`(건별 조건)를 나눠 쓴 것과 같은 구조.
  *
- * 수락하면 멤버십을 `invited`(초대 시점에 `initiateCrewMembership`이 이미 만들어 둔 상태)에서
- * `active`로 전이하고 크루 홈으로 이동한다(FR-021 AC1). 거절은 멤버십을 `declined`로 전이할
- * 뿐 페이지에 머무른다 — `leave-crew.ts`와 달리 거절 후에도 볼 화면(초대함 자신)이 그대로다.
+ * 수락하면 크루 홈으로 이동한다(FR-021 AC1). 거절은 페이지에 머무른다 — `leave-crew.ts`와
+ * 달리 거절 후에도 볼 화면(초대함 자신)이 그대로다.
+ *
+ * **Task 032(18일차) — `acceptCrewInvitationMembership`/`declineCrewInvitationMembership`
+ * 호출을 제거했다.** `respondToInvitation`의 UPDATE가 성공하면
+ * `trg_invitations_sync_membership_on_response`(AFTER UPDATE on invitations)가
+ * `invited→active`/`invited→declined` 멤버십 전이를 같은 트랜잭션에서 이미 끝낸다
+ * (`docs/decisions/write-path-realdata-032.md`) — Mock 시절처럼 이 액션이 다시 호출하면
+ * 트리거가 이미 마친 전이를 재시도하다 상태 불일치로 막힌다.
  */
 export interface RespondToInvitationFormState {
   formError?: string;
@@ -91,17 +90,8 @@ export async function respondToInvitationAction(
   }
 
   if (response === "decline") {
-    const membershipResult = await declineCrewInvitationMembership(invitation.crewId, session.profileId);
-    if (!membershipResult.ok) {
-      return { formError: strings.invitation.inbox.errors.failed };
-    }
     refresh();
     return {};
-  }
-
-  const membershipResult = await acceptCrewInvitationMembership(invitation.crewId, session.profileId);
-  if (!membershipResult.ok) {
-    return { formError: strings.invitation.inbox.errors.failed };
   }
 
   redirect(getCrewHomeHref(invitation.crewId));

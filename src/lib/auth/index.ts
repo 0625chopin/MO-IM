@@ -12,11 +12,21 @@ import "server-only";
  * 그래프에 끌려 들어가는 경로가 생겨도(예: 재노출 확장) 여기서도 한 번 더 잡힌다.
  */
 export {
+  confirmPasswordReset,
+  deactivateOwnAccount,
   getSupabaseAuthUser,
+  reauthenticateWithPassword,
+  requestPasswordReset,
   resendSignupConfirmationEmail,
+  restoreOwnAccount,
   signInWithPassword,
   signOutSupabaseSession,
   signUpWithPassword,
+  verifyEmailOtp,
+  type AccountLifecycleRpcResult,
+  type ConfirmPasswordResetFailureCode,
+  type ConfirmPasswordResetResult,
+  type EmailConfirmType,
   type ResendSignupEmailFailureCode,
   type ResendSignupEmailResult,
   type SignInFailureCode,
@@ -24,6 +34,7 @@ export {
   type SignUpFailureCode,
   type SignUpResult,
   type SupabaseAuthUser,
+  type VerifyEmailOtpResult,
 } from "./session";
 
 export {

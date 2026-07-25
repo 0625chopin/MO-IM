@@ -1,12 +1,11 @@
 import "server-only";
 
-import type { ChatMessage, ChatRoom, Id } from "@/lib/types";
+import type { ChatMessage, ChatMessageType, ChatRoom, Id } from "@/lib/types";
 
+import { type CursorPage, type DataResult, err, ok } from "../contracts";
 
 import { toChatMessage, toChatRoom } from "./mappers";
 import { createSupabaseServerClient } from "./server";
-
-import type { CursorPage } from "../contracts";
 
 /**
  * ChatRoom·ChatMessage 읽기 전용 실데이터 구현 (Task 031, FR-050~053). Mock(`../mock/chat.ts`)과
@@ -91,4 +90,74 @@ export async function listMessages(
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
   return { items: page.map(toChatMessage), nextCursor: hasMore ? page[page.length - 1].id : null };
+}
+
+export interface SendMessageInput {
+  roomId: Id;
+  senderId: Id;
+  type: ChatMessageType;
+  body?: string | null;
+  refPostId?: Id | null;
+  /** 재전송 중복 방지 키(D-030 ②). `chat_messages.client_key`가 UNIQUE라 DB가 이 멱등성을
+   *  강제한다. */
+  clientKey: string;
+}
+
+/**
+ * 메시지 전송(FR-050·052). `clientKey`가 이미 존재하면 새로 만들지 않고 기존 메시지를
+ * 그대로 반환한다(Task 020B 재전송 멱등 처리) — 유니크 제약 위반(23505)을 "이미 보낸
+ * 메시지"로 해석해 재조회한다(먼저 SELECT하는 것보다 경쟁에 안전하다).
+ */
+export async function sendMessage(input: SendMessageInput): Promise<DataResult<ChatMessage>> {
+  const supabase = await createSupabaseServerClient();
+
+  if (input.type === "post_link" && !input.refPostId) {
+    return err("validation_failed", "post_link 타입 메시지는 refPostId가 필요하다(FR-052).");
+  }
+  if (input.type === "text" && !input.body) {
+    return err("validation_failed", "text 타입 메시지는 body가 필요하다.");
+  }
+
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .insert({
+      room_id: input.roomId,
+      sender_id: input.senderId,
+      type: input.type,
+      body: input.type === "text" ? (input.body ?? null) : null,
+      ref_post_id: input.type === "post_link" ? (input.refPostId ?? null) : null,
+      client_key: input.clientKey,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: existing, error: existingError } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("client_key", input.clientKey)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (existing) return ok(toChatMessage(existing));
+    }
+    throw error;
+  }
+  return ok(toChatMessage(data));
+}
+
+/** 메시지 삭제(FR-054, v0.2) — 소프트 삭제. `chat_messages_guard_delete_only` 트리거가
+ *  `deletedAt` 외 컬럼 변경을 전원(발신자 포함)에게 막는다. */
+export async function deleteMessage(id: Id): Promise<DataResult<ChatMessage>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return err("not_found", `message ${id} 를 찾을 수 없다.`);
+  return ok(toChatMessage(data));
 }
