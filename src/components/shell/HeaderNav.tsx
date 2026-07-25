@@ -17,6 +17,37 @@ import type { AuthSession } from "./auth-session";
 import type { ReactNode } from "react";
 
 /**
+ * `session.status === "error"`일 때 상단 배너에 띄울 문구를 고른다(I-060 수정, 19일차).
+ * `reason`별 완전 분기(exhaustive switch)다 — 이전에는 `reason === "forbidden" ? … :
+ * network.title` 이분법이라 Task 039가 추가한 `"deactivated"`가 무조건 `network`(연결 문제)로
+ * 잘못 떨어졌다. `default` 분기가 `never` 대입을 강제해, `AuthSession`의 `reason` 유니온에
+ * 값이 더 늘어나면(예: 정지 계정 등) 이 함수가 컴파일 타임에 갱신을 요구한다.
+ *
+ * `deactivated`는 `/account/restore` 페이지에서는 `null`을 반환해 배너를 아예 숨긴다 — 그
+ * 페이지 본문(`RestoreAccountForm`)이 이미 유예 안내를 정확한 남은 기간과 함께 보여주므로,
+ * 배너까지 띄우면 `role="alert"` 두 곳이 같은 정보를 중복 발화한다(스크린 리더 기준으로도
+ * 소음이다). 그 밖의 페이지(`/login`·`/reset-password`·랜딩 등)에는 본문에 이 안내가 없으므로
+ * 배너가 유일한 신호다 — 거기서는 그대로 노출한다.
+ */
+function getSessionErrorBannerMessage(
+  session: Extract<AuthSession, { status: "error" }>,
+  pathname: string,
+): string | null {
+  switch (session.reason) {
+    case "forbidden":
+      return strings.error.forbidden.title;
+    case "network":
+      return strings.error.network.title;
+    case "deactivated":
+      return pathname === "/account/restore" ? null : strings.error.deactivated.title;
+    default: {
+      const exhaustiveCheck: never = session;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+/**
  * 전역 헤더 내비게이션(PRD §5 "헤더 — 전역 공통"). 표현 컴포넌트 — 세션은 props로만 받는다
  * (D-030 ①). 인증 상태 판정·조회는 `src/app/layout.tsx`가 `getAuthSession()`으로 수행한다.
  *
@@ -75,17 +106,17 @@ export function HeaderNav({
 
   const primaryItems = getPrimaryNavItems(session);
   const accountItems = getAccountNavItems(session);
+  const errorBannerMessage =
+    session.status === "error" ? getSessionErrorBannerMessage(session, pathname ?? "") : null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-sm">
-      {session.status === "error" && (
+      {errorBannerMessage && (
         <p
           role="alert"
           className="border-b border-destructive/20 bg-destructive/8 px-4 py-1.5 text-center text-xs text-destructive"
         >
-          {session.reason === "forbidden"
-            ? strings.error.forbidden.title
-            : strings.error.network.title}
+          {errorBannerMessage}
         </p>
       )}
       <div className="flex h-14 items-center gap-6 px-4">

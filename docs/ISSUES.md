@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-060** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-070** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
 - **새 이슈는 상태와 무관하게 파일 맨 끝(아래 "이슈 기록" 절의 마지막)에 번호순으로 붙인다.** 절 제목을 보고 "열린 이슈" 절에 넣지 않는다 — 그 절은 **외부 입력(고객 답변·요금제 선정 등)을 기다리는 초기 미결 4~11건만 남은 역사적 구획**이고, I-027 이후는 전부 아래 시간순 기록에 쌓여 있다. **각 이슈가 열렸는지 닫혔는지는 절 위치가 아니라 항목 안의 `상태` 필드가 단일 소스다.** (18일차에 한 팀원이 절 제목을 그대로 믿고 열린 이슈를 위쪽 절에 등재해 30건 넘는 기존 항목과 어긋났다 — 팀장이 옮기고 이 규칙을 명시했다.)
@@ -570,6 +570,17 @@
   ③ 라우트 핸들러·프록시 층에서 상태를 갈아 끼움(D-011로 `proxy.ts`가 v0.1 범위 밖이라 v0.2 이후).
   Task 029A(RLS 정책)·031(읽기 경로 실데이터 교체) 착수 전에 정하는 것이 좋다 — 그때 같은 판단이
   RLS 403 경로에도 필요해지고, 두 경로가 갈리면 되돌리기 어렵다.
+- **한계 추가(19일차, BOARD — I-069 조사 중 발견)**: 위 "화면은 요구사항대로다"는 **`npm run
+  dev` 기준 확인이었다**(7일차 당시 이 저장소는 `npm run build`+`npm start` 조합을 검증
+  절차로 쓰지 않았다). 19일차 DESIGN이 프로덕션 빌드(`npm start`)에서 **정확히 같은
+  `(app)/crews/[crewId]/layout.tsx` throw 지점**을 재현한 결과, 화면이 "접근 권한이
+  없어요"가 아니라 **"연결에 문제가 있어요"로 렌더됐다** — dev와 prod가 이 지점에서
+  다르게 동작한다는 뜻이다(원인: Next.js가 프로덕션에서 서버 컴포넌트 예외의 `error.cause`를
+  클라이언트에 넘기지 않는다, 상세는 **I-069**가 단일 소스). **7일차 확인이 틀린 게
+  아니다** — 검증 환경(dev)에서는 실제로 그렇게 렌더됐다. 검증 시점에 dev/prod 차이가
+  존재하는 줄 몰랐을 뿐이다. **D-040 재검토 필요**: 그 결정의 "이유 3"(v0.1 Mock 단계라
+  지금 당장 사용자 영향 없음)이 I-069로 무너졌다 — 근거·후보 조사는 I-069 §"근본 해결
+  후보 조사"에 정리했다(결정은 20일차로 이월).
 
 ### I-045 · `npm install`(플래그 없이)이 `@schedule-x/calendar`의 peer 충돌로 항상 ERESOLVE 실패한다
 
@@ -770,6 +781,18 @@
   supabase_migrations.schema_migrations where version='<그 버전>'`으로 실제 적용된 SQL을 그대로
   꺼내 **파일명의 버전을 정확히 맞춰**(어긋나면 `db push`가 미적용으로 오판해 재적용을 시도한다)
   로컬 파일로 만든다.
+- **후속(19일차, DESIGN)**: BOARD가 로컬 57건↔원격 57건 전수 대조로 불일치 6건을 새로
+  발견했다(팀장 재확인) — 이번 회차에 새로 생긴 드리프트가 아니라 **18일차 Task 032부터
+  저장소에 방치돼 있던 것**이었다. 그중 DESIGN 소관 3건(`respond_meetup_attendance_function_
+  fix_permission_check`·`_v2`·`profiles_backfill_onboarding_completed_at_for_seed`, 파일명이
+  각각 `20260725080100`·`80200`·`80300`으로 돼 있었으나 실제 원격 버전은
+  `20260725073553`·`73702`·`74122`)는 `supabase_migrations.schema_migrations`의
+  `statements`와 로컬 파일 내용을 문장 단위로 대조해 **바이트 단위 일치**를 확인한 뒤
+  `git mv`로 원격 버전에 맞춰 rename했다(내용 무변경). rename 후 57 대 57 재대조 결과 이
+  3건은 불일치 0건 — 나머지 3건(`crews_guard_owner_transfer_target_active`·
+  `crew_memberships_invalidate_votes_on_removal`·`disband_crew_function`, 로컬
+  `20260725090500`·`090612`·`090730` vs 원격 `085454`·`085508`·`085528`)은 CREW의 이번
+  회차(19일차) 산출이라 DESIGN 범위 밖이다 — 손대지 않았다.
 
 ### I-052 · 인증 보호 라우트의 `notFound()`가 HTTP 200으로 응답된다("소프트 404")
 
@@ -944,10 +967,53 @@
   대시보드 템플릿 자체도 확인할 방법이 없었다.
 - **후속**: Resend 연결(D-042 잔여 작업)과 같은 타이밍에 운영자가 이메일 템플릿도 함께
   PKCE 형식으로 갱신해야 한다. 그 전까지 "구현했으나 실제 링크 클릭은 미검증"으로 취급한다.
+- **19일차 재시도(DESIGN) — 여전히 미검증, 결론 불변**: 프로덕션 서버(`localhost:3210`)에서
+  `/reset-password`에 `chopin0625@gmail.com`으로 재설정 메일을 실제 요청했다. UI는 AC1대로
+  "메일함을 확인해 주세요…" 동일 응답을 보였고, `mcp__supabase__get_logs(service: "auth")`로
+  받은 최근 24시간 로그에서 `POST /recover` 200(`user_recovery_requested`, actor
+  `chopin0625@gmail.com`, referer `http://localhost:3210/reset-password/confirm`)을 확인해
+  **GoTrue가 재설정 요청 자체는 정상 접수했음**은 실측했다. 그러나 이 API 로그에는 실제
+  발송된 메일 본문·링크 형식(`token_hash`+`type=recovery` PKCE vs 구식 `ConfirmationURL`
+  해시 프래그먼트)이 담기지 않고, `smtp`·`mail`·`template` 키워드로 로그를 훑어도 관련
+  항목이 없었다(전송 성공/실패 여부조차 이 로그로는 판별 불가). **Gmail 수신함에 접근할
+  방법이 이 세션에 없다**(IMAP·웹메일 자동화 도구 없음, 팀장 지시대로 억지 우회하지 않음) —
+  이 사실 자체가 이번 회차의 결론이다. 대시보드 이메일 템플릿 설정을 MCP로 조회할 수 없다는
+  기존 결론도 함께 재확인했다(`mcp__supabase__get_logs`/`execute_sql`/`list_*` 계열 어디에도
+  이메일 템플릿 접근 도구가 없음). **상태를 "열림"으로 유지한다** — 검증 수단 자체가
+  없다는 것이 명확해졌으므로, 다음 회차가 이 항목을 또 시도하기 전에 팀장 판단으로 (a)
+  Supabase 대시보드에 직접 접근 권한이 있는 사람이 육안으로 템플릿을 확인하거나 (b) 테스트
+  계정 중 하나의 실제 Gmail 수신함 접근 권한을 확보하는 두 방법 중 하나가 선행돼야
+  한다(상세 재현 절차: `docs/decisions/auth-roundtrip-verification-019.md` 항목 4).
 
 ### I-058 · `profiles` 테이블 직접 조회로 회원 명부 열거·NFR-013 필드 제한·D-005 레이트 리밋이 전부 우회된다
 
-- **상태**: 열림
+- **상태**: 해소 — 단, **닫힌 것과 남은 것을 구분해서 읽을 것**(18일차에 문서의 부정확한
+  단정이 세 번 오판을 유발한 전례가 있어 19일차 팀장 지시로 명시한다).
+  - **닫힘**: 인증 사용자(`authenticated`)의 `profiles` **전 컬럼·전 행 덤프**는 닫혔다 —
+    `profiles_select_authenticated`가 self-row 전용으로 좁혀져 직접 조회로는 자기 자신의
+    행 하나만 나온다(실측: `total=21→1`, 옵트아웃 포함 덤프 불가).
+  - **닫힘(인증 경로 한정)**: **로그인한 사용자의 handle 기반 "타인 존재 확인"은 SQL 강제
+    레이트 리밋 하에서만** 가능하다 — 처음 만든 대체 경로(`get_profile_public_by_handle`)가
+    리밋 없는 오라클이었던 것을 19일차 팀장 교차검증(major①)이 지적해 **그 RPC 자체를
+    삭제**했다. FR-006 검색은 `profile_search`(D-005 SQL 리밋·NFR-013 3필드·R-012 옵트아웃/
+    비활성 배제, 18일차 §14)만 쓰고, 가입/초대 등 내부 handle→id 재해석은 client-invokable
+    경로가 아예 없는 service-role 전용 함수로 옮겼다(상세: `docs/decisions/
+    rls-policies-029b.md` §17). **⚠️ 이 "닫힘"은 인증된 사용자 경로에만 적용된다 — 아래
+    "남음" 항목의 미인증 경로는 별개다.** 이 구분을 놓치면 18일차 §14가 `profile_search`
+    한계 문장에서 겪은 것과 같은 오독이 반복된다.
+  - **남음**: `get_profile_public_by_id`(id 기준 "작성자 표기" 조회)는 상태·탈퇴 필터가
+    없고, UUID를 아는 경우 "그 사람이 가입돼 있다"는 사실 확인은 여전히 가능하다 — 팀장이
+    검토 후 수정 대상에서 제외했다(UUID 추측 불가능, 작성자 표기 용도가 명확, `qual=true`
+    시절부터 있던 성질이라 새로 생긴 위험이 아님). §16.6·§17 참고.
+  - **남음**: **미인증(guest) 가입 폼 경로는 handle 존재 확인이 여전히 무제한이다** —
+    `checkHandleAvailabilityAction`(`check-handle-availability.ts`)은 로그인 없이 blur마다
+    호출되고, `getProfileByHandle`이 major① 수정으로 service-role(RLS 완전 우회)을 쓰게 되며
+    실제로 정상 동작하기 시작했는데 리밋이 없다. **R-012(사용자 열거 방지)의 미완화 잔여
+    위험**이며, **I-065**로 별도 등재했다(열림, D-\* 결정 필요 — 아래 참고). 위 "닫힘(인증
+    경로 한정)"과 혼동하지 말 것 — 인증 경로는 리밋이 있고 미인증 경로는 없다.
+  - **부수 발견·해소**: `getProfileByHandle`을 service-role로 재구현하는 과정에서 회원가입
+    핸들 중복 사전 확인이 `anon` 컨텍스트에서 무력화(그리고 한때 예외로 깨져) 있었다는 것을
+    발견해 함께 고쳤다 — 별도 이슈 **I-062**(해소)로 등재.
 - **영역**: 보안 / 데이터
 - **제보**: 팀장 (2026-07-25, 18일차 — CORE가 Task 032/038 교차검증 중 지적받은 #3(`profile_search`
   레이트 리밋)을 수정한 직후 팀장이 직접 재실측해 발견)
@@ -1002,6 +1068,75 @@
   `docs/decisions/account-lifecycle-039.md` §6.1). **`profiles` 테이블 직접 조회 경로(위
   "후속 1"이 다루는 근본 원인)는 이번에도 손대지 않았다** — `deactivated` 계정도 여전히
   그 경로로는 노출된다. 이 이슈의 상태는 "열림"을 유지한다.
+- **각주(19일차, CORE — 근본 원인 해소)**: 마이그레이션
+  `profiles_narrow_select_policy_and_public_profile_rpcs`로 `profiles_select_authenticated`를
+  `qual: id = (select auth.uid())`로 좁혔다 — 이제 `authenticated`가 직접 `.select("*")`로
+  얻는 것은 **자기 자신의 행 하나뿐**이다(트랜잭션 롤백 실측: 변경 전 `total=21·opted_out=1`
+  → 변경 후 `total=1·opted_out=0`, 타인 행 직접 조회 0건). "작성자 표기" 등 정당한 타인 조회는
+  `private.get_profile_public_by_{id,handle}`(SECURITY DEFINER) + `public.*` 얇은 INVOKER
+  래퍼 2단 구조(029B와 같은 패턴)로 이전했고, `handle`·`displayName`·`avatarUrl`(+ 내부용
+  `id`, FR-006용 `status`·`searchOptOut`)만 반환한다 — `bio`·`anonymized_at`·
+  `handle_changed_at`·`onboarding_completed_at`은 타인 행에서 노출되지 않는다. 전수 조사(7개
+  컨테이너·4개 Server Action)로 어느 호출부도 그 이상을 쓰지 않음을 확인했고, `getProfileById`·
+  `getProfileByHandle` 시그니처를 유지한 채 데이터 레이어 내부 폴백만 바꿔 **호출부 코드는
+  한 줄도 바꾸지 않았다**(회귀 위험 최소화). `get_advisors(security)` 신규 WARN 0건,
+  `anon` 노출 범위 확대 없음(실측). 상세·대안 비교·실측 전문:
+  `docs/decisions/rls-policies-029b.md` §16.
+
+  **⚠️ 정정(같은 날 팀장 교차검증, major①)**: 아래 "남은 한계" 1번이 서술한
+  `get_profile_public_by_handle`가 실제로는 한계가 아니라 **새로 만든 결함**이었다 —
+  `authenticated` EXECUTE + `STABLE`(리밋 불가 구조) + `search_opt_out` 반환이 겹쳐 리밋
+  없는 핸들 오라클이 됐다. 이 RPC는 이후 완전히 삭제됐다 — 아래 "각주(19일차 재검증)"과
+  `rls-policies-029b.md` §17 참고. **이 문단(위 4개 문단)은 그 삭제 이전의 1차 수정을
+  그대로 남긴 역사 기록**이다 — 지금 시점의 정확한 상태는 이 I-058 항목 최상단 "상태" 절과
+  아래 재검증 각주를 보라.
+
+  **남은 한계(닫지 못한 것, 1차 수정 시점 기준 — 1번은 이후 삭제로 해소됨)**:
+  1. `get_profile_public_by_id`/`by_handle`은 의도적으로 상태·탈퇴 필터가 없다(작성자 표기
+     용도에 맞는 설계) — 이름에 `public`이 들어가지만 "검색 안전"을 뜻하지 않는다. 향후 다른
+     기능이 이 RPC를 재사용하려면 그 시점에 R-012 재검토가 필요하다.
+  2. UUID를 아는 경우 `get_profile_public_by_id`로 "그 사람이 가입돼 있다"는 사실 자체는
+     여전히 확인 가능하다(추측 불가능한 UUID라 실질 위험은 낮다고 판단, 새로 도입된 위험은
+     아니다 — `qual=true`였던 기존 상태도 이 확인을 이미 허용했다).
+  3. `signup.ts`의 핸들 중복 사전 확인(가입 폼 제출, 세션 생성 전)은 **이번 변경과 무관하게
+     이미 무력화돼 있었을 가능성이 높다** — 호출 시점이 `anon` 컨텍스트라 `profiles`·신규
+     RPC 어느 쪽에도 `anon` 권한이 없다(이번에도 이전에도 `roles={authenticated}`만). 실제
+     유일성 보장은 `createProfile`의 `23505` 처리(별도 방어, 정상 동작)가 맡는다 — I-058
+     범위(인증된 사용자의 과다 노출) 밖이라 이번 회차에서 손대지 않았다. **후속(같은 날)**:
+     팀장 지시로 실제 확인한 결과 무력화 정도가 아니라 **예외로 깨지는 상태**였음이 드러나
+     `major①` 수정과 함께 해소했다 — **I-062**로 등재.
+  4. 코드 레벨(`npx tsc --noEmit` exit 0)과 SQL 트랜잭션 롤백으로만 확인했다 — 브라우저 실
+     렌더 회귀 확인(`npm run dev`/`build`)은 팀장 전용이라 이번 회차에서 실행하지 못했다.
+
+- **각주(19일차 재검증, CORE — 팀장 교차검증 major① 수정)**: 위 1차 수정의
+  `get_profile_public_by_handle`(handle 기준 RPC)이 `authenticated` EXECUTE + `STABLE`(부수
+  효과 불가라 리밋을 넣을 수 없는 구조) + `search_opt_out` 반환이 겹쳐 **리밋 없는 핸들
+  오라클**이었다 — publishable key로 로그인한 아무 계정이나 임의 핸들의 존재·옵트아웃 여부를
+  무제한 조회할 수 있었다(이 이슈가 닫으려던 것과 같은 종류의 구멍을 `profiles` 대신 이
+  RPC에 다시 열었던 것). 마이그레이션 `profiles_drop_public_handle_lookup_rpc_i058_major1`로
+  `public`·`private` 양쪽 `get_profile_public_by_handle`을 **완전히 삭제**했다. 대체 설계
+  (팀장 지시 옵션 b — 내부 재해석과 사용자 검색을 다른 경로로 분리):
+  - `getProfileByHandle`(가입/초대/핸들가용성확인 전용)은 이제 client-invokable RPC를 전혀
+    거치지 않고 **service-role 클라이언트로 직접 조회**한다(`service_role`은
+    `rolbypassrls=true`) — publishable key로는 이 조회에 도달할 방법이 원천적으로 없다.
+  - FR-006 검색(`search-user-by-handle.ts`)은 `getProfileByHandle`을 더 이상 쓰지 않고
+    `searchProfilesByHandle`(`profile_search` RPC, D-005 SQL 강제 리밋·NFR-013 3필드·
+    R-012 옵트아웃/비활성 배제가 이미 있음)로 재배선했다.
+  - **부수 발견**: 1차 수정의 RPC 폴백이 `signup.ts`(anon 컨텍스트)에서
+    `permission denied`를 그대로 throw해 회원가입 핸들 중복 검사가 라이브로 깨져 있었다 —
+    service-role 전환으로 함께 해소(**I-062**로 등재, 상태 "해소").
+  - 실측(트랜잭션): `authenticated`로 `get_profile_public_by_handle` 호출 → `42883
+    undefined_function`(완전 삭제 확인). `service_role`로 `request.jwt.claims` 없이(= anon/
+    가입-전 컨텍스트 재현) handle 조회 → 정상 조회(`found:true`, RLS 영향 없음).
+    `profile_search`는 이번 수정과 무관해 그대로 — 옵트아웃 계정 재조회 시 0건, 일반 계정
+    3필드 정상 반환 재확인. `get_advisors(security)` 신규 WARN 0건(기존 `auth_leaked_
+    password_protection` 1건 + CREW의 `disband_crew` SECURITY DEFINER WARN 1건은 각각
+    무관한 기존/타 팀원 항목). `pg_policies`(profiles) 3건 그대로(이번 수정은 함수만 다뤘고
+    정책은 건드리지 않았다). `npx tsc --noEmit` — 내 변경 파일(`profile.ts`·`search-user-
+    by-handle.ts`·`handle-search.ts`·`database.types.ts`) 관련 에러 0건(다른 팀원의 동시
+    작업으로 보이는 무관한 에러 2건이 다른 파일에 있었다 — 확인만 하고 손대지 않음).
+    `get_profile_public_by_id`(id 기준)는 이번에도 수정하지 않았다(팀장 판단, 위 "상태"
+    절 참고). 상세·전문: `docs/decisions/rls-policies-029b.md` §17.
 
 
 ### I-059 · 게스트가 보호 라우트에 접근하면 서버 로그에 "레이아웃 가드가 깨졌다"는 오진단 예외가 남는다
@@ -1056,3 +1191,734 @@
     재검토할 사안**이다 — 두 이슈가 "인증/존재 경계가 렌더를 중단하지 못한다"는 같은 뿌리를
     공유한다(스트리밍 SSR이 이미 헤더를 보낸 뒤에는 상태 코드도, 예외로 인한 트리 취소도
     더 이상 되돌릴 수 없다는 Next.js App Router의 구조적 제약).
+
+### I-060 · 탈퇴 유예(`deactivated`) 세션에서 헤더 배너가 "연결에 문제가 있어요"(네트워크 오류)로 잘못 표시된다
+
+- **상태**: 해소 — 19일차, DESIGN(팀장이 파일 소유권 기준으로 DESIGN에 배정, CREW는 Task 040
+  한복판이라 병렬 충돌 회피). 아래 "후속(적용)" 참고.
+- **영역**: UI / 접근성
+- **제보**: DESIGN (2026-07-25, 19일차 — 항목 3 탈퇴→복구 왕복 실측 중 발견, 프로덕션
+  `localhost:3210`)
+- **내용**: `src/components/shell/HeaderNav.tsx:86-88`이 `session.status === "error"`일 때
+  배너 문구를 `session.reason === "forbidden" ? strings.error.forbidden.title :
+  strings.error.network.title`로 이분법 판정한다. Task 039(18일차, CREW)가
+  `AuthSession`의 `reason`에 `"deactivated"`를 새로 추가했지만(`get-auth-session.ts`)
+  이 삼항식은 갱신되지 않아 `deactivated` 세션도 `"forbidden"`이 아니므로 **무조건
+  `strings.error.network.title`("연결에 문제가 있어요. 네트워크 상태를 확인하고 다시
+  시도해 주세요")로 떨어진다.** 실측: `0625chopin@gmail.com` 계정을 `/settings`에서
+  탈퇴시킨 뒤 `/account/restore`·`/login`·`/reset-password` 등 어떤 페이지를 봐도 헤더에
+  이 잘못된 문구가 뜬다(스크린샷 `/tmp/auth-roundtrip-019-screenshots/
+  item3-restore-page-initial.png`) — 정작 페이지 본문은 "탈퇴 처리 중인 계정이에요 · N일까지
+  복구하지 않으면…"으로 정확하다. 네트워크 장애가 전혀 아닌데 사용자에게 그렇게 안내한다.
+- **영향**: 기능 차단은 없다(복구 자체는 정상 동작, 항목 3 참고) — 순수 문구 오표시다.
+  다만 탈퇴 유예 중인 사용자가 "내 계정에 문제가 있나, 네트워크가 문제인가" 혼동할 수 있고,
+  실제 네트워크 오류(`error.network`가 원래 의도한 경우, `auth-session.ts` 참고)와 구분이
+  안 돼 진짜 네트워크 문제를 놓칠 수도 있다.
+- **후속**: `HeaderNav.tsx`의 삼항식을 `reason`별 3분기(`forbidden`·`deactivated`·그 외)로
+  넓히고, `deactivated`에는 새 문구(또는 배너 자체를 숨기고 페이지 본문에만 안내를 맡기는
+  방안 — 이미 `/account/restore` 본문이 유예 안내를 하고 있어 배너가 중복일 수 있다)를
+  붙인다. **소관**: 파일 자체는 DESIGN Task 011 자산이지만, 이 gap은 CREW의 Task 039가
+  `AuthSession.reason`에 새 값을 추가하면서 이 소비처를 갱신하지 않아 생겼다 — CREW가
+  Task 039 마무리로 처리하거나, DESIGN에게 인계할지 팀장이 정한다.
+- **후속(적용, 19일차 DESIGN)**: 팀장이 파일 소유권 기준으로 DESIGN에 배정. 세 가지를 했다.
+  1. **`HeaderNav.tsx`에 `getSessionErrorBannerMessage(session, pathname)` 헬퍼를 신설**하고
+     기존 이분법 삼항식을 `reason`(`"forbidden" | "network" | "deactivated"`) 완전 분기
+     (exhaustive switch)로 교체했다 — `default` 분기가 `const exhaustiveCheck: never =
+     session`로 `never` 대입을 강제해, `AuthSession.reason` 유니온에 값이 더 늘어나면(예:
+     향후 정지 계정) 이 함수가 컴파일 타임에 갱신을 요구한다. 이번 결함의 근본 원인("그 외
+     전부 네트워크 오류로 낙하")이 구조적으로 재발하지 않는다.
+  2. **배너 vs 페이지 본문 선택**: `/account/restore`에서는 배너를 숨긴다(`null` 반환) —
+     그 페이지 본문(`RestoreAccountForm`)이 이미 남은 유예 기간을 정확히 안내하므로 배너까지
+     띄우면 `role="alert"` 두 곳이 같은 정보를 중복 발화한다(스크린 리더 소음). 반면
+     `/login`·`/reset-password`·랜딩 등 **다른 페이지에는 탈퇴 유예 안내가 본문에 전혀
+     없음을 코드로 확인**했다 — 그 페이지들에서는 배너를 그대로 두되 문구만
+     `strings.error.deactivated.title`("계정이 탈퇴 처리 중이에요")로 정확하게 바꿨다.
+     팀장이 제시한 "배너 숨김"과 "문구만 정정" 두 안 중 페이지별로 다르게 적용한 것 — 두
+     안이 상호 배타적이지 않았다.
+  3. `src/lib/strings/ko.ts`의 `error` 객체에 `deactivated` 키를 **추가만** 했다(기존 키
+     재정렬 없음, BOARD·CREW가 동시 편집 중인 `realtime`·`crew` 섹션과 겹치지 않는 위치).
+     `/sample`(`src/components/sample/sections/shell.tsx`)의 `HeaderNav` "오류" 패널에
+     `SESSION_DEACTIVATED` 변형을 추가해 `forbidden`·`deactivated` 두 배너 문구를 나란히
+     대조할 수 있게 했다(CON-09 4상태 원칙 — 패널 슬롯 4개 고정이라 5번째 상태를 새로 만들지
+     않고 기존 "오류" 슬롯 안에서 두 변형을 함께 보여주는 방식을 택했다).
+  - **검증 범위**: `npx tsc --noEmit`로 내 변경분(HeaderNav.tsx·shell.tsx·ko.ts)에 새 오류
+    없음을 확인했다(남은 오류 2건은 `NotificationType`에 `ownership_transferred`·
+    `crew_disbanded`가 빠져 나는 것으로 `src/lib/types/notification.types.ts`가 이미 수정된
+    CREW Task 040 진행 중 파일 — 내 변경과 무관, 손대지 않았다). **빌드·서버 실행은 하지
+    않았다**(팀장 지시대로 금지) — 브라우저 재확인은 팀장이 재빌드한 뒤 진행한다.
+
+### I-061 · 계정 복구 성공 후 헤더가 새로고침 전까지 로그아웃 상태로 잘못 보인다(`refresh()` 누락)
+
+- **상태**: 해결됨(19일차, CREW)
+- **영역**: UI / 캐시
+- **제보**: DESIGN (2026-07-25, 19일차 — 항목 3 탈퇴→복구 왕복 실측 중 발견)
+- **내용**: `/account/restore`에서 "계정 복구하기"를 누르면 `restoreAccountAction`
+  (`src/lib/actions/restore-account.ts:40`)이 DB 상태(`profiles.status`)를 `active`로
+  되돌린 뒤 `redirect("/home")`만 호출하고 **`refresh()`를 호출하지 않는다**(CLAUDE.md
+  "쓰기 후 갱신은 Server Action + `refresh()` 패턴을 Mock 단계부터 쓴다" 원칙과 다른 배선).
+  실측: 버튼 클릭 직후 `/home`으로 이동은 되고 **본문(다가오는 모임 목록)은 이미 정상
+  인증된 데이터를 보여주는데, 같은 화면의 헤더는 여전히 `로그인/회원가입` 게스트 링크 +
+  I-060의 "연결에 문제가 있어요" 배너를 그대로 유지한다** — 같은 렌더 안에서 본문과 헤더가
+  서로 다른 세션 상태를 보여주는 불일치다. 주소창을 그대로 다시 로드(`http://localhost:3210/
+  home` 재이동)하면 헤더가 `계정 설정 · 받은 초대함 · 로그아웃`으로 정상 갱신된다 — DB는
+  이미 정확했고(재확인: `profiles.status='active', deactivated_at=null`), 문제는 순수
+  클라이언트 라우터 캐시가 이전 요청의 헤더 세그먼트를 재사용한 것으로 보인다.
+- **영향**: 계정 복구가 실제로는 성공했는데도 사용자에게는 "아직 로그인이 안 된 것처럼,
+  게다가 네트워크에 문제가 있는 것처럼" 보인다(I-060과 겹쳐 혼동이 배가된다) — 새로고침을
+  모르는 사용자는 복구가 실패했다고 오해하고 이탈할 수 있다.
+- **후속**: `restoreAccountAction`이 `redirect()` 전에 `refresh()`를 호출하도록 한다(같은
+  파일의 `deactivateAccountAction`도 같은 패턴이 없는지 함께 점검 — 다만 그쪽은 목적지
+  페이지(`/account/restore`)가 매번 서버에서 세션을 다시 읽어 이번 실측에서는 증상이
+  드러나지 않았다). **소관**: CREW(Task 039 파일 소유, `docs/decisions/
+  account-lifecycle-039.md` §5 "신규(CREW 소유)" 목록에 포함).
+- **후속(적용, 19일차 CREW)**: Next.js 16 `refresh()` 문서(`node_modules/next/dist/docs/
+  01-app/03-api-reference/04-functions/refresh.md`)와 "Redirect after a mutation" 예시
+  (`01-app/01-getting-started/07-mutating-data.md`)를 먼저 읽었다 — 둘 다 `redirect()`가
+  예외를 던져 렌더를 즉시 종료시키므로 `refresh()`(또는 `revalidatePath`/`updateTag`)는
+  반드시 `redirect()` **이전**에 호출해야 함을 확인했다. `restore-account.ts`에서
+  `refresh()`를 `redirect("/home")` 앞으로 옮겼다. **같은 파일의 `deactivateAccountAction`
+  도 같은 배선(누락)이었다** — 이번 검증에서 증상이 관찰되지 않았다는 것이 배선이 옳다는
+  뜻은 아니라고 판단해 함께 고쳤다(`refresh()` → `redirect("/account/restore")` 순서).
+  **Task 040에서 새로 만든 3개 액션도 점검**: `transfer-crew-ownership.ts`·
+  `remove-crew-member.ts`는 `redirect()`를 쓰지 않아(같은 화면에 남는 폼) 해당 없음.
+  `disband-crew.ts`는 성공 시 크루 홈으로 `redirect()`하는데 같은 누락이 있어(원래
+  docstring이 "`leave-crew.ts`와 같은 이유로 `refresh()` 대신 `redirect()`를 쓴다"고
+  적었던 것 자체가 이번에 틀렸다고 확인된 가정이었다) 함께 고쳤다. **`leave-crew.ts`·
+  `create-crew.ts`도 같은 가정(같은 근거 없는 docstring 문구)을 쓰고 있어 같은 위험이
+  있을 수 있으나, 다른 Task(017A·016B) 산출물이라 이번 회차 범위 밖으로 두고 다음 회차
+  점검 대상으로만 남긴다** — 새 이슈를 등재하지 않고 여기 기록으로 남긴다(등재 여부는
+  팀장 판단).
+- **후속(적용 확대, 19일차 CREW — 팀장 지시로 범위 확대)**: 팀장이 위 "다음 회차로 이월"
+  판단을 반려했다 — 두 파일 모두 CREW 소유(Task 016B·017A)라 이월 사유가 없고, 수정 내용이
+  이미 검증된 것과 동일하다는 근거였다. `leave-crew.ts`·`create-crew.ts`에도 각각
+  `refresh()`를 `redirect()` 앞에 추가했다. `leave-crew.ts` docstring의 틀린 가정("`create
+  CrewAction`과 같은 이유로 `refresh()` 대신 `redirect()`를 쓴다" — 이 문장이 `disband-
+  crew.ts`로 복제된 원본이었다)을 정정 이력으로 남기고(원 서술 삭제하지 않음)
+  `create-crew.ts`에도 같은 근거를 인용한 정정을 추가했다. **증상 확인 여부를 명확히
+  구분한다**: `restore-account.ts`는 DESIGN이 브라우저로 실제 증상(헤더 미갱신)을 관찰했지만,
+  `leave-crew.ts`·`create-crew.ts`·`deactivate-account.ts`·`disband-crew.ts` 4곳은 **배선만
+  Next 16 공식 문서 근거로 선제 수정했을 뿐 실제 화면 증상을 직접 관찰하지는 못했다**
+  (Playwright 브라우저 세션 공유 제약, Task 039와 같은 한계) — "배선을 고쳤다"와 "증상을
+  확인했다"를 섞지 않도록 여기 명시한다.
+
+
+### I-062 · 회원가입 폼의 핸들 중복 사전 확인이 `anon` 컨텍스트에서 무력화·한때 예외로 깨져 있었다
+
+- **상태**: 해소
+- **영역**: 보안 / 인증
+- **제보**: 팀장(2026-07-25, 19일차 — I-058 major① 교차검증에서 CORE에게 확인 지시)
+- **내용**: `signup.ts`(87행)의 `await getProfileByHandle(handle)` 핸들 중복 사전 확인은
+  `signUpWithPassword`(99행) **이전**, 즉 세션이 없는 `anon` 컨텍스트에서 실행된다
+  (`createSupabaseServerClient()`가 쿠키에 세션이 없으면 PostgREST 요청이 `anon` 롤로
+  간다). 실측으로 두 단계의 상태를 확인했다:
+  1. **I-058 수정 이전(029A 원본, `qual=true`) 상태에서도 이미 무력화였다** —
+     `profiles_select_authenticated`가 `roles={authenticated}`만 부여했으므로 `anon`은
+     이 정책 자체에 걸리지 않아 직접 조회가 조용히 0행을 반환했다. 즉 회원가입 폼은 **이미
+     존재하는 핸들도 항상 "사용 가능"으로 통과시키고 있었다** — 실제 충돌은 `createProfile`의
+     `23505` UNIQUE 위반 처리(정상 동작)가 뒤에서 잡아 최종적으로는 가입이 막히지만, 사용자는
+     "사전 확인은 통과했는데 제출은 실패하는" 혼란스러운 UX를 겪었을 것이다.
+  2. **19일차 I-058 1차 수정(직접조회 실패 시 `get_profile_public_by_handle` RPC 폴백) 동안
+     라이브 회귀로 악화됐다** — `anon`은 그 RPC에도 EXECUTE가 없어 `permission denied for
+     function`이 반환되고, `getProfileByHandle`이 `if (pubError) throw pubError`로 이를
+     그대로 던져 **회원가입 핸들 중복 검사 자체가 예외로 깨지는 상태**가 됐다(실측:
+     `set local role anon`으로 해당 RPC 호출 시 `permission denied` 확인). `npm run dev`로
+     실사용자가 이 상태를 실제로 겪기 전에 팀장 교차검증(major①)에서 발견돼 반영 전 단계에서
+     잡혔다 — 즉 배포·실사용 노출은 없었다.
+- **영향**: FR-001 AC2(가입 폼 핸들 실시간 중복 검사)가 사실상 항상 "사용 가능"으로
+  응답하거나(1) 예외로 깨지는(2) 상태였다. 최종 방어(`createProfile`의 23505 처리)가 있어
+  **중복 핸들로 실제 계정이 생성되는 일은 없었다** — 사용성 결함이지 데이터 무결성 결함은
+  아니었다.
+- **해소**: I-058 major① 수정(`docs/decisions/rls-policies-029b.md` §17)으로
+  `getProfileByHandle`이 service-role 클라이언트(RLS 완전 우회, `auth.uid()`/세션 유무와
+  무관하게 동작)로 재구현되며 함께 해소됐다. 실측(트랜잭션, `request.jwt.claims` 없이
+  `set local role service_role`로 `anon`/가입-전 컨텍스트 재현): 핸들 조회가 세션 없이도
+  정상적으로 행을 찾아낸다(`found:true`) — 회원가입 폼의 중복 확인이 이제 실제로 정확하게
+  동작한다(이전의 "항상 통과" 상태에서 벗어난 기능 개선이기도 하다).
+- **잔여**: 없음. `checkHandleAvailabilityAction`(핸들 변경 화면)도 같은 함수를 쓰므로 함께
+  해소됐다 — 별도 확인은 생략했다(같은 함수·같은 클라이언트라 조회 경로가 완전히 동일하다).
+
+### I-063 · 채팅 Realtime Broadcast 트리거가 `postLinkCard`를 채우지 않는다(post_link 쓰기 경로가 생기면 재확인 필요)
+
+- **상태**: 열림
+- **영역**: 실시간 / 채팅
+- **제보**: BOARD (2026-07-25, 19일차 — Task 033 구현 중 설계로 발견)
+- **내용**: `chat_messages_broadcast` DB 트리거(`crew:{crewId}:chat` 토픽 발신, 마이그레이션
+  `realtime_broadcast_triggers_033`)는 `MessageViewModel`의 `postLinkCard` 필드를 항상
+  `null`로 보낸다. `resolvePostLinkCard`(FR-052 "삭제됨/다른 크루" 판정)가 TS 전용 도메인
+  로직(NFR-036, `lib/rules` 재사용 원칙 — 판정을 두 곳에 두지 않는다)이라 SQL 트리거로
+  옮기지 않았기 때문이다.
+- **영향**: **현재는 실제 영향이 0이다** — `sendChatMessageAction`(FR-051 실제 쓰기 경로)은
+  `type: "text"`만 만들고, `type: "post_link"` 메시지를 만드는 실사용 경로가 앱에 없다(코드
+  확인, mock 시드 `fixtures.ts`에만 존재). 그런 경로(게시글을 채팅에 공유, FR-052 쓰기 쪽)가
+  나중에 생기면, 그 메시지가 실시간으로 다른 크루원 화면에 도착할 때 카드 없이(본문도
+  `null`이라 사실상 빈 말풍선) 나타난다 — 최초 페이지 조회(`listMessages` + `toMessageViewModel`)
+  로 보면 정상이므로 새로고침하면 사라지는 형태의 결함이 된다.
+- **후속**: `post_link` 쓰기 경로를 만드는 Task(현재 로드맵상 명시적으로 배정되지 않음, FR-052
+  전체가 이번에 처음 언급됨)에서 트리거를 다시 보거나, 클라이언트가 `type === "post_link"`
+  이벤트 수신 시 개별 재조회(resync 패턴 재사용)로 채우는 방식을 추가해야 한다. 상세는
+  `docs/decisions/realtime-broadcast-033.md` §4.
+
+### I-064 · `/sample` 알림 시뮬레이터가 Mock 시드 id(`"profile-1"`)를 실 Supabase에 그대로 보내 항상 예외로 실패했다(수정 완료)
+
+- **상태**: 해결됨
+- **영역**: UI / 실시간 / 문서
+- **제보**: BOARD (2026-07-25, 19일차 — Task 033 `/sample` 반영 중 발견·즉시 수정)
+- **내용**: `src/lib/actions/simulate-notification-event.ts`의 `SAMPLE_RECIPIENT_ID`와
+  `NotificationSimulatorPreviewContainer.tsx`의 `SAMPLE_PROFILE_ID`가 Mock 픽스처 문자열
+  `"profile-1"`로 고정돼 있었다. `createNotification`(`src/lib/data/supabase/notification.ts`)
+  은 Task 032부터 이미 실 Supabase(`notifications.recipient_id`, `uuid` 컬럼)에 쓰고 있어,
+  `"profile-1"`은 유효한 UUID가 아니므로 이 버튼을 누르면 매번
+  `22P02 invalid input syntax for type uuid` 예외가 났다 — Task 031/032가 Mock→실데이터
+  전환을 끝낸 이후 한 번도 이 버튼이 정상 동작한 적이 없었을 가능성이 높다(CORE·DESIGN
+  교차검증 범위 밖이라 이번에 처음 발견됨). 실측: `execute_sql`로 같은 값을 넣어 재현,
+  정확히 이 오류 확인.
+- **영향**: `/sample`의 알림 토스트·벨 종단 시연(Task 023 산출물)이 클릭 즉시 서버 예외로
+  실패했다 — 쇼케이스로서 기능하지 못하는 상태였다.
+- **후속(적용)**: 두 상수를 실 프로필 UUID(`chopin0625@gmail.com`, CLAUDE.md 테스트계정)로
+  교체했다. 다만 Realtime Authorization이 `auth.uid() = recipientId`를 요구하므로(029B
+  §6.2), 이 미리보기의 벨·토스트가 **실시간으로** 갱신되는 것을 보려면 그 계정으로 로그인한
+  브라우저 세션에서 `/sample`을 열어야 한다 — 다른 계정/비로그인으로는 알림 행 자체는 정상
+  생성되지만(DB에 남는다) 이 미리보기에는 나타나지 않는다. 컴포넌트에 이 조건을 명시한
+  `Alert`를 추가했다. 상세: `docs/decisions/realtime-broadcast-033.md` §6.
+
+
+### I-065 · `checkHandleAvailabilityAction`이 미인증(guest) 사용자에게 리밋 없는 핸들 존재 확인 오라클이 됐다(I-058 major① 부작용)
+
+- **상태**: 열림 — **20일차 작업 확정**(2026-07-25, 19일차 마감에 사용자가 결정: 아래 "판단"의
+  두 갈래 중 **(1) 익명 흐름 전용 레이트 리밋 정책을 새 결정 D-\*로 확정한 뒤 구현**을 택했다.
+  "잔여 위험으로 수용·종결"은 기각됐다). 20일차 배치에서 이 이슈를 Task처럼 다루고, **정책
+  숫자·윈도·IP 신뢰경계를 먼저 D-\*로 등재한 다음** 구현한다 — 구현 자체는 기존 자산
+  (`evaluateFixedWindowRateLimit` 순수 함수 · 카운터 테이블 패턴 · `headers()` 전례)
+  재사용으로 저비용이고, 어려운 부분은 숫자의 근거다.
+- **영역**: 보안 / 데이터
+- **제보**: 팀장(2026-07-25, 19일차 — I-058 major① 해소를 실측으로 확인하던 중 발견해
+  CORE에 조사·판단 지시)
+- **내용**: `src/lib/actions/check-handle-availability.ts`의 `checkHandleAvailabilityAction`은
+  `SignupForm`이 핸들 입력란 **blur마다**(즉 로그인하지 않은 방문자가) 호출하는 Server
+  Action이다. I-058 major① 수정으로 `getProfileByHandle`(`src/lib/data/supabase/profile.ts`)
+  이 service-role 클라이언트(`rolbypassrls=true`)로 조회하도록 바뀌면서, 이 액션이 **이제
+  실제로 정상 동작한다** — I-062가 정확히 이 지점을 다뤘다: 이전에는 `anon`이 `profiles`에
+  아무 정책도 없어(`roles={authenticated}`만 부여) 조회가 항상 조용히 실패("사용 가능"으로
+  오판)했는데, 지금은 RLS를 완전히 우회해 정확한 답을 준다. **그런데 그 "정확한 답"에
+  리밋이 전혀 없다** — 로그인하지 않은 누구나 임의 핸들 문자열을 무제한으로 넣어 존재 여부를
+  확인할 수 있다.
+- **심각도 판단**: I-058 원본(전 컬럼·전 행 덤프, PII·옵트아웃 플래그 노출)보다 **훨씬
+  좁다** — 이 액션은 한 번에 정확히 하나의 핸들에 대한 **boolean 하나**만 반환하고,
+  `displayName`·`avatarUrl`·`bio`·`search_opt_out` 등 어떤 필드도 노출하지 않는다. 또한
+  "이 핸들이 존재하는가"를 알려주는 것 자체가 회원가입 폼의 본질적 기능이다(중복이면 사용자에게
+  알려야 한다) — 없앨 수 없는 기능, 다만 **속도 제한 없이 대량으로** 할 수 있다는 것이
+  R-012(사용자 열거 방지) 관점의 문제다.
+- **검토한 설계**: BOARD가 만든 재사용 가능한 순수 판정 함수
+  `evaluateFixedWindowRateLimit`(`lib/rules/rate-limit.ts`)는 identifier를 모르므로 그대로
+  재사용 가능하다. 문제는 **키**다 — 미인증 호출자는 계정 식별자가 없어 D-005/`handle_search_
+  attempts`(계정당 리밋, `identifier uuid references profiles`)를 그대로 쓸 수 없다. IP 기준
+  리밋을 하려면: ① `headers()`(Next 16, await 필요 — `request-password-reset.ts`에 이미
+  `next/headers` 사용 전례가 있다)로 `x-forwarded-for`를 읽고, ② 새 카운터 테이블(`identifier
+  text` — IP, uuid FK 불가능)을 만들고, ③ `src/lib/actions/**`(zone 6, `eslint.config.mjs`
+  확인)는 `@supabase/*` 직접 import가 금지라 조회/기록 함수는 zone 3(`src/lib/data/supabase/**`,
+  CORE 소유)에 둬야 하고, ④ 정리 잡은 BOARD 소유 `purge_expired_rate_limit_counters()`를
+  건드리지 않고 새 잡을 만들어야 한다.
+- **판단(CORE, 이번 회차에는 넣지 않음)**: 이 설계에서 남는 진짜 어려운 부분은 코드가 아니라
+  **숫자와 신뢰 경계를 정하는 것**이다 — 요구사항 문서(NFR-016·D-005)는 "계정당" 리밋만
+  명시하고 **익명 흐름의 리밋은 어디에도 정의돼 있지 않다.** 이 판단을 뒷받침하는 정확히 같은
+  성격의 선례가 이미 코드에 있다 — `request-password-reset.ts`의 docstring(Task 039 결정):
+  "커스텀 레이트 리밋 테이블을 새로 두지 않는다... FR-003 원문이 구체적 상한을 명시하지 않는다
+  ... 근거 없는 숫자를 지어내지 않고" (그 경우는 Supabase Auth 내장 리밋에 위임했지만, 이
+  액션에는 그런 하부 안전망이 없다는 차이는 있다). `HANDLE_SEARCH_RATE_LIMIT`(20/60)을 그대로
+  재사용하는 안도 검토했으나, 그 값은 **계정당·인증된 사용자** 위협 모델(D-005)로 승인된
+  숫자이지 **IP당·익명** 위협 모델(공유 IP·NAT 뒤 여러 사용자, IP 회전으로 쉽게 우회 가능한
+  약한 방어)에 대한 근거는 아니다 — 다른 위협 모델에 값만 재사용하는 것은 "근거 없는 숫자"에
+  해당한다고 판단했다. 그래서 이번 회차에는 구현하지 않는다.
+- **R-012(사용자 열거 방지) 잔여 위험**: `docs/prioritization-and-risks.md` 6.2절 R-012에
+  이 회차(19일차) 잔여 위험으로 한 줄 추가했다 — R-012는 "정책은 D-005로 확정, 남은 위험은
+  구현이 정책을 지키는가"라고 이미 적고 있는데, 이 이슈가 정확히 그 "구현" 축에서 **미인증
+  흐름은 애초에 D-005 정책 범위 밖**이라는 것을 드러냈다. 릴리스 전 리스크 등록부 재검토
+  시 이 항목이 다시 읽히도록 남겨 둔다(이슈는 닫히면 잊히지만 리스크 등록부는 다시 읽힌다).
+- **결정이 필요하다는 사실 자체를 명시한다**: 아래 두 갈래 **어느 쪽도 새 결정(D-\*) 없이는
+  이 이슈를 닫을 수 없다** — (1)은 그 결정 자체가 새 D-\*이고, (2) "잔여 위험으로 수용"도
+  누가 봐도 같은 결론에 도달하는 사실 판단이 아니라 "이 정도 노출은 감수한다"는 **정책
+  판단**이라 마찬가지로 명시적 결정이 필요하다. CORE가 임의로 어느 한쪽을 골라 조용히
+  닫아서는 안 된다.
+- **후속**: 아래 중 하나를 팀장이 결정해야 한다.
+  1. 익명 흐름 전용 레이트 리밋 정책(제한 횟수·윈도·IP 신뢰 경계 — Vercel 배포 기준
+     `x-forwarded-for` 신뢰 가능)을 새 결정(D-\*)으로 확정한 뒤 위 설계대로 구현.
+  2. 노출이 "존재 여부 boolean 1개, PII 없음"으로 제한적이라는 심각도 판단에 근거해 **잔여
+     위험으로 수용**하고, 그 판단 자체를 D-\*(또는 R-012 갱신)로 남긴 뒤 이 이슈를 닫는다
+     (요청받은 회원가입 UX상 필수 기능의 불가피한 부산물로 판단).
+  두 경로 모두 CORE가 실행할 수 있다 — **결정만 필요하다.** 팀장이 워크로그에 "다음 회차
+  판단 대상"으로 올리기로 했다.
+
+### I-068 · 탈퇴 확인 다이얼로그가 "작성자가 즉시 '탈퇴한 사용자'로 표시된다"고 약속하지만 실제로는 30일 유예가 끝나야 바뀐다
+
+- **상태**: 해결됨(19일차, CREW — 아래 "후속(적용)")
+- **영역**: UI / 콘텐츠(카피) — 백엔드 결함 아님
+- **제보**: DESIGN(2026-07-25, 19일차 — I-058 major① 교차검증 관점ⓒ, 팀장이 "18일차 D-010
+  익명화 범위 19테이블 전수 대조를 직접 한 영역이니 UUID 오라클 프레이밍과 다른 판단이면
+  반박하라"고 위임한 부분에 대한 답)
+- **내용**: `AccountWithdrawSection.tsx`의 탈퇴 확인 다이얼로그(`strings.account.settings.
+  withdraw.notice`, `src/lib/strings/ko.ts:665-669`)는 세 항목을 나열한다 — ①
+  `personalData`: "이메일·핸들·표시 이름·아바타·소개는 **30일 뒤** 파기돼요"(시점 명시) ②
+  `content`: "작성한 게시글·투표·채팅은 본문이 유지되고, 작성자는 **'탈퇴한 사용자'로
+  표시돼요**"(시점 **미명시** — ①과 나란히 놓이면 "탈퇴 즉시"로 읽힌다) ③ `votes`: 집계
+  보존 안내. SQL로 직접 대조한 결과, ②가 가리키는 동작은 ①과 **같은 시점(30일 후)에만**
+  일어난다 — 별개의 두 함수가 이를 증명한다:
+  - `request_account_deactivation()`(탈퇴 신청 즉시 실행, `public.profiles`의 `status`·
+    `deactivated_at`만 갱신 — `display_name`·`avatar_url`·`handle`·`bio`는 **전혀 건드리지
+    않는다**, `pg_get_functiondef`로 실측).
+  - `anonymize_expired_deactivated_profiles()`(pg_cron, `deactivated_at`으로부터 **30일
+    경과 후**에만 대상이 됨)가 그제서야 `display_name = '탈퇴한 사용자'`로 갱신한다(같은
+    방법으로 실측).
+  - 작성자 표기 조회 경로(`private.get_profile_public_by_id`, I-058 major①의 산출물)는
+    **의도적으로 상태 필터가 없다**(D-044 결정문 원문: "deactivated(유예 중, 복구 가능,
+    **PII 원본 보존**)") — 이건 CORE의 설계가 정확히 D-044를 구현한 것이지 결함이 아니다.
+    **결함은 이 SQL 동작과 어긋나는 쪽은 오히려 사용자에게 보여주는 다이얼로그 카피다.**
+  실사용 시나리오: 크루원 A가 게시글·채팅을 여러 건 남긴 뒤 탈퇴를 신청하면, 같은 크루의
+  다른 멤버들은 **30일 내내** A의 실명·실제 아바타를 그 글·메시지 작성자로 계속 본다 — A
+  본인은 확인 다이얼로그에서 "작성자는 '탈퇴한 사용자'로 표시돼요"를 읽고 즉시 그렇게 될
+  것으로 기대했을 가능성이 높다.
+- **팀장 판단과 다른 지점**: I-058 §16.6·§17.5는 이 RPC의 상태 미필터를 "UUID를 알아야
+  가능한 확인이라 위험 낮음"으로 판단해 손대지 않았다 — 그 판단은 **정확하다(반박하지
+  않는다)**, 그 프레임(공격자가 UUID를 추측·수집해야 하는 능동적 열거 시나리오)에서는.
+  다만 이번에 확인한 경로는 그 프레임과 다르다 — **공격이 전혀 필요 없다.** 크루의 게시글·
+  채팅·모임 참석자 목록을 정상적으로 열람하는 모든 크루원에게 UUID 없이도 자동으로
+  노출되는, 매 렌더마다 일어나는 통상 동작이다. 그래서 이 이슈는 I-058(쿼리 경로의 데이터
+  노출)의 재발이 아니라 **별개의 카피-구현 불일치**로 등재한다 — RPC를 고칠 필요는 없다
+  (D-044 설계 의도가 맞다), 다이얼로그 문구만 부정확하다.
+- **영향**: 낮음~중간. 데이터 유출이 아니라 **사용자에게 한 명시적 약속을 지키지 못하는
+  것**(신뢰 문제) — 탈퇴하는 사용자 본인이 "내 글에서 내 이름이 바로 사라질 것"으로 기대하고
+  탈퇴를 결정했다면, 30일간 그렇지 않은 것을 발견하고 당혹스러울 수 있다. FR-005 원문이
+  "즉시"를 요구하는지 "30일 후"를 요구하는지는 요구사항 문서 재확인이 필요하다(이번
+  검증에서는 열지 않았다).
+- **후속(방향만 제시 — CREW 소관, `ko.ts` Task 039 자산·`AccountWithdrawSection.tsx`도
+  CREW 소유, 코드는 고치지 않았다)**:
+  1. **(카피만 수정, 저비용)** `notice.content`에 ①처럼 시점을 명시한다 — 예: "게시글·투표·
+     채팅은 본문이 유지되고, **30일 뒤** 작성자가 '탈퇴한 사용자'로 바뀌어요. 그 전까지는
+     실명이 계속 보여요." 요구사항 문서가 "즉시"를 요구하지 않는다면 이 방향이 맞다.
+  2. **(동작을 카피에 맞춘다, 고비용)** `deactivated` 상태에도 작성자 표기를 가리는 경로를
+     추가한다(예: `get_profile_public_by_id`에 `CASE WHEN status='deactivated' THEN
+     '탈퇴 처리 중' ELSE display_name END`) — D-044가 "PII 원본 보존"을 명시적으로
+     의도했으므로 이건 D-044 자체를 재검토하는 결정이 필요하다(단순 버그 수정이 아니다).
+  - 어느 쪽이든 **요구사항 문서(FR-005) 재확인이 먼저**다 — 이번 검증은 코드·문구 대조까지만
+    했고 원문 재해석은 하지 않았다.
+- **후속(적용, 19일차 CREW)**: FR-005 정상 흐름이 "④ `deactivated` 전이 + 30일 유예 → ⑤
+  유예 후 개인정보 파기"로 두 단계를 명시적으로 분리하고, AC2("탈퇴 **완료**")가 이 흐름의
+  종착점(⑤ 이후)을 가리킨다고 읽는 것이 D-044(2단계 상태 모델) 설계와 정합적이라고 판단해
+  **방향 1(카피만 수정)**을 채택했다 — RPC·D-044 동작은 그대로 두고 `ko.ts`의
+  `account.settings.withdraw.notice.content`에 "30일 유예가 끝난 뒤 바뀌고, 그 전까지는
+  그대로 보여요"로 시점을 명시했다. `/account/restore` 쪽 카피는 이미 유예를 정확히
+  말하고 있어(재확인함) 수정하지 않았다. `AccountWithdrawSection.tsx`(컴포넌트)는 손대지
+  않았다 — `strings` 값만 바뀌면 반영되는 구조다.
+
+### I-066 · 해산된 크루(`status='archived'`)에서도 게시판·채팅·설정 쓰기 경로가 막히지 않는다
+
+- **상태**: 해결됨(SQL 절반 CORE + UI/라우트 절반 BOARD, 19일차 — 아래 두 각주와 맨 아래
+  "상태 갱신" 참고). **원래 이월 판단이 뒤집힌
+  경위**: 최초에는 팀장이 CREW의 이월 근거(FR-013 AC에 쓰기 차단 명시 없음)를 받아들여
+  다음 회차로 미뤘으나, BOARD의 교차검증이 "API 우회 없이 평상시 UI로 항상 재현된다"는
+  사실을 확인하면서 판단이 바뀌었다 — AC에 없다는 것과 사용자가 겪지 않는다는 것은
+  다르다고 재평가해 이번 회차에 SQL 쪽을 배정했다.
+- **영역**: 데이터 / 보안
+- **제보**: CREW(2026-07-25, 19일차 — Task 040 크루 생애주기 구현 중 발견)
+- **내용**: FR-013(크루 해산) 구현 시 `crews.status`를 `archived`로 전이하지만,
+  `(app)/crews/[crewId]/layout.tsx`의 크루원 게이트(D-039)는 "활성 멤버십인가"만 확인하고
+  `crews.status`를 보지 않는다. `posts`·`comments`·`chat_messages`·`polls` 등의 RLS INSERT
+  정책(029A/029B)도 크루원 여부만 확인하고 크루 상태는 보지 않는다. 그 결과 크루가 해산된
+  뒤에도 남은 크루원들이(멤버십 행 자체는 해산으로 바뀌지 않는다 — `docs/decisions/
+  crew-lifecycle-040.md` 참고) 게시글 작성·채팅 발신·크루 정보 수정을 계속할 수 있다 —
+  채팅은 즉시 파기됐어도 그 이후 새로 쓴 메시지는 파기 대상이 아니었으므로 계속 쌓인다.
+- **영향**: FR-013의 "해산 = 종료"라는 의도와 어긋난다. 데이터 유출·권한 상승은 아니지만
+  (여전히 그 크루의 원래 멤버만 쓸 수 있다), 해산 후에도 크루가 사실상 계속 운영되는
+  모순적 상태가 남는다.
+  * **재현(실측 필요, 이번 회차엔 실행하지 않음)**: 크루 해산 후 원 크루원 세션으로
+    `POST /crews/{id}/board` 글쓰기 또는 채팅 전송 시도 → 현재 코드 기준 성공이 예상된다.
+  * **교차검증(19일차, BOARD — Task 040 리뷰 짝)**: 코드로 독립 재확인했다.
+    `(app)/crews/[crewId]/layout.tsx`(D-039 크루원 게이트, 내 소유 영역 018A/018B와 같은
+    라우트 트리)는 `getCrewMembership` + `isActiveMembership(membership.status)`만 보고
+    `crew.status`는 아예 조회하지 않는다(`grep`으로 재확인). `posts`·`chat_messages`·
+    `comments`의 INSERT `WITH CHECK`(`pg_policies` 재조회)도 전부 `crew_memberships.status
+    = 'active'`만 확인하고 `crews.status`는 어디에도 없다. **원 서술보다 한 단계 더
+    심각하다** — API 우회 없이 **정상적인 UI 클릭만으로도** 재현된다: 해산된 크루의
+    이전 크루원이 `/crews/{id}/board`·`/crews/{id}/chat`에 그냥 들어가면(게이트가 막지
+    않는다) 글쓰기·채팅 폼이 그대로 나오고 제출도 성공한다 — "우회해야 뚫리는" 결함이
+    아니라 "아무것도 안 해도 뚫려 있는" 상태다. 심각도 판정(요청받은 대로): 그래도
+    **데이터 유출·권한 상승은 아니다**(원 크루원만 쓸 수 있고, 외부인·다른 크루원은
+    여전히 막힌다) — CREW·팀장의 이번 Task 범위 이월 판단에 동의한다. 다만 다음 회차
+    우선순위를 매길 때 "API 우회 필요" 등급이 아니라 "평상시 UI로 항상 재현" 등급으로
+    올려 잡을 것을 권고한다.
+- **후속**: FR-013을 구현하는 이번 Task(040) 범위로 좁혀 판단했다 — 게시판·채팅·투표
+  RLS INSERT 정책에 `crews.status='active'` 조건을 추가하는 것은 029A/029B가 만든 정책
+  객체(각 4~5개 테이블)를 폭넓게 건드리는 작업이라, 이번 회차 병렬 작업(BOARD의 Realtime,
+  CORE의 profiles RLS)과 충돌 위험이 커 미루었다. 다음 회차에 다음 중 하나로 해소를 권고한다.
+  1. 각 INSERT 정책의 `WITH CHECK`에 `exists(select 1 from crews c where c.id = crew_id and
+     c.status = 'active')` 서브쿼리를 추가(테이블마다 크루 참조 경로가 달라 개별 작업 필요 —
+     `posts`는 `board_id → boards.crew_id`, `chat_messages`는 `room_id → chat_rooms.crew_id`).
+  2. 또는 `private.is_active_crew_member()`(029B) 헬퍼 자체를 "크루도 active인가"까지
+     포함하도록 확장 — 헬퍼 하나만 고치면 이를 재사용하는 모든 정책에 자동 반영되지만,
+     "활성 크루원"의 의미가 바뀌므로 그 헬퍼를 쓰는 다른 정책(멤버 조회 등)에 부작용이
+     없는지 전수 재검증이 필요하다.
+- **각주(19일차, CORE — SQL 절반 해소)**: 위 "후속" 1번을 채택했다(2번은 실제로 조사해보니
+  `is_active_crew_member`가 `crew_memberships_select_self_or_fellow_member`·
+  `poll_vote_tally`·`poll_vote_tally_for_decision`·`realtime_messages_select_crew_broadcast`·
+  `respond_meetup_attendance` 같은 **읽기 경로**에서도 쓰여서, 그 헬퍼를 고치면 해산된
+  크루의 과거 투표 집계 조회·Broadcast 구독까지 막혀 FR-013 AC2를 위반했을 것이다 —
+  기각). `posts`·`comments`·`chat_messages`(I-066 원문이 명시한 "게시글 작성·채팅 발신")·
+  `invitations`·`join_requests`의 INSERT 정책에 크루 active 조건을 추가했다(신규 헬퍼
+  `private.is_crew_active`, 마이그레이션 `crews_block_writes_in_archived_crew_i066`).
+  **"크루 정보 수정" 차단은 이번에도 닫지 못했다** — `crews_update_staff_or_owner`가
+  `crews` 테이블 자체 정책이라, CREW가 `disband_crew`를 029B 2단 구조로 재구성 중인 것과
+  겹쳐 팀장 지시로 이번 범위에서 제외했다(다음 회차 이월). `posts`/`comments`/
+  `chat_messages`의 UPDATE(수정·소프트삭제)도 "과잉" 위험 판단으로 넣지 않았다. 트랜잭션
+  롤백 9개 시나리오(활성 크루 4개 성공·해산 크루 5개 거부) 전부 기대와 일치, `get_advisors
+  (security)` 신규 WARN 0건. **라우트 게이트(UI, `(app)/crews/[crewId]/layout.tsx`) 쪽은
+  BOARD 소관으로 남아 있다** — SQL이 최종 강제 경계이므로 데이터 무결성은 이미 보장되지만,
+  게이트가 고쳐지기 전까지는 사용자가 폼 진입 후 제출 시점에야 원인 불명 오류를 겪는다.
+  상세: `docs/decisions/rls-policies-029b.md` §18.
+- **각주(19일차, BOARD — UI/라우트 절반 해소, 양쪽 완료)**: `(app)/crews/[crewId]/layout.tsx`
+  가 `crews.status==='archived'`면 하위 화면 공통으로 `ArchivedCrewBanner`(신규)를 띄운다 —
+  멤버십 게이트 자체(누가 들어올 수 있는가)는 바꾸지 않았다(읽기는 그대로 통과). 쓰기는 각
+  컨테이너가 개별 확인한다: `BoardListContainer.canWrite`·`MessageListContainer.canSend`에
+  `crew.status==='active'`를 추가(버튼·입력창이 조용히 숨는다), `PostWriteContainer`(`/board/new`,
+  쓰기 전용 라우트)는 해산 크루면 진입 자체를 `forbidden`으로 막는다. **CORE의 SQL 정책과
+  독립적으로 트랜잭션 롤백 재검증**(활성 크루 글쓰기 성공/해산 크루 글쓰기·채팅 발신 거부/
+  해산 크루 게시판·채팅 **열람은 성공** 5개 시나리오) — 전부 CORE 실측과 일치, 신규 회귀
+  없음(`npx tsc --noEmit`·`npm run lint` clean, 브라우저 클릭 검증은 운영 규칙상 하지 않음).
+  `ko.ts`에 `crew.archivedNotice` 키 추가, `/sample`의 `crews.tsx`에 배너 항목 등록. **이제
+  UI·SQL 두 층 다 닫혔다** — 남은 것은 위 각주가 이월한 "크루 정보 수정 차단"(`crews_update_
+  staff_or_owner`, CREW/CORE 소관, 다음 회차)뿐이다. I-067(해산 안내 부재)도 이 배너로 함께
+  닫힌다 — `CrewHomeContainer`의 "미래 Meetup 바 숨김" 세부는 여전히 CREW 소관 미확인이지만,
+  "왜 못 쓰는지 사용자가 안다"는 최소 요건은 배너로 충족했다. 별도 결정 문서를 새로 만들지
+  않고 이 각주를 단일 소스로 둔다(산출물 목록: `ArchivedCrewBanner.tsx`(신규)·
+  `(app)/crews/[crewId]/layout.tsx`·`BoardListContainer.tsx`·`PostWriteContainer.tsx`·
+  `MessageListContainer.tsx`·`ko.ts`·`sample/sections/crews.tsx`).
+- **상태 갱신**: 위 두 각주로 SQL·UI 양쪽이 닫혀 **해결됨**으로 올린다("크루 정보 수정"
+  이월 1건은 새 관찰이 아니라 처음부터 범위 밖으로 명시했던 것이라 이 이슈의 재오픈 사유가
+  아니다 — 필요하면 별도 이슈로 새로 등재한다).
+
+### I-067 · `CrewHomeContainer`가 해산된 크루(`status='archived'`)를 실제로 열람 전용으로 렌더하는지 미검증
+
+- **상태**: **해결됨 — 캘린더 부분(FR-013 AC2).** 19일차 DESIGN이 구현("화면 절반 구현
+  완료" 각주)한 뒤 재빌드된 서버에서 실제로 클릭·스크린샷으로 재검증했다(아래 "화면 최종
+  검증" 각주). **남는 범위**: `CrewHomeContainer`(크루 홈 화면 자체)의 세부 렌더는 이번
+  수정 대상이 아니었다 — BOARD가 등록한 공통 `ArchivedCrewBanner`가 `/board`·`/chat`·크루
+  홈에 최소 요건(해산 사실 고지)은 채우지만, "정보 수정 폼이 archived 상태에서도 그대로
+  노출되는가" 같은 세부는 이번 회차에 다시 확인하지 않았다(팀장이 이번 착수 범위를
+  캘린더로 명시적으로 좁혔다) — 이 부분은 **열림으로 남긴다.** 이슈 제목이 원래 가리키던
+  두 절반(`CrewHomeContainer`·캘린더) 중 캘린더는 닫혔고 `CrewHomeContainer` 세부는
+  아직이라는 뜻이다 — 제목 자체는 재정렬하지 않고(CLAUDE.md "갱신되는 값은 다른 문서에"
+  원칙) 상태 줄로만 구분한다.
+- **영역**: UI / 문서
+- **제보**: CREW(2026-07-25, 19일차 — Task 040 크루 생애주기 구현 중 발견)
+- **내용**: FR-013 AC2는 "해산된 크루, 크루원이 캘린더 조회, 미래 Meetup 바가 사라지고
+  과거 항목은 열람 전용으로 남는다"를 요구한다. `disband-crew.ts`(Task 040)는 성공 시
+  크루 홈(`getCrewHomeHref`)으로 리다이렉트하는데, `CrewHomeContainer`(Task 016B, CREW
+  담당이지만 이전 회차 산출물)가 `crew.status === 'archived'`를 실제로 특별하게(읽기 전용
+  안내·수정 UI 숨김 등) 처리하는지 이번 회차에 코드를 읽어 확인하지 못했다 — "확인하지
+  않은 것을 확인한 것처럼 적지 않는다"는 원칙에 따라 미검증으로 남긴다. 캘린더의
+  "미래 Meetup 바 숨김"은 Task 040이 `meetups.status='cancelled'`로 전이시켰으므로 캘린더
+  조회 쿼리가 `status='confirmed'`만 걸러낸다면 자동으로 만족되겠지만, 이 역시 캘린더
+  컨테이너(다른 담당자 영역) 코드를 확인하지 못했다.
+- **영향**: FR-013 AC2가 실제로 충족되는지 불확실하다 — 최악의 경우 해산된 크루 홈이
+  일반 크루 홈과 구분 없이 보이거나, 임원 이상에게 정보 수정 폼이 그대로 노출될 수 있다
+  (`crew:update_info` 판정 자체는 role 기준이라 크루 상태와 무관하게 통과한다 — I-066과
+  같은 근본 원인).
+- **후속**: 다음 회차에 `CrewHomeContainer`·`MonthCalendarContainer`(또는 해당 담당자)가
+  `crews.status`를 실제로 어떻게 다루는지 확인하고, 필요하면 archived 크루 전용 읽기 전용
+  배너·수정 UI 숨김을 추가한다.
+- **교차검증(19일차, BOARD — Task 040 리뷰 짝)**: "미검증"을 "검증 완료·부재 확인"으로
+  좁힐 수 있었다. `CrewHomeContainer.tsx`를 읽은 결과 `crew.status`·`archived` 문자열이
+  코드 어디에도 없다(`grep` 재확인) — 즉 "확인 못 함"이 아니라 **"archived 전용 분기 자체가
+  없다"는 것을 확인**했다. 지금 상태로는 해산된 크루 홈이 평상시 크루 홈과 똑같이 렌더된다
+  (읽기 전용 안내 없음, 위 §"영향"의 "최악의 경우"가 현재 실제 동작이라는 뜻). 캘린더 쪽
+  (`MonthCalendarContainer`)은 내 소관도 이번 검토 범위도 아니라 여전히 미확인으로
+  남긴다 — 그 부분만 "미검증"이 맞고, `CrewHomeContainer` 부분은 이제 확정 결함이다.
+- **각주(19일차, DESIGN — 캘린더 부분 브라우저 검증, 재빌드 후)**: 일회용 테스트 크루에
+  과거 Meetup 1건(2026-06-01)·미래 Meetup 1건(2026-09-01)을 SQL로 만들고, 화면에서
+  "크루 해산" 클릭까지 실제로 통과시킨 뒤 `/calendar`를 열었다. **가설("미래만 바에서
+  사라진다")은 절반만 맞았다** — 미래 Meetup 바는 정확히 사라졌지만, **과거 Meetup 바도
+  함께 완전히 사라졌다**(크루 필터 패널 목록에서 그 크루 자체가 빠짐). "열람 전용으로
+  남는다"가 아니라 "완전히 안 보인다"는 뜻이라 AC2 위반이다. **근본 원인**:
+  `MonthCalendarContainer.tsx:60`이 `listCrewsByProfile()`(`src/lib/data/supabase/
+  crew.ts:137-156`)로 "내 크루" 목록을 얻어 그 crew id 집합을 캘린더의 조회 범위·필터
+  옵션 양쪽에 재사용하는데, 이 함수가 `crews.status='active'`로 **크루 자체**를 거른다
+  (meetup의 status가 아니다). archived 크루는 이 목록에서 아예 빠지므로, 그 크루의
+  meetup은 `status='confirmed'`가 살아 있어도 캘린더 쿼리 대상에 들지 못한다. 홈 대시보드
+  용도로는 맞는 필터(해산된 크루를 "내 크루"에서 빼는 것 자체는 합리적)지만, 캘린더의
+  "과거 이력은 계속 본다"는 요구사항에는 같은 함수를 그대로 재사용하면 안 됐다. RLS
+  이중 확인(글쓰기 직접 INSERT 시도 → `42501`)·`ArchivedCrewBanner`(`/board`·`/chat`
+  정상 렌더, 레이아웃 안 깨짐, Composer/새 글쓰기 버튼 부재)는 전부 PASS — 문제는 캘린더
+  하나뿐이다. 재현 절차·스크린샷 전문: `docs/decisions/auth-roundtrip-verification-019.md`
+  §9.3. **소관**: `MonthCalendarContainer.tsx`는 명목상 DESIGN Task 021A 자산이지만
+  `listCrewsByProfile`(근본 원인)은 데이터 레이어 공용 함수라 팀장 배정 필요 — 코드는
+  고치지 않았다(이번 회차 동시 작업 충돌 회피).
+- **렌더링 판단(19일차, DESIGN — 착수 대기, CREW의 `listCrewsByProfile` 시그니처 확정 후
+  실행)**: 팀장이 캘린더 화면 절반을 배정하며 위임한 4가지 판단. 코드는 아직 안 만졌다 —
+  CREW가 데이터 레이어 절반(archived 크루를 조건부로 포함하도록 `listCrewsByProfile` 확장)을
+  끝내야 이 스펙대로 실제 구현에 들어갈 수 있다.
+  1. **격자 바(그리드)는 시각적으로 구분하지 않는다** — archived 크루의 과거 Meetup 바는
+     보통 크루색 바와 완전히 동일하게 그린다. 근거: FR-063 AC2의 요구는 "열람 전용"(조작
+     불가)이지 "달라 보여야 한다"가 아니다. 그 Meetup 자체는 `status='confirmed'`로
+     실제로 열렸던 일정이라, `취소됨` 배지(흐리게 처리되는 유일한 기존 전례,
+     `isCancelled`)를 archived 크루에도 재사용하면 "이 모임이 취소됐다"는 **틀린 신호**를
+     준다. `MonthCalendarContainer.tsx`의 `events.push` 필터(`meetup.status !== "confirmed"`
+     면 제외)는 **그대로 둔다** — 미래 Meetup이 계속 숨는 것은 이미 맞으므로 이 필터를
+     건드리면 그게 되살아날 위험만 생긴다.
+  2. **`DayDetailPanel`(요일 상세 패널)에는 배지를 추가한다** — `CalendarMeetupDetail`
+     (`calendar-types.ts:45`)에 `isArchivedCrew: boolean` 필드를 `isCancelled`와 나란히
+     추가하고, `DayDetailMeetupRow`(`DayDetailPanel.tsx:150-157`)가 `isCancelled` 배지
+     (`Badge variant="secondary"`, `strings.calendar.month.detail.cancelledBadge`="취소됨")
+     바로 그 자리에 같은 방식으로 `isArchivedCrew`일 때 새 배지(`strings.calendar.month.
+     detail.archivedCrewBadge`="해산된 크루", 신규 문구 — `ko.ts`에 **추가만**)를 함께
+     보여준다. 두 배지는 배타적이지 않다(해산 전에 이미 취소됐던 Meetup은 둘 다 뜬다 —
+     사실이 둘 다 참이면 그대로 보여주는 게 맞다). 이미 있는 패턴을 그대로 확장하는
+     것이라 별도 설계 결정이 필요 없다.
+  3. **크루 필터(`CrewFilterPanel`/`CrewLegend`)에는 archived 크루를 넣되 구분 배지를
+     단다** — 뺄 이유가 없다(과거 이력을 계속 보려면 그 크루의 토글이 필터 목록에 있어야
+     한다). 기본 체크 상태는 **켜짐**(다른 크루와 동일 기본값 — "열람 가능"이 기본이라는
+     AC2 취지와 맞는다). `CrewFilterOption`(`calendar-types.ts:87`)에 `isArchived: boolean`
+     필드를 추가하고, `CrewLegend`(`CrewLegend.tsx`)에 새 선택적 prop `badge?: string`을
+     추가해(이름을 archived 전용으로 짓지 않는다 — 범용 배지 슬롯으로 만들어 두면 나중에
+     다른 상태 배지가 필요할 때도 재사용된다) `CrewFilterPanel`이 `crew.isArchived`일 때
+     그 prop에 새 문구(위 배지 재사용 또는 축약형, 예: "해산")를 넘긴다. 기존 `dimmed` prop
+     (체크 해제 시 흐리게)과는 **다른 신호**라 혼용하지 않는다 — archived 크루가 체크된
+     상태(기본값)에서도 배지는 계속 보여야 하므로 `dimmed`(선택 여부에 종속)로는 표현할
+     수 없다.
+  4. **팔레트·색 충돌은 손대지 않는다** — `colorKey`는 크루 고정 속성(D-006 해시)이라
+     archived 여부와 무관하고, `resolveCrewColorCollision`(날짜 셀 단위 충돌 회피)은 이미
+     크루 상태를 모르는 범용 로직이라 archived 크루의 과거 Meetup도 같은 규칙으로 자동
+     처리된다 — 별도 분기가 필요 없다. **다만 장기적으로**(이번엔 손대지 않음) archived
+     크루가 누적되면 크루 필터 목록이 죽은 크루로 계속 길어질 수 있다(FR-061 E5·D-014의
+     "12개 초과 시 필터 필수" 상황을 더 자주 만든다) — 실측 없이 미리 최적화하지 않는다
+     (D-029 원칙과 같은 결)는 판단으로 이번 범위에 넣지 않았고, 다음에 실제로 문제로
+     제보되면 이 문단이 원인 후보 1순위다.
+  - `/sample`에 archived 크루가 섞인 캘린더 상태를 등록하는 것은 위 컴포넌트 변경이 실제로
+    적용된 뒤에 함께 한다(지금 등록하면 실제 구현과 어긋난 정적 데모가 남는다) — CREW의
+    데이터 레이어 확정 통보를 받으면 구현과 `/sample` 등록을 같은 커밋에서 처리한다.
+- **데이터 레이어 확정(19일차 CREW, 위 DESIGN 대기 항목 해소)**: `listCrewsByProfile`
+  (`src/lib/data/supabase/crew.ts`)에 두 번째 인자 `opts?: { includeArchived?: boolean }`
+  (기본값 `false`)을 추가했다 — 확정 시그니처:
+  ```ts
+  listCrewsByProfile(profileId: Id, opts?: { includeArchived?: boolean }): Promise<Crew[]>
+  ```
+  1단계(멤버십 조회)는 옵션과 무관하게 항상 `status='active'`만 본다 — "속해 있는가"와
+  "그 크루가 archived인가"는 별개 판정이다. 2단계(크루 자체 조회)에서만
+  `includeArchived=true`일 때 `crews.status='active'` 필터를 생략한다. **기존 호출자 4곳
+  전수 조사**(`HomeCalendarSummaryContainer`·`fetch-crew-cards.ts`·`AccountSettingsContainer`·
+  `MonthCalendarContainer`) 결과 앞의 셋은 옵션을 생략해 기존과 동일하게 동작하고,
+  `MonthCalendarContainer`만 `{ includeArchived: true }`로 바꿔야 한다 —
+  **`MonthCalendarContainer.tsx:60`을 그렇게 고치면 DESIGN 쪽 나머지 작업(위 4가지 판단)을
+  시작할 수 있다.** `crews`·`meetups` SELECT RLS는 실측 확인 결과 이미 정상이라
+  (`crews_select_authenticated`·`meetups_select_members` 둘 다 `crews.status`를 보지 않음,
+  합성 데이터로 재확인) 이 함수 수정 하나로 근본 원인이 해소된다 — RLS 쪽 변경은 필요 없다.
+  상세 실측·전수 조사 근거: `docs/decisions/crew-lifecycle-040.md` §11.
+- **화면 절반 구현 완료(19일차, DESIGN — 코드·타입 검증까지, 화면 검증은 재빌드 후)**:
+  CREW의 `listCrewsByProfile` 시그니처를 `git diff`로 직접 대조해(팀장 요약이 아니라 코드
+  자체) 위 "데이터 레이어 확정" 각주와 정확히 일치함을 확인한 뒤 착수했다. 승인받은 4가지
+  판단을 그대로 구현했다 — 새 설계는 없다:
+  1. `MonthCalendarContainer.tsx:60`을 `listCrewsByProfile(profileId, { includeArchived:
+     true })`로 변경. `events.push` 필터(`meetup.status !== "confirmed"`면 제외, 197행대)는
+     **한 글자도 건드리지 않았다** — 미래 Meetup 숨김 회귀 방지가 이 수정의 최대 위험이라고
+     스스로 지적한 지점이라 diff를 별도로 다시 확인했다.
+  2. `calendar-types.ts`의 `CalendarMeetupDetail`에 `isArchivedCrew: boolean` 추가,
+     `CrewFilterOption`에 `isArchived: boolean` 추가. `MonthCalendarContainer.tsx`가
+     `crewById.get(meetup.crewId)?.status === "archived"`로 채운다.
+  3. `DayDetailPanel.tsx`의 `DayDetailMeetupRow`에 `isArchivedCrew` 배지
+     (`strings.calendar.month.detail.archivedCrewBadge`="해산된 크루")를 `isCancelled` 배지
+     옆에 추가 — 두 배지가 배타적이지 않게 같은 컨테이너에 나란히 뒀다(계획대로).
+  4. `CrewLegend.tsx`에 범용 `badge?: string` prop 추가(archived 전용 이름 안 씀, 계획대로),
+     `dimmed`와 별개 신호로 동시에 켤 수 있게 구현. `CrewFilterPanel.tsx`가
+     `crew.isArchived`일 때 `strings.calendar.month.filter.archivedCrewBadge`="해산됨"
+     (좁은 필터 행에 맞춰 상세 패널 배지보다 짧게)을 넘긴다.
+  5. 팔레트·충돌 회피는 계획대로 손대지 않았다.
+  - **문구**: `ko.ts`에 `calendar.month.filter.archivedCrewBadge`·`calendar.month.detail.
+    archivedCrewBadge` 2개를 **추가만** 했다(기존 키 재정렬 없음, `git diff`로 재확인 —
+    BOARD·CREW의 동시 편집 구간과 안 겹침).
+  - **`/sample` 등록** — 계획대로 구현과 같은 시점에 처리했다: `calendar.tsx`에 해산된
+    크루("종료된 스터디 모임") 1개를 크루 필터 데모에 추가(기본 체크 켜짐 + "해산됨" 배지),
+    그 크루의 과거 Meetup 1건을 8/5 날짜 셀에 추가(그리드 바는 다른 확정 Meetup과 동일하게
+    렌더 — 판단 1번을 데모로도 지킴). `DayDetailPanelPreview.tsx`의 "기본 상태" 샘플을
+    3건→4건으로 늘려 취소·해산 두 배지가 한 화면에서 함께 보이는 경우도 포함시켰다.
+    `CrewLegend` 단독 데모에도 `badge` prop 사용 예시를 추가했다.
+  - **검증**: `npx tsc --noEmit` 전체 0 errors(수정 전에도 무관한 기존 오류가 없었다 —
+    수정 후에도 0). `npx eslint`로 수정한 8개 파일 전부 클린. **빌드·서버 실행은 하지
+    않았다** — 화면 실렌더 확인(캘린더 그리드·크루 필터·요일 패널 배지가 실제로 그렇게
+    보이는지)은 재빌드 후 브라우저로 재확인이 필요하다(§ 아래 셋업 계획).
+- **화면 검증 대기(19일차 DESIGN)**: 재빌드되면 항목③과 같은 절차(일회용 private 크루 +
+  과거 Meetup 1건 SQL 삽입 → 화면에서 "크루 해산" 클릭 → 캘린더에서 ① 격자 바가 다른 확정
+  Meetup과 구분 없이 보이는지 ② 그 날짜 클릭 시 패널에 "해산된 크루" 배지가 뜨는지 ③ 크루
+  필터 목록에 그 크루가 기본 체크 상태로 남아 "해산됨" 배지와 함께 보이는지 ④ 다른 크루의
+  미래 Meetup 숨김이 회귀하지 않았는지 확인 → 12단계 정리 → 오너 크루 1개 재확인)로 진행할
+  예정이다. FR-013 AC2의 화면 만족 여부는 이 검증까지 마쳐야 최종 확정할 수 있다 —
+  아직 "구현 완료"이지 "검증 완료"는 아니다.
+- **화면 최종 검증 완료(19일차 DESIGN, 두 번째 재빌드) — FR-013 AC2 캘린더 경로 PASS**:
+  위 계획 그대로 실행했다. 일회용 크루("DESIGN 캘린더 재검증 크루(I-067)") + Meetup 3건
+  (과거 확정·과거+이미취소·미래 확정)을 SQL로 셋업, 화면에서 "크루 해산" 클릭, 4개 확인
+  항목 전부 스크린샷·접근성 스냅샷으로 실증:
+  1. **과거 Meetup 바가 격자에 보인다** — 6/5에 정상 렌더(§9.3에서 사라졌던 그 바가 이제
+     보인다).
+  2. **미래 Meetup 바는 여전히 사라진다** — 9월 캘린더 `find` 0건, 회귀 없음.
+  3. **`DayDetailPanel` 배지** — 과거 단독 Meetup에는 "해산된 크루" 배지만, 과거+이미
+     취소된 Meetup에는 "해산된 크루"·"취소됨" **두 배지가 함께**(팀장이 명시적으로 요청한
+     조합 케이스) 렌더됨을 확인.
+  4. **크루 필터** — 해산된 크루가 **기본 체크 상태**로 남고 "해산됨" 배지가 붙어 있으며,
+     체크 해제 시 `dimmed`(흐림)와 배지가 **동시에** 보임을 스크린샷으로 확인(설계한 대로
+     두 신호가 독립적으로 공존).
+  정리는 12단계 그대로 막힘 없이 완료, 잔여 0건·오너 크루 1개(주말 러닝 클럽) 재확인.
+  **판정: "미래 Meetup 바가 사라지고 과거 항목은 열람 전용으로 남는다"가 캘린더 경로에서
+  이제 화면으로 만족된다.** 이 회차에 새로 발생한 500/digest는 없었다(I-069 대조용 새
+  증거 없음). 재현 절차·스크린샷 전문:
+  `docs/decisions/auth-roundtrip-verification-019.md` §10.
+
+### I-069 · 프로덕션 빌드에서 서버 컴포넌트가 던진 `cause:{code:...}` 도메인 오류가 전부 "네트워크 오류"로 잘못 분류된다
+
+- **상태**: **확정**(19일차, 팀장 — Next.js 16 공식 문서 인용으로 확정) + **완화 적용됨**(19일차,
+  BOARD) — 근본 해결은 다음 회차 이월(아래 "후속" 참고).
+- **확정 근거(팀장, 문서 인용)**: `node_modules/next/dist/docs/01-app/03-api-reference/
+  03-file-conventions/error.md:110-111`(BOARD가 직접 재확인):
+  > - Errors forwarded from Client Components show the original `Error` message.
+  > - Errors forwarded from Server Components show a generic message with an identifier.
+  > This is to prevent leaking sensitive details. You can use the identifier, under
+  > `errors.digest`, to match the corresponding server-side logs.
+
+  즉 서버 컴포넌트가 던진 오류는 프로덕션에서 클라이언트로 **`digest`와 일반화된 메시지만**
+  넘어간다 — `error.cause`는 여기 포함되지 않으므로 `classifyError`가 절대 읽을 수 없다.
+  이건 Next.js의 **의도된 보안 동작**이지 버그가 아니다(민감 정보 차단 목적).
+- **영역**: UI / 빌드 / 프레임워크 경계
+- **제보**: DESIGN(2026-07-25, 19일차 — 항목④ ArchivedCrewBanner 검증 중 `/board/new`
+  직접 URL 접근으로 발견, 재빌드된 프로덕션 서버 `localhost:3210`에서 실측)
+- **내용**: `src/app/error.tsx`의 `classifyError()`는 서버 컴포넌트가 던진
+  `Error(message, {cause:{code, message}})`의 `cause.code`를 읽어 `RouteErrorBoundary`에
+  `forbidden`·`not_found`·`conflict`·`validation_failed`·`network` 중 하나를 표시한다
+  (D-030 ③ "도메인 오류도 화면 상태로"의 핵심 메커니즘). 이 프로젝트 곳곳의 Server
+  Component가 이 패턴으로 도메인 오류를 던진다. **두 개의 독립된 코드 경로에서 같은 증상을
+  재현했다**:
+  1. `PostWriteContainer.tsx:41-45` — 해산된 크루의 `/board/new`에 직접 URL로 접근하면
+     `throw new Error("해산된 크루에는 글을 쓸 수 없다.", {cause:{code:"forbidden",
+     message:"crew_archived"}})`를 던진다(19일차 Task 040이 의도적으로 만든 쓰기 차단
+     UX). 화면은 `strings.error.forbidden`("접근 권한이 없어요")이 나와야 하는데 실제로는
+     `strings.error.network`("연결에 문제가 있어요 / 네트워크 상태를 확인하고 다시 시도해
+     주세요")가 렌더됐다(HTTP 500, digest `2416360409`).
+  2. `(app)/crews/[crewId]/layout.tsx:80-82` — 비크루원인 private 크루에 직접 URL로
+     접근하면 `throw new Error("이 크루의 크루원만 볼 수 있다.", {cause:{code:"forbidden",
+     message:"not_crew_member"}})`를 던진다. **이 경로는 `docs/ISSUES.md` I-044(7일차)가
+     "화면은 요구사항대로다 — 접근 권한이 없어요가 정상 출력"이라고 명시적으로 확인해 둔
+     바로 그 지점이다.** 같은 크루·계정 조합으로 재현한 결과 **똑같이 "네트워크 오류"로
+     렌더됐다**(다른 digest `1418416045` — 캐시가 아니라 새 발생 확인).
+  - **근본 원인 추정**: 브라우저 콘솔에 뜨는 실제 오류 텍스트가 단서다 — `"An error
+    occurred in the Server Components render. The specific message is omitted in
+    production builds to avoid leaking sensitive details."` 이건 Next.js가 **프로덕션
+    빌드에서 서버 컴포넌트 예외를 클라이언트로 넘길 때 상세를 범용 오류로 치환하는 공식
+    동작**이다. `error.tsx` 자체 docstring도 "프로덕션에서는 `error.message`가 일반화된
+    문구로 대체되고 `digest`만 전달된다(NFR-014)"고 이미 알고 있었지만, **`error.cause`도
+    함께 사라진다는 것은 검증된 적이 없었다.** `classifyError`가 정확히 `cause.code`에
+    의존하므로, `cause`가 프로덕션에서 살아남지 못하면 이 분류는 구조적으로 항상
+    `network`로 떨어진다.
+  - **왜 지금까지 안 걸렸나**: I-044의 "정상 렌더 확인"은 **Mock 단계, `npm run dev`**
+    에서였다. 이 저장소에서 실제 `npm run build && npm start`(프로덕션 빌드) 기준으로
+    `cause` 기반 도메인 오류 분류를 브라우저로 검증한 것은 이번이 사실상 처음이다 — 이전
+    회차 기록 대부분이 "dev 서버 제약·팀장 전용 빌드라 확인 못 함"으로 끝난다
+    (`crew-lifecycle-040.md` §7-6, `rls-policies-029b.md` §16.5 등 반복 패턴). dev와
+    prod가 이 지점에서 다르게 동작한다면 dev 기준 확인만으로는 이 결함을 발견할 수
+    없었다.
+- **영향(추정, 코드 전수 확인은 안 함)**: 이 패턴을 쓰는 모든 서버 컴포넌트에서 프로덕션
+  사용자는 실제 사유(권한 없음·정원 마감 등)와 무관하게 항상 "연결에 문제가 있어요"만
+  본다. HTTP 상태 코드(500)와 서버 로그의 digest 자체는 정상 기록되므로 관측성에는 영향이
+  없지만(I-044가 지적한 "500 자체" 문제와는 결이 다르다), **사용자에게 보이는 안내 문구는
+  광범위하게 부정확**해진다 — D-030 ③ 설계 의도 전체가 프로덕션에서 무력화되는 셈이다.
+- **~~확정하지 못한 것~~(19일차 팀장이 위 문서 인용으로 확정, 원 문단은 경위 보존을 위해
+  지우지 않는다)**: 이 세션은 Next.js 앱 서버(`npm start`)의 실제 stdout/stderr에
+  접근할 수 없다(Supabase MCP `get_logs`는 Supabase 인프라 로그만 준다) — 위 두 digest로
+  서버 콘솔을 대조하면 (a) 의도한 `cause`가 서버 쪽에서 정확히 만들어졌는지(코드 확인상
+  맞다) (b) 클라이언트로 넘어오며 실제로 사라지는지를 확정할 수 있다. 코드 근거(동일 패턴
+  두 곳에서 재현·I-044의 dev 기준 대조·Next 공식 프로덕션 정화 동작)만으로는 "매우
+  유력"이지 "100% 확정"은 아니라고 정직하게 남긴다.
+
+- **I-044와의 상호 참조(19일차, BOARD)**: I-044(7일차)가 "화면은 요구사항대로다"라고 확인한
+  것은 **틀리지 않았다** — 그 확인은 `npm run dev` 기준이었고, dev에서는 서버 컴포넌트
+  예외의 `cause`가 프로덕션과 달리 클라이언트로 그대로 전달돼(NFR-014 문서화 동작과 정확히
+  대칭) `classifyError`가 정상적으로 `forbidden`을 분류했다. **검증 환경이 검증 결과를
+  바꾼 사례다** — I-044 항목에도 이 한계("dev 기준 확인이었고 prod에서는 I-069가 다른 결과를
+  낸다")를 추가해 둔다(아래 I-044 항목 자체 갱신 참고).
+- **I-052(소프트 404)·I-059(게스트 오진단 예외)와 같은 뿌리인가 — 판정: 아니다, 다른
+  뿌리다.** 셋 다 "같은 라우트 트리(`(app)/*`, 인증·크루원 게이트)에서 dev/prod 또는
+  런타임 조건에 따라 다르게 동작한다"는 표면적 공통점이 있지만 근본 원인은 서로 다르다.
+  I-052는 `notFound()`가 HTTP 200을 반환하는 Next.js 자체의 동작(별개 메커니즘, `not-found.tsx`
+  경로). I-059는 App Router가 레이아웃과 페이지를 병렬 렌더해 이미 리다이렉트를 택한
+  트리에서도 자식 서버 컴포넌트가 실행되며 나는 콘솔 전용 부작용(사용자에게 보이는 화면과
+  무관). I-069는 **Next.js가 프로덕션에서 서버 컴포넌트 예외의 `cause`를 의도적으로
+  제거하는 것**(클라이언트에 실제로 보이는 화면 문구가 바뀐다)이 원인이다. 셋을 하나로
+  묶어 "라우트 트리 오류 처리가 전반적으로 부실하다"고 뭉뚱그리면 각자 다른 해법(I-052는
+  상태 코드 매핑, I-059는 로깅 필터링, I-069는 오류 분류 채널 재설계)이 필요하다는 사실이
+  가려진다 — 별개 이슈로 유지한다.
+
+- **영향 범위 인벤토리(19일차, BOARD — 팀장이 "11곳/8개 파일"로 추산한 것을 코드로 직접
+  재조사)**: `grep -rn "cause: {"` + `throw new Error`로 전수 조사한 결과 **실행되는 throw
+  지점은 8곳·7개 파일**이다(`sample/sections/meetup.tsx`는 이 패턴을 설명하는 주석 인용일
+  뿐 실행되는 throw가 아니라 이번 집계에서 제외 — 팀장 추산과 숫자가 다른 이유). 전부
+  `code: "forbidden"`만 쓴다(`conflict`·`validation_failed`·`not_found`는 이 throw 패턴으로
+  쓰인 실제 사례가 이 저장소에 아직 없다 — `err()`로 값 반환하는 Server Action 경로에만
+  있다). 도달 가능성으로 나눴다:
+
+  | # | 파일:행 | 트리거 | 프로덕션 현재 렌더(완화 전) | 실사용자 도달 가능성 |
+  | - | --- | --- | --- | --- |
+  | 1 | `(app)/crews/[crewId]/layout.tsx:80` | 비크루원이 크루 하위 아무 URL이나 직접 접근(D-039 게이트) | "연결에 문제가 있어요" | **높음** — 링크 공유·즐겨찾기 등으로 누구나 흔히 도달 |
+  | 2 | `MeetupDetailContainer.tsx:56` | 비크루원이 `/meetups/[id]` 직접 접근(크루 레이아웃 밖, 리소스 ID 기준) | 동일 | **높음** — 1과 같은 성격, 초대 없이 URL만 알아도 도달 |
+  | 3 | `CrewSettingsContainer.tsx:46` | **활성 크루원이지만 임원 미만**이 `/crews/[id]/settings` 직접 접근 | 동일 | **높음** — 일반 크루원 누구나(레이아웃 게이트는 "크루원인가"만 보고 "임원인가"는 안 봄) |
+  | 4 | `PostWriteContainer.tsx:42`(19일차 Task 040 신설) | 해산된 크루 크루원이 `/board/new` 직접 접근 | 동일(DESIGN이 최초 발견한 지점) | **중간** — 해산된 크루에 한정되지만 그 조건에서는 항상 발생 |
+  | 5 | `BoardListContainer.tsx:34` | `board:read` 거부 | 동일 | **사실상 0** — `board:read`는 `crew_member` 이상 전원 `allow`(`permission.ts` 확인)이고 레이아웃이 이미 "크루원인가"를 걸렀으므로, 이 분기가 실제로 타지는 조건이 현재 권한 매트릭스에 없다(방어적 코드) |
+  | 6 | `PostDetailContainer.tsx:31` | 동일 논리 | 동일 | **사실상 0**(5와 같은 이유) |
+  | 7 | `PostWriteContainer.tsx:35` | `post:create` 거부 | 동일 | **사실상 0**(`post:create`도 `crew_member` 이상 전원 allow) |
+  | 8 | `MessageListContainer.tsx:35` | `chat:send_message` 거부(읽기 게이트 겸용) | 동일 | **사실상 0**(`chat:send_message`도 crew_member 이상 전원 allow) |
+
+  **우선순위 시사점**: 5~8은 현재 권한 매트릭스로는 도달 불가능한 방어적 코드라 당장 사용자
+  피해가 없다(향후 role별 세분화가 생기면 얘기가 달라진다). 1~4가 실제 사용자가 매일 겪을
+  수 있는 지점이다 — 완화(아래)와 다음 회차 근본 해결 모두 이 넷을 최우선으로 봐야 한다.
+
+- **완화 적용됨(19일차, BOARD)**: `classifyError`의 미분류 fallback을 `"network"`에서
+  새 kind `"unknown"`으로 분리했다 — "네트워크 문제"라고 원인을 **단정**하는 대신 "문제가
+  발생했어요"로 원인을 모른다고 **정직하게** 말한다. `global-error.tsx`(루트 레이아웃 오류
+  경계)의 `"network"` 사용은 건드리지 않았다 — 그 경로는 `classifyError`를 거치지 않고
+  독립적으로 `"network"`를 하드코딩하며, 루트 레이아웃 자체가 깨지는 것은 실제로 인프라·
+  연결 실패일 가능성이 더 높은 별개 상황이라 판단을 바꿀 근거가 없다(`grep`으로 다른
+  정당한 `network` 사용처가 있는지 전수 확인 — `global-error.tsx` 하나뿐임을 확인했다).
+  변경 파일: `src/components/errors/route-error-kind.ts`(`RouteErrorKind`에 `"unknown"`
+  추가)·`RouteErrorBoundary.tsx`(`KIND_META.unknown`, 아이콘 `CircleHelp`)·
+  `src/app/error.tsx`(fallback `"network"`→`"unknown"`)·`ko.ts`(`error.unknown` 문구 신설)·
+  `/sample`의 `errors.tsx`(새 kind 항목 등록 + 기존 `network`/`forbidden` 항목 note 정정).
+  `npx tsc --noEmit`·`npm run lint` clean, 브라우저 검증은 하지 않음(운영 규칙, 정직하게
+  남긴다). **이 완화는 오분류 자체를 고치지 않는다** — `forbidden`이어야 할 오류가 여전히
+  `unknown`으로 잘못 분류되는 것은 그대로다. 다만 사용자에게 **틀린 원인을 적극적으로
+  안내하던 것을 멈춘다**는 점에서 가치가 있다고 판단해 넣었다.
+
+- **근본 해결 후보 조사(19일차, BOARD — 결정은 하지 않음, 20일차 배치용 근거만 정리)**:
+  `node_modules/next/dist/docs/`를 먼저 읽었다(팀장 지시). **핵심 발견: 이 조사는 이미
+  D-040(18일차, CREW, `docs/prioritization-and-risks.md`)이 대부분 끝내 놓았다** — I-044
+  후속으로 CREW가 이미 `forbidden()`/`unauthorized()`·`authInterrupts`를 검토하고
+  "현행 유지"로 결정했었다. 19일차 재확인 결과 **그 결정의 사실관계는 바뀌지 않았다**:
+  - `forbidden()`/`unauthorized()`(`node_modules/next/dist/docs/01-app/03-api-reference/
+    04-functions/{forbidden,unauthorized}.md`)와 `forbidden.tsx`/`unauthorized.tsx` 파일
+    컨벤션이 실제로 존재하지만, 오늘도 여전히 `version: experimental`(함수·file convention)·
+    `version: canary`(`authInterrupts` 설정)로 표시된다 — `next.config.ts`를 확인한 결과
+    실제로 `experimental.authInterrupts`가 켜져 있지 않다(D-040 결정과 일치).
+  - **새로 확인한 것(D-040에는 없던 각도)**: `forbidden()`은 이 문제의 **근본 메커니즘을
+    구조적으로 우회한다** — Next 내장 오류 경계가 렌더하므로 애초에 `cause`를 클라이언트로
+    실어 나를 필요가 없다(어떤 함수를 호출했는지 자체가 분류다). 그래서 프로덕션 정화 문제
+    자체가 발생하지 않는다. 단 **`forbidden`/`unauthorized` 두 종류만 해당** — 이 저장소가
+    쓰는 `conflict`·`validation_failed`(현재 실제 throw 사례는 없지만 타입엔 있다)까지
+    커버하지 못해 부분 도입이 된다(D-040의 "이유 2"가 이미 지적한 문제, 여전히 유효).
+  - **대안 (b) — Server Component가 throw 대신 값을 반환하고 페이지가 직접 분기 렌더**:
+    이 프로젝트의 `DataResult`/`err`/`ok` 패턴(Server Action에는 이미 있다)을 서버 컴포넌트
+    조회 경로까지 넓히는 방향이다. `cause` 직렬화에 의존하지 않아 프로덕션 정화 문제를
+    구조적으로 피하고, `forbidden`뿐 아니라 6종 전체를 동일하게 처리할 수 있다는 게
+    `forbidden()`보다 나은 점이다. 대가는 **8곳(위 인벤토리) 전부를 "throw" → "값 반환 +
+    페이지가 조건부로 `<RouteErrorBoundary kind=.../>` 직접 렌더"로 재작업**해야 한다는
+    것 — `error.tsx`(세그먼트 경계) 자체를 안 타게 되므로 `classifyError`도 이 8곳에 대해서는
+    무의미해진다(다른 미분류 예외에 대한 fallback 역할은 유지).
+  - **팀장 결정 대상 프레임(제안, 결정 아님)**: authInterrupts는 "forbidden/unauthorized
+    2종만 지금 당장 고치고 나머지는 그대로 둔다"는 **부분 커버 + 실험적 API 리스크** 트레이드,
+    (b)는 "8곳 전부를 한 번에 재작업"이라는 **더 큰 비용 + 안정 API로 완결**되는 트레이드다.
+    D-040이 3개월 전(18일차) "지금 당장 사용자 영향 없음"을 이유 3으로 들어 유보했는데,
+    **I-069가 그 이유 3을 무너뜨렸다** — 지금은 실제 프로덕션에서 사용자가 틀린 안내를 받는
+    것이 실측으로 확인된 상태라, D-040을 재검토할 시점이 됐다는 것이 이번 조사의 결론이다.
+- **후속**: 20일차 배치 대상. 위 두 후보(authInterrupts 부분 도입 vs 값 반환 패턴 전면
+  전환) 중 선택은 팀장 몫으로 남긴다. 재현 절차·스크린샷 전문:
+  `docs/decisions/auth-roundtrip-verification-019.md` §9.4.

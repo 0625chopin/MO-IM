@@ -16,11 +16,18 @@ export interface MemberRowViewModel {
   isSelf: boolean;
   /** 오너가 이 행의 역할(임원 ↔ 일반)을 바꿀 수 있는가(FR-024, D-002 — 오너 행은 항상 false). */
   canAppoint: boolean;
-  /** 본인 행이고 `crew:leave` 판정을 통과했는가(FR-026). 오너는 항상 false다(오너 이양·해산이
-   *  아직 없어 전제조건을 만족시킬 방법이 없다 — `leave-crew.ts` docstring 참고). */
+  /** 본인 행이고 `crew:leave` 판정을 통과했는가(FR-026). 오너는 항상 false다(오너 이양·해산으로
+   *  먼저 자리를 비워야 한다 — `leave-crew.ts` docstring 참고). */
   canLeave: boolean;
   /** `isSelf && !canLeave`일 때만 채워지는 안내 문구(예: 오너의 탈퇴 불가 사유). */
   leaveBlockedReason: string | null;
+  /** 오너가 이 행(본인 제외 다른 active 크루원)에게 오너 자리를 넘길 수 있는가(FR-025, D-002).
+   *  Task 040. */
+  canTransferOwnership: boolean;
+  /** 뷰어가 이 행을 강퇴할 수 있는가(FR-027). 오너는 임원·일반 누구나, 임원은 일반 크루원만
+   *  (각주⁴) — 최종 판정은 Server Action이 `checkPermission`으로 다시 하므로 여기서는 버튼
+   *  노출 여부만 결정한다(R-015, 오너 행은 항상 false). Task 040. */
+  canRemove: boolean;
 }
 
 /**

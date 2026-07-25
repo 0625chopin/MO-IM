@@ -11,6 +11,7 @@ import { toNotificationItemViewModel } from "@/components/notifications/notifica
 import type { NotificationItemViewModel } from "@/components/notifications/notification-view-models";
 import { markAllNotificationsReadAction } from "@/lib/actions/mark-all-notifications-read";
 import { markNotificationReadAction } from "@/lib/actions/mark-notification-read";
+import { describeRealtimeError } from "@/lib/realtime";
 import type { Id } from "@/lib/types";
 
 export interface UseNotificationFeedResult {
@@ -51,7 +52,9 @@ export function useNotificationFeed(
         if (!notification.readAt) setUnreadCount((count) => count + 1);
       },
       (error) => {
-        console.error("[notifications] realtime subscription error", error);
+        // `cause`(원본 소켓 에러) 노출 폭을 줄인다(19일차 CORE 교차검증 후속 — MessageRoomContainer
+        // 와 같은 이유, `docs/decisions/realtime-broadcast-033.md` §8-후속①).
+        console.error("[notifications] realtime subscription error", describeRealtimeError(error));
       },
     );
     return unsubscribe;

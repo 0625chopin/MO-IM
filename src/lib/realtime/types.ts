@@ -43,6 +43,22 @@ export interface RealtimeConnectionError {
 export type RealtimeErrorHandler = (error: RealtimeConnectionError) => void;
 
 /**
+ * `RealtimeConnectionError`를 콘솔 로깅용 안전한 문자열로 좁힌다 — Task 033 CORE 교차검증
+ * 후속(19일차). `cause`는 실데이터 단계(`broadcast.ts`)에서 supabase-js realtime-js가 돌려주는
+ * 원본 소켓 에러 객체다 — 그 안에 `access_token` 원문이 실제로 담기는지는 라이브러리 소스까지
+ * 확인해야 알 수 있어 "샌다"고 단정하지 않지만, **토큰을 다루는 경로에서 불필요하게 로깅
+ * 노출 폭을 넓히지 않는다**는 원칙으로 `console.error(..., error)`(객체 통째)가 아니라 이
+ * 함수가 뽑아낸 메시지 문자열만 찍는다. 디버깅에 필요한 최소 정보(오류 메시지)는 남긴다 —
+ * `cause`가 `Error` 인스턴스면 그 `message`만, 아니면 문자열로 강제 변환해 원본 객체 구조
+ * (스택 트레이스·소켓 내부 필드 등)를 로그에 남기지 않는다.
+ */
+export function describeRealtimeError(error: RealtimeConnectionError): string {
+  if (error.cause === undefined) return error.message;
+  const causeMessage = error.cause instanceof Error ? error.cause.message : String(error.cause);
+  return `${error.message} (cause: ${causeMessage})`;
+}
+
+/**
  * 제안된 구독 인터페이스 형태 — `subscribeToRoom(id, onEvent): Unsubscribe`
  * (README·ROADMAP 원문 그대로) + 선택적 세 번째 인자 `onError`로 D-030 ③의
  * 도메인 오류 콜백을 분리했다. Mock(`mock.ts`)·Broadcast(`broadcast.ts`) 둘

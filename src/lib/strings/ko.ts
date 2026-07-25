@@ -330,11 +330,32 @@ export const ko = {
         errors: {
           sessionExpired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
           notAllowed: "탈퇴할 수 없어요",
-          /** 오너는 오너 이양(FR-025)이나 크루 해산(FR-013) 전에는 탈퇴할 수 없다 — 둘 다
-           *  아직 구현되지 않아(v0.2·후속 Task 대상) 이 문구가 안내하는 조치를 지금 화면에서
-           *  바로 진행할 수는 없다. */
+          /** 오너는 오너 이양(FR-025, `settings.transferOwnership`)이나 크루 해산(FR-013,
+           *  `settings.disband`) 없이는 이 크루를 탈퇴할 수 없다 — 둘 다 Task 040에서 구현됐다
+           *  (크루 설정 화면 안내). */
           ownerMustTransferOrDisband: "오너는 먼저 오너를 위임하거나 크루를 해산해야 탈퇴할 수 있어요",
           failed: "탈퇴하지 못했어요. 다시 시도해 주세요.",
+        },
+      },
+      /** FR-027 크루원 강퇴(D-003, Task 040) — `MemberList`의 행별 버튼. 오너는 임원·일반
+       *  크루원 누구나, 임원은 일반 크루원만 대상으로 할 수 있다(각주⁴). 사유는 선택 입력. */
+      remove: {
+        button: "강퇴",
+        dialogTitle: "크루원을 강퇴할까요?",
+        dialogDescription: "강퇴하면 이 크루원은 즉시 크루를 떠나고, 같은 크루에 재신청할 수 없어요(오너가 해제 전까지). 진행 중인 투표에 던진 표는 무효 처리돼요.",
+        reasonLabel: "사유(선택)",
+        reasonPlaceholder: "강퇴 사유를 남길 수 있어요",
+        submit: "강퇴하기",
+        submitPending: "강퇴하는 중…",
+        cancel: "취소",
+        errors: {
+          sessionExpired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+          /** FR-027 E1 — 임원이 임원·오너를 대상으로 시도(각주⁴, `staff_can_only_remove_member`). */
+          notAllowed: "일반 크루원만 강퇴할 수 있어요",
+          /** FR-027 E2 — 대상이 오너. */
+          targetIsOwner: "오너는 강퇴 대상이 아니에요",
+          targetInactive: "이미 크루를 떠난 크루원이에요",
+          failed: "강퇴하지 못했어요. 다시 시도해 주세요.",
         },
       },
       /** FR-020 크루원 초대 다이얼로그. 핸들 검색은 `UserSearchField`(계정 설정과 공유,
@@ -436,6 +457,60 @@ export const ko = {
           failed: "변경하지 못했어요. 다시 시도해 주세요.",
         },
       },
+      /** FR-025 오너 이양(D-002, Task 040). 오너 전용 — 대상은 멤버 목록에서 고른다(핸들
+       *  검색이 아니다, 이미 크루원인 사람만 대상이 될 수 있으므로). 크루명 재입력 확인은
+       *  해산과 같은 이유(돌이킬 수 없는 조작의 오클릭 방지)로 둔다 — SQL 강제 경계는 아니고
+       *  UX 확인용이다(`crews_guard_owner_only_fields`가 대상 자격은 별도로 강제한다). */
+      transferOwnership: {
+        trigger: "오너로 임명",
+        dialogTitle: "오너 이양",
+        dialogDescription: "이양하면 나는 임원이 되고, 선택한 크루원이 새 오너가 돼요. 되돌리려면 새 오너가 다시 이양해야 해요.",
+        confirmLabel: "확인을 위해 크루명을 입력해 주세요",
+        confirmPlaceholder: "크루명 입력",
+        submit: "이양하기",
+        submitPending: "이양하는 중…",
+        cancel: "취소",
+        errors: {
+          sessionExpired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+          notAllowed: "오너 이양 권한이 없어요",
+          nameMismatch: "크루명이 일치하지 않아요",
+          /** FR-025 E1 — 대상이 활성 크루원이 아님(SQL 강제 경계, `crews_guard_owner_only_fields`). */
+          targetInactive: "이미 크루를 떠난 크루원이에요",
+          failed: "이양하지 못했어요. 다시 시도해 주세요.",
+        },
+      },
+      /** FR-013 크루 해산(D-009 후반, Task 040). 오너 전용, 되돌릴 수 없다 — 진행 중 투표·미래
+       *  Meetup이 전부 취소되고 채팅 로그가 즉시 파기된다. */
+      disband: {
+        trigger: "크루 해산",
+        dialogTitle: "크루를 해산할까요?",
+        dialogDescription: "해산하면 되돌릴 수 없어요. 진행 중인 투표는 모두 취소되고, 앞으로 예정된 모임도 모두 취소돼요. 채팅 기록은 즉시 삭제돼요.",
+        noticeVotes: "진행 중인 투표가 전부 취소됩니다",
+        noticeMeetups: "앞으로 예정된 모임이 전부 취소됩니다(지난 모임은 열람 전용으로 남아요)",
+        noticeChat: "채팅 기록이 즉시 삭제됩니다",
+        confirmLabel: "확인을 위해 크루명을 입력해 주세요",
+        confirmPlaceholder: "크루명 입력",
+        submit: "해산하기",
+        submitPending: "해산하는 중…",
+        cancel: "취소",
+        errors: {
+          sessionExpired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+          notAllowed: "크루 해산은 오너만 할 수 있어요",
+          nameMismatch: "크루명이 일치하지 않아요",
+          alreadyDisbanded: "이미 해산된 크루예요",
+          failed: "해산하지 못했어요. 다시 시도해 주세요.",
+        },
+      },
+    },
+    /** FR-013 AC2 — 해산된 크루 안내(Task 040 UI/게이트 절반, BOARD, 19일차, I-066·I-067
+     *  해소). 크루원 게이트 레이아웃(`(app)/crews/[crewId]/layout.tsx`)이 `crews.status
+     *  ==='archived'`인 크루의 모든 하위 화면 상단에 공통으로 띄운다 — 게시판 글쓰기·채팅
+     *  전송이 막혔을 때 "왜 안 되는지" 사용자가 알 수 있어야 한다(팀장 지시, "글을 쓸 수
+     *  없는 이유를 모르면 그건 또 다른 결함"). 열람은 그대로 되므로 "막혔다"가 아니라
+     *  "제한된다"는 톤을 쓴다. */
+    archivedNotice: {
+      title: "해산된 크루예요",
+      description: "이 크루는 해산되어 새 글 작성·채팅 전송이 제한됩니다. 기존 게시글·채팅 기록은 계속 열람할 수 있어요.",
     },
   },
 
@@ -490,6 +565,11 @@ export const ko = {
         crewCheckboxLabel: "{crewName}",
         /** FR-061 E5 — 소속 크루가 12개를 넘어 색이 반드시 겹칠 때의 안내. */
         collisionNotice: "소속 크루가 12개를 넘어 일부는 색이 겹쳐요. 크루명으로 구분해 주세요.",
+        /** FR-013 AC2(I-067, 19일차) — 해산된 크루도 과거 이력 열람을 위해 필터 목록에 남지만
+         *  더 이상 선택할 수 있는 미래 일정이 없다는 걸 알려야 한다. `CrewLegend`의 범용
+         *  `badge` prop에 넘긴다 — 좁은 2열 그리드 안에 들어가야 해서 상세 패널
+         *  (`detail.archivedCrewBadge`)보다 짧게 줄였다. */
+        archivedCrewBadge: "해산됨",
       },
       /**
        * Task 021B — `DayDetailPanel`(FR-063). 데스크톱 사이드 패널·모바일 바텀시트 공통 문구.
@@ -508,6 +588,12 @@ export const ko = {
         errorDescription: "네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
         /** FR-063 E3 — 취소된 Meetup 배지. */
         cancelledBadge: "취소됨",
+        /** FR-013 AC2(I-067, 19일차) — 해산된 크루의 과거 Meetup에 붙는 배지.
+         *  `cancelledBadge`와 배타적이지 않다(해산 전에 이미 취소됐던 Meetup은 둘 다 뜬다 —
+         *  그 자체로는 사실 두 개가 함께 참이므로 그대로 보여준다). 이 Meetup은
+         *  `status='confirmed'`로 실제 열렸던 일정이라 "취소됨"과 혼동되면 안 된다는 뜻에서
+         *  독립된 문구로 뒀다. */
+        archivedCrewBadge: "해산된 크루",
         /** `{count}`/`{capacity}` 정원 표시(FR-064 AC3 파생). */
         capacityLabel: "{count}/{capacity}명 참석",
         /** 정원 제한이 없는 Meetup(capacity === null). */
@@ -597,9 +683,19 @@ export const ko = {
         heading: "계정 탈퇴",
         description: "탈퇴하면 계정이 30일간 비활성화된 뒤 개인정보가 파기돼요.",
         /** D-010 — 정상 흐름 ②(처리 내역 고지)에 쓰는 안내 3줄. */
+        /**
+         * FR-005 정상 흐름 ②(처리 내역 고지). **정정(19일차, I-068 — DESIGN 실측·팀장 확인)**:
+         * `content`가 시점을 밝히지 않아 "탈퇴 즉시 작성자 표기가 바뀐다"로 읽혔지만, 실제로는
+         * `personalData`와 같은 시점(30일 유예가 끝난 뒤, D-044 `deactivated`→`withdrawn`
+         * 전이)에만 바뀐다 — `request_account_deactivation()`은 `display_name` 등을 건드리지
+         * 않고, `anonymize_expired_deactivated_profiles()`(pg_cron, 30일 경과 후)가 그제서야
+         * 바꾼다(실측). 그 사이 유예 기간에는 크루원들에게 실명·실아바타가 계속 작성자로
+         * 보인다 — D-044 설계(유예 중 PII 원본 보존) 자체는 의도된 것이라 동작은 고치지 않고
+         * 문구만 시점을 명시하도록 고쳤다.
+         */
         notice: {
           personalData: "이메일·핸들·표시 이름·아바타·소개는 30일 뒤 파기돼요.",
-          content: "작성한 게시글·투표·채팅은 본문이 유지되고, 작성자는 '탈퇴한 사용자'로 표시돼요.",
+          content: "작성한 게시글·투표·채팅은 본문이 유지돼요. 작성자 표기는 30일 유예가 끝난 뒤 '탈퇴한 사용자'로 바뀌고, 그 전까지는 그대로 보여요.",
           votes: "투표 기록은 집계 정합성을 위해 그대로 남아요.",
         },
         blockedByOwnership: {
@@ -971,6 +1067,10 @@ export const ko = {
       meetupCreated: "새 모임이 만들어졌어요",
       meetupCancelled: "모임이 취소됐어요",
       postCommented: "내 글에 새 댓글이 달렸어요",
+      /** FR-025 오너 이양(Task 040) — 이전 오너·신규 오너 양쪽에 보낸다. */
+      ownershipTransferred: "크루 오너가 바뀌었어요",
+      /** FR-013 크루 해산(Task 040) — 해산 시점의 전 크루원에게 보낸다. */
+      crewDisbanded: "크루가 해산됐어요",
     },
   },
 
@@ -1158,6 +1258,11 @@ export const ko = {
    * `forbidden`) + 그 계약 밖의 `network`(세션 조회 실패, `auth-session.ts`)·`capacityFull`
    * (정원 마감, `meetup.types.ts`의 `AttendanceJoinResult.reason: "full"`)을 합친 어휘와
    * 1:1 대응한다 — 새 오류 분류 체계를 만들지 않고 기존 도메인 오류 타입을 그대로 옮겼다.
+   *
+   * **`deactivated`(19일차, I-060 수정)**: `AuthSession`의 `status:"error"` 판별 유니온에서
+   * `reason:"deactivated"`(Task 039)만 가리키는 문구다 — `forbidden`(게스트 취급, 복구
+   * 불가)·`network`(진짜 네트워크 실패)와 다른 세 번째 원인이라 별도 키로 뺐다.
+   * `HeaderNav.tsx`가 `reason`별 완전 분기(exhaustive switch)로 이 키를 쓴다.
    */
   error: {
     notFound: {
@@ -1168,9 +1273,21 @@ export const ko = {
       title: "접근 권한이 없어요",
       description: "이 크루의 크루원만 볼 수 있어요",
     },
+    deactivated: {
+      title: "계정이 탈퇴 처리 중이에요",
+      description: "로그인하면 남은 유예 기간 동안 계정을 복구할 수 있어요",
+    },
     network: {
       title: "연결에 문제가 있어요",
       description: "네트워크 상태를 확인하고 다시 시도해 주세요",
+    },
+    /** 19일차, I-069 완화 — `error.tsx`의 `classifyError`가 원인을 알 수 없을 때(프로덕션에서는
+     *  항상 이 경로다) 쓰는 중립 문구. `network`와 달리 원인을 단정하지 않는다 — 실제로는
+     *  권한 없음·정원 마감 등 다른 이유일 수 있는데 "네트워크 문제"라고 잘못 안내하지 않기
+     *  위해서다. `docs/ISSUES.md` I-069 참고. */
+    unknown: {
+      title: "문제가 발생했어요",
+      description: "잠시 후 다시 시도해 주세요. 계속되면 새로고침해 주세요.",
     },
     conflict: {
       title: "다른 사용자가 먼저 처리했어요",

@@ -19,6 +19,7 @@ const SAMPLE_MEETUPS: CalendarMeetupDetail[] = [
     attendingCount: 12,
     capacity: 20,
     isCancelled: false,
+    isArchivedCrew: false,
     postHref: "#",
   },
   {
@@ -32,6 +33,7 @@ const SAMPLE_MEETUPS: CalendarMeetupDetail[] = [
     attendingCount: 6,
     capacity: null,
     isCancelled: false,
+    isArchivedCrew: false,
     postHref: "#",
   },
   {
@@ -45,7 +47,27 @@ const SAMPLE_MEETUPS: CalendarMeetupDetail[] = [
     attendingCount: 0,
     capacity: 10,
     isCancelled: true,
+    isArchivedCrew: false,
     postHref: null,
+  },
+  /**
+   * FR-013 AC2(I-067, 19일차) — 해산된 크루의 과거 Meetup. `isCancelled`와 독립 신호라
+   * 별도 항목으로 둔다(둘 다 참인 경우까지 보여주면 오히려 "취소된 Meetup은 항상 해산된
+   * 크루"라는 잘못된 인상을 줄 수 있어, 취소 예시와는 다른 크루로 분리했다).
+   */
+  {
+    id: "sample-meetup-archived",
+    crewId: "sample-crew-archived",
+    crewName: "종료된 스터디 모임",
+    title: "8월 첫째 주 스터디",
+    colorIndex: 7,
+    startTime: "20:00",
+    place: "온라인",
+    attendingCount: 5,
+    capacity: 8,
+    isCancelled: false,
+    isArchivedCrew: true,
+    postHref: "#",
   },
 ];
 
@@ -53,8 +75,9 @@ const SAMPLE_MEETUPS: CalendarMeetupDetail[] = [
  * `/sample` 전용 클라이언트 경계 — `DayDetailPanel`은 `open`/`onOpenChange`를 부모가 제어하는
  * 표현 컴포넌트라, 여는 상태를 갖는 트리거가 있어야 실제로 열어 볼 수 있다(`overlays.tsx`의
  * `ToastTriggerPreview`와 같은 이유 — 서버 컴포넌트인 `sections/calendar.tsx`가 `useState`를
- * 가질 수 없다). 네 버튼이 4상태와 1:1 대응한다 — "기본"은 취소 배지 1건을 포함한 3건, "빈
- * 상태"는 그날 Meetup이 0건(FR-063 E1), "로딩"·"오류"는 `DayDetailPanel`의 `status` prop을
+ * 가질 수 없다). 네 버튼이 4상태와 1:1 대응한다 — "기본"은 취소 배지 1건·해산된 크루 배지
+ * 1건(FR-013 AC2, I-067, 19일차)을 포함한 4건, "빈 상태"는 그날 Meetup이 0건(FR-063 E1),
+ * "로딩"·"오류"는 `DayDetailPanel`의 `status` prop을
  * 그 값으로 고정해 연다(CORE 재검증 지적, 7일차 — 처음엔 이 둘이 없어 2/4 커버리지였다).
  * `status`는 `/sample` 전용이고 실제 호출부(`MonthCalendar.tsx`)는 쓰지 않는다(`DayDetailPanel.tsx`
  * 모듈 docstring 참고).
@@ -67,7 +90,7 @@ export function DayDetailPanelPreview() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" onClick={() => setOpenState("default")}>
-        기본 상태 열기 (Meetup 3건, 그중 1건 취소)
+        기본 상태 열기 (Meetup 4건 — 취소 1건, 해산된 크루 1건)
       </Button>
       <Button variant="outline" size="sm" onClick={() => setOpenState("empty")}>
         빈 상태 열기 (Meetup 0건)

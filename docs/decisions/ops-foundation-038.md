@@ -30,6 +30,30 @@ Task 038(2.0인일, S)의 세 축 — 감사 로그(NFR-015)·레이트 리밋(D
 따랐다. NFR-015가 요구하는 "100% 기록"에는 재시도 큐가 없어 이론상 못 미친다 — §5 "남은
 리스크" 참고.
 
+> **추가(19일차, 팀장 지시로 확인 — Task 040이 `AuditAction` 유니온에 값 3개를 추가하며 드러난
+> 사실) — `action` 컬럼에는 CHECK 제약이 없다.** 원 절(§1.2)이 RLS(완전 거부)는 적었지만
+> `audit_logs` 테이블 자체의 제약 목록은 적지 않았다. 실측(`pg_constraint` 조회, 19일차
+> 재확인):
+>
+> ```
+> audit_logs_pkey        PRIMARY KEY (id)
+> audit_logs_actor_id_fkey  FOREIGN KEY (actor_id) REFERENCES profiles(id) ON DELETE RESTRICT
+> audit_logs_crew_id_fkey   FOREIGN KEY (crew_id) REFERENCES crews(id) ON DELETE RESTRICT
+> ```
+>
+> **3개뿐이다 — `action`(text 컬럼)에는 CHECK도 없고 참조할 별도 lookup 테이블(enum)도 없다.**
+> 즉 `action` 값이 `AuditAction`(TypeScript 유니온, `src/lib/audit/audit-log.ts`)이 정한 형태와
+> 일치하는지 강제하는 경계는 **TypeScript 유니온 하나뿐**이다 — `recordAuditLog`를 우회해 DB에
+> 직접(또는 다른 서버 코드에서 문자열 리터럴 오타로) 쓰면 걸러지지 않는다. 18일차 §2.6이
+> "SQL이 최종 경계"라고 적었다가 I-058로 정정된 것과 **같은 계열의 함정**이다 — 이번엔 그
+> 전제 자체를 처음부터 적지 않아서 정정할 것도 없었지만, 없는 채로 남겨 두면 같은 오독이
+> 반복될 수 있어 이번에 명시적으로 채운다. **결함으로 등재하지는 않는다** — `audit_logs`는
+> 클라이언트가 완전히 못 쓰는 테이블이라(§1.1) 이 컬럼에 잘못된 값이 들어갈 수 있는 경로가
+> 서버 코드(`recordAuditLog` 호출부) 오타뿐이고, 그건 코드 리뷰·타입 체커가 잡는 종류의
+> 실수이지 외부 공격 표면이 아니다. 다만 **CHECK 제약을 추가하는 것 자체는 저비용 방어**라 —
+> 필요하다고 판단되면 후속 마이그레이션으로 `check (action in (...))`을 붙이는 안을 검토할
+> 수 있다(이번 회차 범위 밖으로 남긴다).
+
 ### 1.3 호출부 3곳 — DESIGN 소유 파일에 최소 삽입
 
 NFR-015 대상 5행위(권한 변경·강퇴·해산·투표 종료·게시물 강제 삭제) 중 **강퇴·해산은 이

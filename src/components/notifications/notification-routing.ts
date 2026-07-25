@@ -73,6 +73,14 @@ const NOTIFICATION_ROUTE_RESOLVERS: Record<NotificationType, NotificationRouteRe
     const postId = readResourceId(payload, "postId");
     return crewId && postId ? getPostDetailHref(crewId, postId) : null;
   },
+  // FR-025 오너 이양(Task 040) — 결과를 확인할 곳이 크루 홈(staff_appointed와 같은 이유).
+  ownership_transferred: (payload) => {
+    const crewId = readResourceId(payload, "crewId");
+    return crewId ? getCrewHomeHref(crewId) : null;
+  },
+  // FR-013 크루 해산(Task 040) — member_removed와 같은 이유(해산된 크루로는 더 이상 갈 수
+  // 없다, D-030 ③) 크루 탐색 일반 목록으로 보낸다.
+  crew_disbanded: () => CREW_EXPLORE_HREF,
 };
 
 /**

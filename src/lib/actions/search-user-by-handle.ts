@@ -3,7 +3,7 @@
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getRecentHandleSearchAttempts, recordHandleSearchAttempt } from "@/lib/audit/rate-limit-store";
-import { getProfileByHandle } from "@/lib/data";
+import { searchProfilesByHandle } from "@/lib/data";
 import { projectHandleSearchResult, type HandleSearchResult } from "@/lib/rules/handle-search";
 import { checkPermission } from "@/lib/rules/permission";
 import { evaluateFixedWindowRateLimit, HANDLE_SEARCH_RATE_LIMIT } from "@/lib/rules/rate-limit";
@@ -40,11 +40,20 @@ import { evaluateFixedWindowRateLimit, HANDLE_SEARCH_RATE_LIMIT } from "@/lib/ru
  * 무관하게 "너는 검색 자체를 할 수 없다"는 정보가 새어 나간다. 이 액션이 반환할 수 있는 모양은
  * 처음부터 `HandleSearchResult` 하나뿐이라 그럴 여지가 없다.
  *
- * **동일 코드 경로로 미존재·옵트아웃을 처리한다(R-012)**: `getProfileByHandle`은 정확 일치
- * 조회이고(부분 일치 없음, D-005·AC2), 그 결과를 무엇을 하든 바로
+ * **동일 코드 경로로 미존재·옵트아웃을 처리한다(R-012)**: 조회 결과를 무엇을 하든 바로
  * `projectHandleSearchResult`(순수 함수, `lib/rules/handle-search.ts`)에 넘긴다 — 이 액션
  * 자신은 "존재하지만 옵트아웃"과 "존재하지 않음"을 구분하는 조건문을 갖지 않는다. 그 판정
  * 함수 안에서 두 경우가 이미 같은 값으로 합쳐진다.
+ *
+ * **19일차(I-058 major① 교차검증) — `getProfileByHandle` 대신 `searchProfilesByHandle`
+ * (`profile_search` RPC 경유)을 쓴다.** `getProfileByHandle`은 handle→id 내부 재해석
+ * 전용으로 좁혀졌다(`src/lib/data/supabase/profile.ts` 모듈 docstring) — service-role로 RLS를
+ * 완전히 우회하고 상태·옵트아웃 필터·리밋이 전혀 없어, 이 FR-006 "검색" 경로에 계속 썼다면
+ * SQL 강제 리밋이 없는 무제한 핸들 오라클을 다시 만드는 것이었다. `searchProfilesByHandle`이
+ * 부르는 `profile_search`는 이미 SQL 강제 레이트 리밋(D-005, 18일차 §14)·정확 일치·
+ * `status='active' and search_opt_out=false` 필터(NFR-013·R-012)를 갖고 있다 — 이 액션의
+ * 인증·자체 레이트 리밋은 그 위에 얹는 UX 계층일 뿐, SQL 경계가 이중으로 보호한다. RPC는
+ * 정확 일치 0~1건만 반환하므로 배열의 첫 항목만 쓴다.
  *
  * **레이트 리밋(D-005·NFR-016, 계정당 분당 20회)이 여기 있다(Task 038, 18일차 BOARD)** —
  * `lib/audit/rate-limit-store.ts`가 `public.handle_search_attempts`를 읽고 쓰기만 하고, 판정은
@@ -75,6 +84,6 @@ export async function searchUserByHandleAction(handleQuery: string): Promise<Han
     return { found: false };
   }
 
-  const profile = await getProfileByHandle(handle);
-  return projectHandleSearchResult(profile);
+  const matches = await searchProfilesByHandle(handle);
+  return projectHandleSearchResult(matches[0] ?? null);
 }

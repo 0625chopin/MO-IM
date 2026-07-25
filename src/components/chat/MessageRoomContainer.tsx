@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 
+import { getCrewChatTopic } from "@/components/chat/chat-topic";
 import { Composer } from "@/components/chat/Composer";
 import { ConnectionBanner } from "@/components/chat/ConnectionBanner";
 import {
@@ -14,7 +15,7 @@ import { loadEarlierMessagesAction } from "@/lib/actions/load-earlier-messages";
 import { resyncChatMessagesAction } from "@/lib/actions/resync-chat-messages";
 import type { SendChatMessageState } from "@/lib/actions/send-chat-message";
 import { sendChatMessageAction } from "@/lib/actions/send-chat-message";
-import { publishMockEvent, subscribeToRoom } from "@/lib/realtime";
+import { describeRealtimeError, subscribeToRoom } from "@/lib/realtime";
 import {
   nextChatConnectionStatus,
   type ChatConnectionStatus,
@@ -123,15 +124,17 @@ function getMountedFalseOnServer(): boolean {
  * 개념이 없으므로 이 회차에서는 "재구독"을 실제로 해제·재등록하는 의식(儀式) 코드를 만들지
  * 않았다 — `subscribeToRoom` 호출은 `roomId`가 바뀌지 않는 한 계속 유효하다.
  *
- * **Mock 단계의 구조적 한계 — 반드시 알고 있을 것**: `publishMockEvent` 발행은 **같은 브라우저
- * 탭(같은 JS 모듈 인스턴스) 안에서만** 유효하다. 다른 탭·다른 브라우저·다른 사용자에게는 이
- * 이벤트가 절대 전달되지 않는다 — Mock 단계에는 애초에 전송 계층이 없기 때문이다. 이건 새로
- * 생긴 버그가 아니라 **Mock First의 알려진 한계**이고, 억지로 흉내 내려 하지 않는다(예:
- * `BroadcastChannel`이나 폴링으로 탭 간 동기화를 만드는 것 — 실데이터 전환 때 걷어내야 할
- * 코드만 늘어난다). 실제 여러 사용자 간 실시간 전달은 Task 033(Supabase Realtime Broadcast,
- * D-023)이 `lib/realtime/broadcast.ts`를 배럴에 연결하는 순간 그대로 성립한다 — 이 컨테이너의
- * `subscribeToRoom`·`submitMessage`·재연결 처리 어느 쪽도 바뀌지 않는다(D-030 ②). 경위는
- * `docs/ISSUES.md` I-042 참고.
+ * **Task 033(19일차) 업데이트 — 실데이터 전환 완료**: `subscribeToRoom`은 이제 Supabase Realtime
+ * Broadcast를 쓴다(D-023). 방 id 인자는 더 이상 `chat_rooms.id`가 아니라
+ * `getCrewChatTopic(crewId)`(= `crew:{crewId}:chat`) — Realtime Authorization 정책(029B)이
+ * 크루 단위로 인가하기 때문이다. **`publishMockEvent`로 자기 자신에게 되쏘던 I-042 우회가
+ * 더 이상 필요 없다** — DB 트리거(`chat_messages_broadcast`)가 INSERT 시 크루 채팅 토픽에
+ * 자동으로 브로드캐스트하므로, 발신자 자신도 다른 크루원과 똑같은 실시간 이벤트로 자기
+ * 메시지를 받는다. 다만 그 왕복(실측 p50 ~200ms)을 기다리면 "즉시 반영"(FR-051 정상 흐름 ③)
+ * 체감이 흐려지므로, `submitMessage` 성공 시 Server Action이 돌려준 확정 메시지를 **직접**
+ * `messages`에 append하고 `seenIds`에 등록한다 — 뒤이어 도착하는 자기 자신의 브로드캐스트
+ * 에코는 `seenIds` 중복 검사에 걸려 조용히 무시된다(중복 렌더 없음). 다른 크루원의 메시지는
+ * 여전히 브로드캐스트 수신 경로 하나로만 들어온다.
  */
 export function MessageRoomContainer({
   crewId,
@@ -188,10 +191,11 @@ export function MessageRoomContainer({
   });
 
   useEffect(() => {
+    const topic = getCrewChatTopic(crewId);
     const unsubscribe = subscribeToRoom(
-      roomId,
+      topic,
       (event) => {
-        if (event.type !== "chat_message_created" || event.roomId !== roomId) return;
+        if (event.type !== "chat_message_created" || event.roomId !== topic) return;
         if (!isMessageViewModel(event.payload)) return;
         const payload = event.payload;
         if (seenIds.current.has(payload.id)) return;
@@ -201,12 +205,15 @@ export function MessageRoomContainer({
       (error) => {
         // 원본 에러는 개발자용(로그)만 — 화면에는 `ConnectionBanner`가 일반화된 문구를
         // 보여준다(NFR-014와 같은 이유, D-030 ③ 도메인 오류를 사용자에게 안전하게 노출).
-        console.error("[chat] realtime subscription error", error);
+        // `error` 객체 통째가 아니라 `describeRealtimeError`로 좁힌 문자열만 찍는다 — `cause`가
+        // supabase-js의 원본 소켓 에러라 불필요한 노출 폭을 늘리지 않는다(19일차 CORE 교차검증
+        // 후속, `docs/decisions/realtime-broadcast-033.md` §8-후속① 참고).
+        console.error("[chat] realtime subscription error", describeRealtimeError(error));
         setConnectionStatus((s) => nextChatConnectionStatus(s, "connection_lost"));
       },
     );
     return unsubscribe;
-  }, [roomId]);
+  }, [crewId]);
 
   // 브라우저 온/오프라인 — NFR-009가 요구하는 "연결 상태 시각 표시"의 실제 신호다. 별도
   // `useEffect`로 `window` 리스너를 다시 달지 않는다 — 위 `isBrowserOnline`
@@ -291,7 +298,8 @@ export function MessageRoomContainer({
         return;
       }
 
-      if (result.formError || !result.message) {
+      const confirmedMessage = result.message;
+      if (result.formError || !confirmedMessage) {
         markPendingFailed(clientKey);
         return;
       }
@@ -301,13 +309,13 @@ export function MessageRoomContainer({
         next.delete(clientKey);
         return next;
       });
-      // 위 모듈 docstring 참고 — 같은 탭 안에서만 유효한 Mock 단계 한계다(I-042).
-      publishMockEvent(roomId, {
-        type: "chat_message_created",
-        roomId,
-        payload: result.message,
-        occurredAt: result.message.createdAt,
-      });
+      // Task 033 — 실데이터 전환 후에는 이 컨테이너가 자기 메시지를 직접 반영한다(모듈
+      // docstring 참고). 뒤이어 도착하는 자기 자신의 브로드캐스트 에코는 seenIds에 걸려
+      // 중복 없이 무시된다.
+      if (!seenIds.current.has(confirmedMessage.id)) {
+        seenIds.current.add(confirmedMessage.id);
+        setMessages((prev) => [...prev, confirmedMessage]);
+      }
     })();
   }
 

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
 import { assertAuthenticatedSession } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewById, getCrewMembership } from "@/lib/data";
@@ -38,6 +39,24 @@ import type { ReactNode } from "react";
  * 필요로 하지 않아 계산 결과를 어차피 버린다 — 남겨 두는 쪽이 비용이 낮고, 언젠가
  * `BoardListContainer`가 이 레이아웃 밖의 다른 경로에서 재사용될 가능성(예: 관리자 미리보기)에
  * 대한 방어이기도 하다. 근거 전문은 `docs/prioritization-and-risks.md` D-039 참고.
+ *
+ * **19일차(Task 040 UI/게이트 절반, BOARD) 추가 — 해산된 크루 안내 배너.** I-066(해산된
+ * 크루에서도 게시판·채팅 쓰기가 막히지 않는다)·I-067(`CrewHomeContainer`에 archived 분기가
+ * 없다)을 닫으며 팀장이 이월을 철회하고 이번 회차에 배정했다. **이 레이아웃은 "알려라"만
+ * 담당한다** — `crews.status==='archived'`면 하위 화면 공통으로 `ArchivedCrewBanner`를
+ * 띄운다(멤버십 게이트 자체는 바꾸지 않는다, 크루원이면 여전히 읽기·탐색 전부 통과). **쓰기
+ * 차단은 이 레이아웃이 아니라 각 쓰기 컨테이너**(`BoardListContainer`의 `canWrite`,
+ * `PostWriteContainer`의 진입 차단, `MessageListContainer`의 `canSend`)**가 개별적으로
+ * `crew.status`를 확인한다** — 레이아웃은 `children`(이미 렌더된 트리)에 값을 주입할 방법이
+ * 없어(RSC는 부모가 자식에게 props를 나중에 꽂아 넣지 못한다) "무엇을 보여줄지"는 여기서
+ * 정할 수 없고 "안내를 띄울지"만 정할 수 있다. RLS INSERT 정책(SQL 강제 경계)은 CORE 소관 —
+ * 이 레이아웃·컨테이너의 UI 판정은 이번에도(D-039와 같은 원칙) UX 안내일 뿐이다.
+ *
+ * **I-059(게스트 접근 시 서버 콘솔 오진단 예외)와의 관계 — 이 변경은 그 경로를 건드리지
+ * 않는다.** I-059는 `(app)/layout.tsx`가 `RedirectToLogin`(클라이언트 컴포넌트)으로 리다이렉트를
+ * 대체하며 생긴 병렬 렌더 부작용이다. 이 레이아웃(크루원 게이트)의 차단 방식은 여전히 그대로인
+ * `throw new Error(...)`(예외 기반, D-030 ③)이지 클라이언트 컴포넌트 리다이렉트가 아니다 —
+ * 이번 변경은 통과한 뒤에 배너 하나를 추가로 렌더하는 것뿐이라 그 부작용 경로에 들어가지 않는다.
  */
 export default async function CrewMemberGateLayout({
   children,
@@ -63,5 +82,10 @@ export default async function CrewMemberGateLayout({
     });
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {crew.status === "archived" && <ArchivedCrewBanner />}
+      {children}
+    </>
+  );
 }

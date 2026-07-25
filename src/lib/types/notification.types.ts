@@ -3,6 +3,10 @@ import type { Id, ISODateTimeString } from "./common.types";
 /**
  * FR-070 "대상 이벤트" 목록과 1:1 대응. `post_commented`는 Comment(v0.2)에
  * 의존하는 이벤트라 v0.1에서는 발생하지 않지만, 타입은 지금 확정해 둔다.
+ *
+ * `ownership_transferred`·`crew_disbanded`는 Task 040(크루 생애주기, FR-025·FR-013)이
+ * 추가했다 — 원문 FR-070 목록에는 없지만 D-030 정상 흐름이 "양측 알림"·"전 크루원에게 알림"을
+ * 명시해 필요했다.
  */
 export type NotificationType =
   | "poll_closed"
@@ -14,7 +18,9 @@ export type NotificationType =
   | "member_removed"
   | "meetup_created"
   | "meetup_cancelled"
-  | "post_commented";
+  | "post_commented"
+  | "ownership_transferred"
+  | "crew_disbanded";
 
 /**
  * 채널 추상화(NFR-038). v0.1에서 실제로 발송하는 채널은 `in_app`뿐이며

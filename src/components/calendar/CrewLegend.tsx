@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { crewCertaintyVars } from "@/lib/crew-palette";
 import { cn } from "@/lib/utils";
 
@@ -16,12 +17,23 @@ import type { CSSProperties } from "react";
 export interface CrewLegendProps {
   crewName: string;
   colorIndex: number;
-  /** 필터에서 꺼진 크루처럼 시각적으로 흐리게 보여줄 때. */
+  /** 필터에서 꺼진 크루처럼 시각적으로 흐리게 보여줄 때. `badge`와는 다른 신호라 혼용하지
+   *  않는다 — `dimmed`는 "선택 해제됨"(체크 여부에 종속), `badge`는 "이 크루의 상태"(선택
+   *  여부와 무관하게 항상 사실이면 보인다). archived 크루가 기본값대로 체크돼 있어도
+   *  배지는 계속 떠야 하므로 하나로 합칠 수 없다. */
   dimmed?: boolean;
+  /**
+   * 크루명 옆에 붙는 범용 상태 배지(FR-013 AC2, I-067, 19일차) — 이름을 "archived 전용"으로
+   * 짓지 않은 이유: 지금 당장의 소비자는 해산된 크루뿐이지만, 다음에 다른 크루 상태 배지가
+   * 필요해지면(예: 정지) 같은 슬롯을 재사용하면 된다. 비워 두면(`undefined`) 아무것도 안
+   * 그린다 — 기존 호출부(`CrewFilterPanel`의 다른 크루들, `DayDetailPanel`이 아직 안 넘기는
+   * 경우)는 전부 이 값을 생략하므로 시각적으로 그대로다.
+   */
+  badge?: string;
   className?: string;
 }
 
-export function CrewLegend({ crewName, colorIndex, dimmed, className }: CrewLegendProps) {
+export function CrewLegend({ crewName, colorIndex, dimmed, badge, className }: CrewLegendProps) {
   const vars = crewCertaintyVars(colorIndex) as CSSProperties;
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
@@ -40,6 +52,11 @@ export function CrewLegend({ crewName, colorIndex, dimmed, className }: CrewLege
       >
         {crewName}
       </span>
+      {badge && (
+        <Badge variant="secondary" className="shrink-0">
+          {badge}
+        </Badge>
+      )}
     </span>
   );
 }

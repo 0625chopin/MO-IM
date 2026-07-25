@@ -57,7 +57,12 @@ export async function MonthCalendarContainer({ monthParam }: MonthCalendarContai
   const now = new Date();
   const { year, month } = parseMonthParam(monthParam, currentYearMonthUtc(now));
 
-  const crews = await listCrewsByProfile(profileId);
+  // FR-013 AC2(I-067, 19일차) — archived 크루도 포함해야 그 크루의 과거 Meetup을 "열람
+  // 전용"으로 계속 보여줄 수 있다(크루명·색상을 crewById로 조인하려면 해산된 크루 자체가
+  // 이 목록에 있어야 한다). `listCrewsByProfile`의 다른 호출자(홈 요약·크루 탐색·계정 설정)는
+  // 전부 `active`만 봐야 해서 이 옵션을 켜지 않는다 — `crew.ts`의 `ListCrewsByProfileOptions`
+  // docstring 참고.
+  const crews = await listCrewsByProfile(profileId, { includeArchived: true });
   const crewById = new Map(crews.map((c) => [c.id, c]));
 
   const rawFilterCookie = await getCrewFilterCookieRaw();
@@ -133,10 +138,14 @@ export async function MonthCalendarContainer({ monthParam }: MonthCalendarContai
       attendingCount: meetup.attendingCount,
       capacity: meetup.capacity,
       isCancelled: meetup.status === "cancelled",
+      // FR-013 AC2(I-067) — `isCancelled`와 독립 신호(모듈 docstring 없음, calendar-types.ts의
+      // `CalendarMeetupDetail.isArchivedCrew` 참고). 격자 바 필터(아래)에는 영향을 주지 않는다.
+      isArchivedCrew: crewById.get(meetup.crewId)?.status === "archived",
       postHref: postHrefByMeetupId.get(meetup.id) ?? null,
     }));
 
-    // 격자용: 확정만(기존 바 규칙과 동일).
+    // 격자용: 확정만(기존 바 규칙과 동일 — archived 크루 여부와 무관하게 이 필터는 그대로
+    // 둔다. 미래 Meetup은 해산 시 `cancelled`로 전이되므로 이 필터 하나로 계속 숨는다).
     for (const meetup of dayMeetups) {
       if (meetup.status !== "confirmed") continue;
       events.push({
@@ -155,6 +164,10 @@ export async function MonthCalendarContainer({ monthParam }: MonthCalendarContai
     id: c.id,
     name: c.name,
     colorIndex: c.colorKey,
+    // FR-013 AC2(I-067) — `CrewFilterPanel`이 이 값으로 `CrewLegend`의 범용 `badge` prop을
+    // 채운다. 목록 노출·기본 체크 상태는 바꾸지 않는다(calendar-types.ts의 `CrewFilterOption.
+    // isArchived` docstring 참고).
+    isArchived: c.status === "archived",
   }));
 
   return (

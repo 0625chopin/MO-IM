@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PostWriteForm } from "@/components/board/PostWriteForm";
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
-import { getBoardByCrewId } from "@/lib/data";
+import { getBoardByCrewId, getCrewById } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import type { Id } from "@/lib/types";
 
@@ -17,6 +17,11 @@ import type { Id } from "@/lib/types";
  *
  * 모임 제안글(`poll:create_proposal`) 판정은 유형을 고른 "이후"에나 의미가 있어 여기서
  * 미리 하지 않는다 — `createPostAction`(Server Action)이 제출 시점에 최종 판정한다.
+ *
+ * **19일차(Task 040 UI/게이트 절반, I-066 해소)** — `/board/new`는 쓰기 전용 라우트라 해산된
+ * 크루면 아예 막는다(팀장 지시: "쓰기 전용 라우트는 아예 막아도 된다"). 이 UI 차단은 UX
+ * 안내일 뿐이고, 실제 강제 경계는 CORE가 posts INSERT RLS 정책에 추가하는
+ * `crews.status='active'` 조건이다(I-066 해소 방향 1, SQL이 최종 경계 — 18일차 교훈).
  */
 export async function PostWriteContainer({ crewId }: { crewId: Id }) {
   const board = await getBoardByCrewId(crewId);
@@ -29,6 +34,13 @@ export async function PostWriteContainer({ crewId }: { crewId: Id }) {
   if (!permission.allowed) {
     throw new Error("게시글을 작성할 권한이 없다.", {
       cause: { code: "forbidden", message: permission.reason ?? "post:create denied" },
+    });
+  }
+
+  const crew = await getCrewById(crewId);
+  if (crew?.status !== "active") {
+    throw new Error("해산된 크루에는 글을 쓸 수 없다.", {
+      cause: { code: "forbidden", message: "crew_archived" },
     });
   }
 

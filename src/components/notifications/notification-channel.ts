@@ -14,14 +14,17 @@ import type { Id, Notification } from "@/lib/types";
  * 접두사를 둔다 — 나중에 다른 도메인이 우연히 같은 문자열의 profileId를 room id로 써도 채널이
  * 섞이지 않는다.
  *
- * Mock 단계의 한계는 `lib/realtime/mock.ts` 모듈 docstring 그대로 적용된다 — 같은 브라우저 탭
- * 안에서 발행한 이벤트만 되받는다(I-042와 같은 종류의 구조적 한계, 탭·사용자 간 전달은
- * Task 033 Broadcast 연결 이후 성립).
+ * **Task 033(19일차)부터 방 id가 곧 Realtime Broadcast 토픽이다** — `getNotificationRoomId`가
+ * 만드는 문자열이 `realtime.messages`의 `realtime_messages_select_own_notifications` 정책(029B
+ * §6.2)이 매치하는 정규식 `^user:[0-9a-fA-F-]{36}:notifications$`와 정확히 같은 모양이어야
+ * 구독이 인가된다. **Mock 단계 문자열(`notification:{profileId}`)은 이 정규식과 형태가 달라
+ * 실데이터에서는 항상 거부됐다** — 이번에 `user:{profileId}:notifications`로 고쳤다(19일차,
+ * Task 033 실측으로 발견).
  */
 export const NOTIFICATION_CREATED_EVENT = "notification_created";
 
 export function getNotificationRoomId(profileId: Id): string {
-  return `notification:${profileId}`;
+  return `user:${profileId}:notifications`;
 }
 
 export type SubscribeToNotifications = (

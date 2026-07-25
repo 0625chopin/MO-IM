@@ -29,13 +29,16 @@ import type { Profile } from "@/lib/types";
  * "동일 경로" 불변식을 깨지 않는 별도 필드로 얹었다.
  *
  * **`status !== "active"`도 이 한 줄로 합류한다(Task 039, 18일차 교차검증 minor 1)** —
- * `profile_search` RPC(`profile-search.sql`, 029B)는 이미 `status='active'`로 필터하는데,
- * 이 앱 경로(`getProfileByHandle` 정확 일치 조회)에는 그 필터가 없어 탈퇴 유예 중
- * (`deactivated`, 파기 전이라 실 PII 보유)인 사용자가 실명·실아바타로 계속 검색됐다. 새
- * 정책이 아니라 RPC가 이미 가진 규칙에 이 경로를 맞추는 것이다 — `searchOptOut`과 똑같이
- * "존재하지 않음"과 구분 불가능한 모양으로 합친다(R-012, 사유를 노출하면 열거 공격 표면이
- * 된다). `profiles` 테이블 직접 조회 경로(예: RLS를 우회하는 service-role 호출)는 이 함수의
- * 책임 밖이다 — 남은 한계는 I-058 각주 참고.
+ * 처음 추가한 시점(18일차)에는 이 앱 경로(`search-user-by-handle.ts`)가 `getProfileByHandle`
+ * (`profiles` 정확 일치 조회, 상태 필터 없음)을 썼기 때문에 이 함수가 그 필터를 대신
+ * 걸어야 했다. **19일차(I-058 major① 교차검증) 이후** `search-user-by-handle.ts`는
+ * `searchProfilesByHandle`(`profile_search` RPC, 이미 `status='active' and search_opt_out
+ * =false`로 필터됨)로 바뀌어 이 검사가 그 경로에서는 중복(방어적 이중 확인)이 됐다 — 그래도
+ * 지우지 않는다. 이 함수는 `Pick<Profile, ...>`만 받는 순수 함수라 앞으로 다른 호출부가 상태
+ * 필터 없는 조회 결과를 넘길 수도 있고, 그때도 R-012가 깨지지 않아야 하기 때문이다(D-029
+ * 정신 — 근거 없이 제거하지 않는다). `getProfileByHandle`(handle→id 내부 재해석 전용,
+ * service-role)은 이제 이 함수 계열의 소비자가 아니다. 상세: I-058, `docs/decisions/
+ * rls-policies-029b.md` §17.
  */
 export type HandleSearchResult =
   | { found: true; handle: string; displayName: string; avatarUrl: string | null }

@@ -10,6 +10,7 @@ import { PreviewFrame } from "@/components/sample/PreviewFrame";
 import { ChatMessageListPreview } from "@/components/sample/sections/ChatMessageListPreview";
 import { ConnectionBannerPreview } from "@/components/sample/sections/ConnectionBannerPreview";
 import { MessageBubblePreview } from "@/components/sample/sections/MessageBubblePreview";
+import { RealtimeAuthErrorDemoContainer } from "@/components/sample/sections/RealtimeAuthErrorDemoContainer";
 import { defineSection } from "@/components/sample/showcase-types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -203,7 +204,7 @@ export const chatSection = defineSection({
   label: "채팅",
   title: "채팅 — MessageList · MessageBubble · PostLinkCard · Composer · ConnectionBanner",
   description:
-    "FR-050~053. 최신 50건 + 위로 이어 로드(윈도잉, D-023)와 lib/realtime 구독(Task 008)을 소비하는 첫 화면이자, 낙관적 렌더·재전송·연결 상태(Task 020B), 게시글 공유 카드·클라이언트 라우팅 이동·스크롤 복원(Task 020C)까지 갖춘 완성형입니다.",
+    "FR-050~053. 최신 50건 + 위로 이어 로드(윈도잉, D-023)와 lib/realtime 구독(Task 008 인터페이스 → Task 033 실 Supabase Broadcast)을 소비하는 첫 화면이자, 낙관적 렌더·재전송·연결 상태(Task 020B), 게시글 공유 카드·클라이언트 라우팅 이동·스크롤 복원(Task 020C)까지 갖춘 완성형입니다.",
   items: [
     {
       name: "메시지 목록 (MessageList)",
@@ -257,6 +258,27 @@ export const chatSection = defineSection({
         error: (
           <PreviewFrame height={120}>
             <ConnectionBannerPreview status="disconnected" />
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "Realtime 구독 인가 (Broadcast Authorization)",
+      note: "D-030 ③, Task 033. Mock으로 흉내 낸 오류가 아니라 존재하지 않는 크루 토픽을 실제로 subscribeToRoom()해 realtime.messages RLS(029B)가 실측으로 거부하는 응답을 그대로 보여줍니다 — 로그인 여부와 무관하게 항상 거부됩니다. 19일차 Node E2E 스크립트로 같은 정규식 패턴이 CHANNEL_ERROR로 거부됨을 먼저 확인했습니다(docs/decisions/realtime-broadcast-033.md).",
+      panels: {
+        default: (
+          <PreviewFrame height={140}>
+            <div className="flex h-full items-center justify-center p-4 text-center text-xs text-muted-foreground">
+              인가된 크루 토픽(crew:&#123;id&#125;:chat)을 구독하면 이 알림 없이 조용히 연결됩니다 — 아래
+              &apos;오류&apos; 패널에서 거부 사례를 확인하세요.
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={140}>
+            <div className="p-4">
+              <RealtimeAuthErrorDemoContainer />
+            </div>
           </PreviewFrame>
         ),
       },

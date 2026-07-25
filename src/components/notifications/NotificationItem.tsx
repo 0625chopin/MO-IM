@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  Archive,
   CalendarPlus,
   CalendarX,
   CheckCircle2,
+  Crown,
   Mail,
   MessageSquare,
   ShieldCheck,
@@ -34,6 +36,9 @@ const NOTIFICATION_ICONS: Record<NotificationType, LucideIcon> = {
   meetup_created: CalendarPlus,
   meetup_cancelled: CalendarX,
   post_commented: MessageSquare,
+  // FR-025·FR-013(Task 040) — 오너 이양·크루 해산.
+  ownership_transferred: Crown,
+  crew_disbanded: Archive,
 };
 
 export interface NotificationItemProps {
