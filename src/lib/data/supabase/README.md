@@ -24,6 +24,16 @@ Mock 단계(Task 007)에서는 비어 있는 것이 정상이다. 자세한 내�
 - **`SUPABASE_SERVICE_ROLE_KEY`(RLS 우회, service_role)는 이번 회차에서 다루지 않는다.** `.env.local`에
   값만 채워 두었고, 이를 쓰는 관리자/스케줄 전용 클라이언트는 필요해지는 시점(Task 027 pg_cron
   또는 029 RLS)에 만든다 — 지금 만들면 쓰는 곳 없는 죽은 코드가 된다.
-- Task 028에서 `generate_typescript_types`로 DB 스키마 타입을 생성하면, 두 팩터리의
-  `createServerClient`/`createBrowserClient` 제네릭에 그 `Database` 타입을 연결한다. 지금은 테이블이
-  없어(D-037 확인, `list_tables` 0개) 제네릭 없이 둔다.
+
+## 스키마 타입 연결 (Task 028, 14일차)
+
+- **`database.types.ts`**: `generate_typescript_types`로 생성한 자동 생성 파일. PRD §7 22종 엔티티 중
+  `DevicePushToken` 1종을 제외한 **21종**(D-004 — 차기 릴리스 대상이라 이번엔 테이블을 만들지 않고
+  타입 자리만 유지) 마이그레이션 적용 후 산출했다 — 손으로 고치지 않는다. 스키마가 바뀌면 새
+  마이그레이션 적용 후 다시 생성해 통째로 교체한다.
+- `server.ts`/`client.ts`의 `createServerClient`/`createBrowserClient` 제네릭에 이 `Database` 타입을
+  연결했다. `.from("...")` 호출의 테이블명·컬럼이 실제 스키마와 어긋나면 타입 오류로 잡힌다.
+- 이 타입은 DB 컬럼명(snake_case)을 그대로 반영한다. `src/lib/types/*`(Task 006 수기 도메인 타입,
+  camelCase)와는 별개이며, 이 디렉터리에 앞으로 생길 도메인별 실데이터 구현(예: `board.ts`)이
+  둘 사이를 매핑하는 책임을 진다(NFR-034). 필드별 대조 결과는
+  `docs/decisions/schema-migration-028.md` 참고.
