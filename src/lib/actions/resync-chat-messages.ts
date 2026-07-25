@@ -1,7 +1,7 @@
 "use server";
 
-import { toMessageViewModel } from "@/components/chat/message-view-models";
 import type { MessageViewModel } from "@/components/chat/message-view-models";
+import { toMessageViewModel } from "@/components/chat/resolve-message-view-model";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getChatRoomByCrewId, getCrewMembership, getProfileById, listMessages } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";

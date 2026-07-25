@@ -128,6 +128,8 @@ RLS는 "이 행에 누가 닿을 수 있는가"만 정한다. FR-024(오너만 �
 
 **실측**: `anon`으로 공개 크루 조회 → `공개크루A|etc|공개 설명|2`(오너+멤버 2명) ✅. `anon`으로 비공개 크루 조회 → `비공개크루B|<null>|<null>|<null>` ✅.
 
+**17일차 후속(재검증 각주)**: 팀장이 `getCrewById`(원본 테이블 raw select, RLS만 의존)를 통해 private 크루 비소속자가 `null`을 받는 회귀(`CrewHomeContainer`가 이를 `notFound()`로 오인)를 발견했다. 이 RPC 자체를 10개 시나리오(크루원·오너·비소속·`anon` × public/private + 존재하지 않는 크루)로 재검증한 결과 위 실측과 완전히 동일하게 정확히 동작한다 — **원문 서술은 틀리지 않았다.** 실제 gap은 `src/lib/data/supabase/crew.ts`의 `getCrewById`가 이 RPC를 아직 한 번도 호출하지 않는다는 것(Task 031이 명시적으로 미룬 결정, `read-path-realdata-031.md` §5)이다. 재검증 전문과 원인 규명: `docs/decisions/crew-directory-summary-verification-hotfix.md`.
+
 ## 6. Realtime Authorization
 
 ### 6.1 토픽 명명 규칙 (Task 033 인계)

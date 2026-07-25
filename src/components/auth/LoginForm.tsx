@@ -6,7 +6,7 @@ import { useActionState, useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { LoginFormState } from "@/lib/actions/login";
 import { loginAction } from "@/lib/actions/login";
@@ -78,8 +78,6 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
         {isPending && <Loader2Icon aria-hidden="true" className="animate-spin" />}
         {isPending ? strings.auth.login.submitPending : strings.auth.login.submit}
       </Button>
-
-      <FieldDescription className="text-center">{strings.auth.login.demoHint}</FieldDescription>
 
       <p className="text-center text-sm text-muted-foreground">
         {strings.auth.login.noAccount}{" "}

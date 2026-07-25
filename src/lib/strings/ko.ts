@@ -928,6 +928,14 @@ export const ko = {
    * 갈라져 있다.
    */
   auth: {
+    /** FR-002 로그아웃(Task 030) — `HeaderNav` 계정 메뉴의 폼 버튼 라벨. */
+    logout: "로그아웃",
+    /** FR-002 AC3(17일차) — `RedirectToLogin`의 `<noscript>` 폴백. JS가 꺼져 있으면
+     *  `useEffect` 기반 클라이언트 리다이렉트가 동작하지 않아 수동으로 갈 수단이 필요하다. */
+    redirectingToLogin: {
+      message: "로그인이 필요합니다.",
+      linkLabel: "로그인 화면으로 이동",
+    },
     login: {
       title: "로그인",
       description: "다시 만나서 반가워요. 이메일과 비밀번호로 로그인하세요.",
@@ -942,10 +950,11 @@ export const ko = {
       lockedNotice: "5회 연속 실패로 잠시 로그인이 제한돼요. 15분 뒤 다시 시도해 주세요.",
       /** FR-002 E1 — 이메일·비밀번호 중 어느 쪽이 틀렸는지 구분하지 않는 단일 메시지. */
       genericError: "이메일 또는 비밀번호를 확인해 주세요",
+      /** FR-002 E4 → FR-001 E4로 이관 — 가입은 됐지만 이메일 인증이 끝나지 않은 계정의
+       *  로그인 시도. E1(자격 증명 불일치)과 원인이 다르므로 별도 문구를 쓴다. */
+      emailNotVerifiedNotice: "이메일 인증이 아직 완료되지 않았어요. 받은 메일함에서 인증 링크를 확인해 주세요.",
       noAccount: "아직 계정이 없으신가요?",
       goToSignup: "회원가입",
-      /** Mock 단계 데모 계정 안내(Supabase Auth 도입 전, CON-06). 실 인증 연동 후 제거 대상. */
-      demoHint: "체험용 계정: seo_runs@example.com / runrun25",
     },
     signup: {
       title: "회원가입",
@@ -982,6 +991,29 @@ export const ko = {
         displayNameRequired: "표시 이름을 입력해 주세요",
         displayNameTooLong: "표시 이름은 30자 이하로 입력해 주세요",
         termsRequired: "계속하려면 약관에 동의해야 해요",
+        /** 동시 요청 경쟁 등 예상 밖 실패 — `DataResult`/Supabase Auth 오류를 구분하지 않고
+         *  같은 자리(`formError`)에 보여준다. */
+        unknown: "가입 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+      },
+      /** FR-001 정상 흐름 ⑤~⑥ — 가입 직후(세션 미발급) 보여주는 인증 안내 화면. 커스텀 SMTP
+       *  대시보드 설정(D-042)이 끝나기 전까지는 Supabase 내장 발송 한도(시간당 2통·프로젝트
+       *  전체)로 지연될 수 있다는 점도 함께 안내한다. */
+      pendingVerification: {
+        title: "메일함을 확인해 주세요",
+        description: "{email}로 인증 메일을 보냈어요. 메일의 링크를 눌러야 가입이 완료돼요.",
+        backToLogin: "로그인 화면으로",
+        /** FR-001 E4(Task 030, 17일차 — BOARD 교차검증 major 지적으로 추가). */
+        resend: {
+          submit: "인증 메일 다시 받기",
+          submitPending: "재발송하는 중…",
+          sent: "인증 메일을 다시 보냈어요.",
+          /** 60초 쿨다운(원문 그대로). {seconds}는 `evaluateResendCooldown`의
+           *  `retryAfterSeconds`를 그대로 꽂는다. */
+          cooldown: "{seconds}초 후에 다시 시도할 수 있어요.",
+          /** 시간당 5회 상한(원문 그대로). */
+          hourlyLimit: "시간당 재발송 한도를 넘었어요. {minutes}분 뒤에 다시 시도해 주세요.",
+          unknown: "재발송 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+        },
       },
     },
     onboarding: {

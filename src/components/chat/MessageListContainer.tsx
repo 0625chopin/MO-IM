@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 
-import { MESSAGE_PAGE_SIZE, toMessageViewModel } from "@/components/chat/message-view-models";
+import { MESSAGE_PAGE_SIZE } from "@/components/chat/message-view-models";
 import { MessageRoomContainer } from "@/components/chat/MessageRoomContainer";
 import { resolveChatViewer } from "@/components/chat/resolve-chat-viewer";
+import { toMessageViewModel } from "@/components/chat/resolve-message-view-model";
 import { getChatRoomByCrewId, getProfileById, listMessages } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import type { Id } from "@/lib/types";

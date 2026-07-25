@@ -104,11 +104,30 @@ Next.js 16.2.11(App Router) + React 19.2.4 + TypeScript(strict) + Tailwind CSS v
 
 ### 테스트계정 (계정/비밀번호)
 
-용도가 다른 두 벌이 있습니다. **섞어 쓰면 로그인이 실패합니다.**
+**Task 030(17일차)부터 `/login`은 실 Supabase Auth를 씁니다.** Mock 데모 계정(`MOCK_DEMO_ACCOUNTS`,
+`locked-demo@example.com` 등)은 제거됐습니다 — Mock 단계는 끝났고, 이 자리에 값을 복사해 두지
+않습니다(로그인 자격 증명은 이제 `auth.users`가 단일 소스입니다, CON-06).
 
-**1. 실 인증용 (Supabase Auth 연동 후)** — 아직 사용처가 없습니다. Task 026에서 실제 계정을 만들 때 이 값을 씁니다.
+실 인증용 계정 2개가 있습니다 — 로그인은 **이메일 + 비밀번호**입니다(핸들이 아닙니다). 이메일·
+비밀번호·profile UUID는 `docs/decisions/auth-integration-030.md` §6이 단일 소스입니다:
 
-- chopin0625/qwer1234
-- 0625chopin/qwer1234
+- `chopin0625@gmail.com` (비밀번호 `qwer1234`, 핸들 `chopin0625`)
+- `0625chopin@gmail.com` (비밀번호 `qwer1234`, 핸들 `chopin_0625`)
 
-**2. Mock 로그인 데모용 (지금 `/login`에서 쓰는 것)** — 값의 단일 소스는 `src/lib/actions/login.ts`의 `MOCK_DEMO_ACCOUNTS`입니다. **여기에 값을 복사해 두지 않습니다** — 두 곳에 적으면 반드시 어긋납니다. 시드 데이터(`fixtures.ts`)와 `profileId`를 맞춰 두어 로그인하면 크루·게시글·알림이 채워진 상태를 그대로 볼 수 있습니다. Task 026에서 실 인증으로 교체할 때 함께 제거합니다.
+**두 번째 계정의 핸들이 요청받은 이름(`0625chopin`)과 다릅니다** — `HANDLE_PATTERN`
+(`src/lib/rules/handle-validation.ts`)이 "소문자로 시작"을 요구해 숫자로 시작하는 `0625chopin`을
+핸들로 쓸 수 없었습니다. 밑줄을 넣어 `chopin_0625`로 대체했습니다(이메일은 요청받은 그대로
+`0625chopin@gmail.com`을 씁니다 — 핸들 제약과 무관합니다).
+
+두 계정 모두 `hasCompletedOnboarding`이 아직 온보딩 완료 표시가 없는 상태입니다(첫 로그인 시
+`/onboarding`으로 이동 — 제출이 막히는 알려진 한계는 `docs/ISSUES.md` I-046과 위 결정 문서 §5
+참고, Task 032가 해소합니다).
+
+**이 두 계정은 `/signup` 회원가입 폼으로 만든 게 아닙니다.** Supabase Auth Admin REST 엔드포인트
+(`POST /auth/v1/admin/users`, `email_confirm:true`)로 `auth.users` 행을 만들고 `public.profiles`
+행을 SQL로 직접 삽입했습니다 — **지금 `/signup`으로 새로 가입해도 같은 결과를 얻지 못합니다.**
+`createProfile`(쓰기 경로, Task 032 소관)이 `auth.uid()`를 받지 않아 신규 가입자의 프로필 행이
+실 DB에 생기지 않고, 그 결과 로그인해도 `forbidden`(게스트와 동일 취급)이 됩니다 — 위 결정 문서
+"FR-001·FR-002 실제 상태" 절 참고. **테스트 계정이 더 필요하면 회원가입 폼을 쓰지 말고 이 두
+계정과 같은 방식(Admin REST + 프로필 SQL 삽입)을 씁니다** — Task 032가 끝나기 전까지는 그것만
+유효한 방법입니다.

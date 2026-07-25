@@ -2,7 +2,10 @@
  * Supabase 프로젝트(damruradpliktkrlkakl, MO-IM)의 `public` 스키마로부터
  * `generate_typescript_types`로 생성한 타입. Task 028 최초 생성, Task 029B(16일차)에서
  * RLS 신규 RPC(`poll_vote_tally`·`crew_directory_summary`·`profile_search`) 반영을 위해
- * 재생성.
+ * 재생성. **17일차(Task 031 후속) 재생성** — CORE의 `poll_vote_tally_for_decision`
+ * RPC(D-031 숨김을 적용하지 않는 판정 전용 집계, `docs/decisions/
+ * poll-vote-tally-for-decision-hotfix.md`)와 CREW의 `email_resend_attempts` 테이블
+ * (`create_email_resend_attempts_table` 마이그레이션)을 반영했다.
  *
  * 이 파일은 자동 생성 파일이다 — 손으로 고치지 않는다. 스키마가 바뀌면
  * 새 마이그레이션을 적용한 뒤 다시 생성해 이 파일을 통째로 교체한다.
@@ -14,8 +17,8 @@
  *
  * `private` 스키마(SECURITY DEFINER 헬퍼·RPC 구현체)는 여기 나타나지 않는다 — PostgREST
  * Exposed schemas에 없어 애초에 API 표면이 아니기 때문이다(docs/decisions/rls-policies-029b.md
- * §8 참고). `public.*` RPC 래퍼(`poll_vote_tally`·`crew_directory_summary`·`profile_search`)
- * 만 `Functions`에 나타나는 것이 정상이다.
+ * §8 참고). `public.*` RPC 래퍼(`poll_vote_tally`·`poll_vote_tally_for_decision`·
+ * `crew_directory_summary`·`profile_search`)만 `Functions`에 나타나는 것이 정상이다.
  */
 export type Json =
   | string
@@ -370,6 +373,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_resend_attempts: {
+        Row: {
+          id: number
+          identifier: string
+          requested_at: string
+        }
+        Insert: {
+          id?: never
+          identifier: string
+          requested_at?: string
+        }
+        Update: {
+          id?: never
+          identifier?: string
+          requested_at?: string
+        }
+        Relationships: []
       }
       invitations: {
         Row: {
@@ -928,6 +949,19 @@ export type Database = {
         }[]
       }
       poll_vote_tally: {
+        Args: { p_poll_id: string }
+        Returns: {
+          abstain_count: number
+          against_count: number
+          eligible_count: number
+          for_count: number
+          participant_count: number
+          poll_id: string
+          poll_status: string
+          tally_hidden: boolean
+        }[]
+      }
+      poll_vote_tally_for_decision: {
         Args: { p_poll_id: string }
         Returns: {
           abstain_count: number

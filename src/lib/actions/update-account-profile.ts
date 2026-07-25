@@ -2,7 +2,6 @@
 
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { patchMockSessionCookie } from "@/components/shell/set-mock-session-cookie";
 import { updateProfile } from "@/lib/data";
 import { validateBio } from "@/lib/rules/bio-validation";
 import { validateDisplayName } from "@/lib/rules/display-name-validation";
@@ -74,9 +73,8 @@ export async function updateAccountProfileAction(
     return { fieldErrors: {}, formError: strings.account.settings.errors.loadFailed };
   }
 
-  // 헤더·내비 등 셸이 세션 쿠키의 displayName을 바로 참조하므로(`AppShell` 등) 저장과 동시에
-  // 갱신한다 — `completeOnboardingAction`과 같은 패턴.
-  await patchMockSessionCookie(session, { displayName: updated.data.displayName });
+  // Task 030부터 세션은 매 요청 `getAuthSession()`이 `profiles`를 다시 읽어 만든다(쿠키에
+  // displayName을 캐시하지 않는다) — 별도 세션 패치 없이 다음 렌더에서 바로 반영된다.
 
   return { fieldErrors: {}, success: true };
 }

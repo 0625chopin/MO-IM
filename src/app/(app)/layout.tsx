@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
+import { RedirectToLogin } from "@/components/auth/RedirectToLogin";
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 
@@ -30,11 +31,23 @@ import type { ReactNode } from "react";
  * — `/onboarding` 자신의 "이미 완료했으면 `/home`으로" 가드와 대칭되는 "완료 전이면
  * `/onboarding`으로" 가드는 이 변경의 범위 밖이다(팀장 지시 범위: `isAuthenticated`만). 필요하면
  * 별도 결정으로 추가한다.
+ *
+ * **FR-002 AC3("로그인 성공 후 원래 요청 경로로 복귀") — 17일차, BOARD 교차검증에서 발견한
+ * 배선 누락 수정.** 비인증 요청은 더 이상 서버 `redirect("/login")`(경로 정보를 버리는
+ * 하드 리다이렉트)을 타지 않는다 — `RedirectToLogin`(클라이언트 컴포넌트)을 대신 렌더한다.
+ * 이 레이아웃(Server Component)은 자신이 감싸는 하위 경로를 알 방법이 공식적으로 없어서다
+ * (`RedirectToLogin.tsx` 모듈 docstring에 근거를 남겼다 — Next.js 공식 문서 확인,
+ * `proxy.ts`가 유일한 서버 측 대안이나 D-011로 범위 밖). `useSearchParams()`를 쓰는 클라이언트
+ * 컴포넌트라 `<Suspense>`로 감싼다(Next.js 프로덕션 빌드 요구사항).
  */
 export default async function AuthenticatedAppLayout({ children }: { children: ReactNode }) {
   const session = await getAuthSession();
   if (!isAuthenticated(session)) {
-    redirect("/login");
+    return (
+      <Suspense fallback={null}>
+        <RedirectToLogin />
+      </Suspense>
+    );
   }
 
   return <>{children}</>;

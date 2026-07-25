@@ -2,66 +2,44 @@
 
 import { redirect } from "next/navigation";
 
-import { setMockSessionCookie } from "@/components/shell/set-mock-session-cookie";
-import { evaluateLoginLockout, isValidEmailFormat } from "@/lib/rules/auth-credentials";
+import { getRecentAuthAttempts, recordAuthAttempt, signInWithPassword } from "@/lib/auth";
+import {
+  evaluateLoginLockout,
+  isValidEmailFormat,
+  sanitizeRedirectTarget,
+} from "@/lib/rules/auth-credentials";
 import { strings } from "@/lib/strings";
 
 /**
  * FR-002 로그인 Server Action. `LoginForm`이 `useActionState(loginAction, ...)`로 건다.
  *
- * **Mock 데모 계정** — 실 계정 저장소가 없는 이유는 `signup.ts` 모듈 docstring과 같다
- * (CON-06, Task 026 이전). `profileId`는 `fixtures.ts` 시드와 값을 맞췄다 — 이 계정으로
- * 로그인하면 이미 데이터가 채워진 크루·게시글·알림을 그대로 볼 수 있다.
+ * **Task 030(17일차)부터 실 Supabase Auth + D-020 계정 잠금을 쓴다.** Mock 데모 계정
+ * (`MOCK_DEMO_ACCOUNTS`)은 제거했다 — `CLAUDE.md`의 "테스트계정" 절도 이 회차에 함께 갱신했다.
  *
- * **`CLAUDE.md`의 「테스트계정」과는 용도가 다르다.** 그쪽 1번(`chopin0625`/`0625chopin`)은
- * 실제 Supabase Auth 연동(Task 026 이후) 대상이고, 여기 있는 계정은 그 전까지 Mock 로그인
- * 흐름(화면 상태 시연)만을 위한 것이다. `CLAUDE.md`는 이 값을 복사하지 않고 이 파일을
- * 가리키기만 한다 — **`MOCK_DEMO_ACCOUNTS`가 Mock 데모 계정의 단일 소스다.** 값을 바꾸면
- * 여기만 고치면 되고, Task 026에서 실 인증으로 교체할 때 이 상수를 통째로 제거한다.
+ * **D-020 게이트**: Supabase Auth의 레이트 리밋은 IP·프로젝트 단위라 "자격 증명이 맞아도
+ * 거부"(AC4)를 표현할 수 없다 — 그래서 `public.auth_attempts`(Task 028이 이미 만들었고
+ * 029A가 client 완전 거부 RLS까지 끝내 둔 "서버 전용" 테이블)를 `evaluateLoginLockout`
+ * (순수 함수, `lib/rules/auth-credentials.ts`)로 먼저 판정한다. **잠긴 동안에는 Supabase
+ * Auth를 아예 호출하지 않는다** — 그래야 "맞는 자격 증명도 거부"가 문자 그대로 성립한다
+ * (호출했다가 성공 결과를 버리는 방식은 AC4가 요구하는 의미론이 아니다).
+ *
+ * 시도 기록(`recordAuthAttempt`)은 실제로 Supabase Auth를 호출한 시도(성공·실패 모두)에만
+ * 남긴다 — 잠금 상태에서 거부된 시도는 기록하지 않는다(어차피 마지막 실패 시각 기준
+ * 15분 창이 그대로 유지되므로 추가 기록이 필요 없다).
+ *
+ * **오픈 리다이렉트 방어(`sanitizeRedirectTarget`)는 17일차에 `lib/rules/auth-credentials.ts`로
+ * 옮겼다** — 문자열 prefix 비교(`startsWith("/")`)가 `/\evil.com`(백슬래시, WHATWG URL이
+ * http/https에서 슬래시와 동등하게 취급)로 우회되는 결함을 팀장이 실측으로 발견해, URL 파싱
+ * 기반 구현으로 교체하며 다른 순수 판정 함수들(`evaluateLoginLockout`·`evaluateResendCooldown`)
+ * 옆으로 옮겼다 — 근거·실측 표는 그 함수의 docstring 참고. **이 함수가 `redirectTo`의 유일한
+ * 방어선이다** — `RedirectToLogin.tsx`(DESIGN)는 의도적으로 클라이언트 측 검증을 생략한다.
  */
-const MOCK_DEMO_ACCOUNTS: ReadonlyArray<{
-  email: string;
-  password: string;
-  profileId: string;
-  displayName: string;
-}> = [
-  {
-    email: "seo_runs@example.com",
-    password: "runrun25",
-    profileId: "profile-1",
-    displayName: "서지훈",
-  },
-  {
-    email: "yuna_book@example.com",
-    password: "runrun25",
-    profileId: "profile-2",
-    displayName: "김유나",
-  },
-];
-
-/** FR-002 E2·AC4(D-020) 잠금 화면 상태 데모 전용 예약 이메일. 비밀번호와 무관하게 항상
- *  잠금 결과를 반환한다 — 실제 5회 실패 카운터는 없다("v0.1(Mock)에서는 잠금 화면 상태만
- *  만든다"). `evaluateLoginLockout`(재사용 대상 순수 함수)에는 5회의 최근 실패 이력을
- *  합성해 넘긴다. */
-const MOCK_LOCKED_DEMO_EMAIL = "locked-demo@example.com";
-
 export interface LoginFormState {
   formError?: string;
 }
 
 // 초기 상태 상수는 여기 두지 않는다 — `'use server'` 파일은 async 함수만 export할 수 있다
 // (signup.ts 모듈 docstring 참고). `LoginForm`이 `LoginFormState` 타입만 가져다 직접 만든다.
-
-/** `redirectTo`는 hidden input을 통해 클라이언트가 넘기는 값이라 신뢰할 수 없다(Next.js
- *  Server Actions 문서 "Validate inputs"). 오픈 리다이렉트를 막기 위해 앱 내부의 단일
- *  슬래시 경로만 허용한다 — `//evil.com`(프로토콜 상대 URL)·`https://...` 전부 거부하고
- *  기본값(`/home`)으로 대체한다. */
-function sanitizeRedirectTarget(candidate: string): string {
-  if (candidate.startsWith("/") && !candidate.startsWith("//")) {
-    return candidate;
-  }
-  return "/home";
-}
 
 export async function loginAction(
   _prevState: LoginFormState,
@@ -76,33 +54,28 @@ export async function loginAction(
     return { formError: strings.auth.login.genericError };
   }
 
-  if (email.toLowerCase() === MOCK_LOCKED_DEMO_EMAIL) {
-    const now = new Date().toISOString();
-    const syntheticRecentFailures = Array.from({ length: 5 }, (_, i) => ({
-      attemptedAt: new Date(Date.parse(now) - i * 60_000).toISOString(),
-      succeeded: false,
-    }));
-    if (evaluateLoginLockout(syntheticRecentFailures, now).locked) {
-      return { formError: strings.auth.login.lockedNotice };
-    }
+  const identifier = email.toLowerCase();
+
+  const recentAttempts = await getRecentAuthAttempts(identifier);
+  const lockout = evaluateLoginLockout(recentAttempts, new Date().toISOString());
+  if (lockout.locked) {
+    // D-020·FR-002 AC4 — 자격 증명을 검사하지 않고 즉시 거부한다.
+    return { formError: strings.auth.login.lockedNotice };
   }
 
-  const account = MOCK_DEMO_ACCOUNTS.find(
-    (candidate) => candidate.email.toLowerCase() === email.toLowerCase(),
-  );
-  if (!account || account.password !== password) {
+  const result = await signInWithPassword(email, password);
+  await recordAuthAttempt(identifier, result.ok);
+
+  if (!result.ok) {
+    if (result.code === "email_not_confirmed") {
+      // FR-002 E4 → FR-001 E4로 이관.
+      return { formError: strings.auth.login.emailNotVerifiedNotice };
+    }
     // 계정 없음과 비밀번호 불일치를 같은 메시지로 합친다(FR-002 E1 "구분하지 않는 단일 메시지").
     return { formError: strings.auth.login.genericError };
   }
 
-  await setMockSessionCookie({
-    profileId: account.profileId,
-    displayName: account.displayName,
-    // 데모 계정은 이미 가입을 마친 기존 사용자로 취급한다 — 로그인 성공마다 온보딩으로
-    // 되돌리면 FR-002 AC1(보호 라우트 접근)을 시연할 수 없다.
-    hasCompletedOnboarding: true,
-    unreadNotificationCount: 0,
-  });
-
+  // 세션은 `signInWithPassword`가 내부에서 이미 httpOnly 쿠키로 써 뒀다(NFR-010) — 여기서
+  // 별도로 세션을 만들지 않는다.
   redirect(redirectTo);
 }

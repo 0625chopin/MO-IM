@@ -124,6 +124,46 @@ export const authSection = defineSection({
       },
     },
     {
+      name: "ResendSignupEmailButton",
+      note: "FR-001 E4(재발송, 60초 쿨다운·시간당 5회 상한, Task 030). 실제 컴포넌트는 /signup의 가입 완료 직후 안내 패널에서 확인합니다 — 여기서는 상태별 정적 모습만 보여줍니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={140}>
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 p-4">
+              <Button variant="outline" size="sm">
+                {strings.auth.signup.pendingVerification.resend.submit}
+              </Button>
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={140}>
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 p-4">
+              <Button variant="outline" size="sm" disabled>
+                <Loader2Icon aria-hidden="true" className="animate-spin" />
+                {strings.auth.signup.pendingVerification.resend.submitPending}
+              </Button>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={180}>
+            <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2 p-4">
+              <Button variant="outline" size="sm">
+                {strings.auth.signup.pendingVerification.resend.submit}
+              </Button>
+              <FieldDescription role="alert" className="text-destructive">
+                {t((s) => s.auth.signup.pendingVerification.resend.cooldown, { seconds: 42 })}
+              </FieldDescription>
+              <FieldDescription role="alert" className="text-destructive">
+                {t((s) => s.auth.signup.pendingVerification.resend.hourlyLimit, { minutes: 37 })}
+              </FieldDescription>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
       name: "LoginForm",
       note: "자격 증명 불일치와 계정 잠금(D-020)이 같은 자리(폼 상단 배너)에 뜹니다 — 어느 필드가 틀렸는지 구분하지 않는 FR-002 E1 요구의 시각적 표현입니다.",
       panels: {
