@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-053** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-054** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
 
@@ -569,7 +569,8 @@
 
 ### I-045 · `npm install`(플래그 없이)이 `@schedule-x/calendar`의 peer 충돌로 항상 ERESOLVE 실패한다
 
-- **상태**: 열림
+- **상태**: 해결됨 (2026-07-25, 17일차 — Vercel 배포가 실제로 이 오류로 실패해 `package.json`에
+  `overrides`를 넣어 해소. 결정 기록은 **D-043**)
 - **영역**: 빌드 / 의존성
 - **제보**: CORE (2026-07-24, 12일차 — Task 026 `@supabase/supabase-js`·`@supabase/ssr` 설치 중, `node_modules` 삭제 후 재설치하며 발견)
 - **내용**: `package.json`의 루트 `temporal-polyfill@^1.0.1`과 `@schedule-x/calendar@4.6.1`이 요구하는
@@ -593,6 +594,18 @@
   `--force`(또는 필요한 최소 플래그)를 명시. 어느 쪽이든 `@schedule-x` 캘린더(Task 021·022, DESIGN
   담당)를 건드리므로 CORE 단독으로 결정하지 않는다 — 이 이슈는 발견만 하고 고치지 않았다(Task 026
   범위 밖). 다음 배포 검증 전에 반드시 확인할 것.
+- **해소(17일차)**: 예고한 대로 **Vercel 배포가 이 오류로 설치 단계에서 멈췄다**(main `4e275ad`,
+  로그의 `ERESOLVE could not resolve` 블록이 위 재현과 동일). 후속안 ②를 골라 `package.json`에
+  `"overrides": { "temporal-polyfill": "$temporal-polyfill" }`을 넣었다. 고른 이유는 **이 peer가
+  선언만 있고 실제 모듈 의존이 아니어서다** — `node_modules/@schedule-x/**`의 번들에는
+  `temporal-polyfill` import·require가 **한 건도 없고**(`grep` 확인) 전역 `Temporal.PlainDate`·
+  `ZonedDateTime`·`Now`·`PlainTime`만 쓴다. 그 전역은 `ScheduleXCalendarView.tsx:8`의
+  `import "temporal-polyfill/global"`이 채우므로, peer 범위를 맞추려고 루트를 `0.3.0`으로
+  낮추면(①) 오히려 지금 동작이 확인된 런타임을 바꾸게 된다. ③(빌드 커맨드에 `--force`)은 Vercel
+  설정에만 남아 저장소를 새로 클론하는 사람에게는 여전히 깨진다. 검증: `npm install`·클린
+  `npm ci` 모두 플래그 없이 통과, `preact`·`@preact/signals` 자동 설치 유지, `temporal-polyfill`은
+  1.0.1 그대로, `package-lock.json`은 변경 없음(`--force`로 만든 기존 트리와 동일), `npm run build`
+  통과. 상세는 **D-043**.
 
 ### I-046 · `profiles`에 온보딩 완료 여부를 담을 컬럼이 없다
 
@@ -790,3 +803,30 @@
   때문이다. D-040(I-044, 라우트 레벨 권한 거부의 HTTP 상태 결정)과 같은 자리에서 함께 재검토할
   것을 제안한다 — 둘 다 "화면은 요구사항대로인데 HTTP 상태만 어긋난다"는 동일 패턴이고, 후보
   ②(`proxy.ts` 도입)가 해결되면 이 이슈도 함께 풀릴 가능성이 크다.
+
+### I-053 · `.env.local`에 타 프로젝트에서 흘러온 자격증명·플래그가 남아 있었다
+
+- **상태**: 해결됨
+- **영역**: 인프라 / 보안 위생
+- **제보**: 팀장 (2026-07-25, 17일차 — 마감 후 대시보드 조치 준비 중 발견)
+- **내용**: `.env.local`에 이 코드베이스가 참조하지 않는 항목 3종이 있었다.
+  - `ADMIN_CONSOLE_ENABLED=true` — `src/` 전체에서 참조 0건(`grep -rl` 확인).
+  - 그 주석이 `59일차(Task 021, NFR-SEC-007 1차)`와 `src/app/[lang]/admin/console-flag.ts`를
+    가리켰다 — **이 프로젝트에 `src/app/[lang]/`은 없고, D-011이 로케일 세그먼트를 명시적으로
+    금지한다.** 즉 다른 프로젝트의 파일 경로·회차 번호였다.
+  - `NOTION_API_KEY` — 이 프로젝트가 쓰지 않는 외부 서비스 키.
+  - Gmail `SMTP_*` 6개 — 주석이 "로컬 SMTP 검증 전용, 호스티드 Supabase Auth는 읽지 않는다"였다.
+- **원인 추정**: **D-037**로 이 Supabase ref(`damruradpliktkrlkakl`)를 타 앱(축구 매니저 시뮬레이션)에서
+  초기화해 재사용했는데, DB만 초기화되고 **`.env.local`은 그때 함께 흘러들어온 것으로 보인다.**
+  D-037 기록은 DB 초기화 범위만 다루고 로컬 환경 파일은 언급하지 않는다 — 확정이 아니라 추정이다.
+- **영향**: `.env.local`은 `.gitignore`의 `.env*`로 추적되지 않아 **커밋·푸시로 유출된 이력은 없다**
+  (`git ls-files`로 확인). 그러나 무관한 API 키가 작업 디렉터리에 남아 있는 것 자체가 위생 문제이고,
+  더 실질적으로는 **"이 값이 이 프로젝트에서 쓰인다"는 잘못된 인상**을 준다 — 17일차에 팀장이
+  Gmail `SMTP_*`를 보고 "커스텀 SMTP가 이미 준비돼 있나" 하고 한 번 멈췄다.
+- **조치(17일차)**: `ADMIN_CONSOLE_ENABLED`와 `NOTION_API_KEY`, 타 프로젝트를 가리키던 주석을
+  제거했다. Gmail `SMTP_*`는 **사용자 확인 결과 본인 계정**(`chopin0625@gmail.com`)이고 D-042
+  Resend 도메인 인증이 끝나기 전까지 **개발 구간 임시 SMTP로 쓰기로 결정**해 남겼으며, 주석을
+  "임시 조치이고 Resend 연결 후 제거한다"로 고쳐 목적을 명시했다.
+- **후속**: **`NOTION_API_KEY`는 파일에서 지웠을 뿐 무효화(revoke)되지 않았다** — 그 키가 실제로
+  유효하다면 발급처에서 폐기해야 한다. 이건 이 리포지터리 밖의 조치이므로 사용자 판단에 남긴다.
+  D-037 기록에 "로컬 환경 파일도 재사용 대상이었다"는 사실을 덧붙일지도 함께 검토할 것.

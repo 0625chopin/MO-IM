@@ -903,4 +903,44 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
 - **대안**: SendGrid·Amazon SES — 둘 다 무료 티어가 더 제한적이거나(SES는 아예 없고 종량제,
   프로덕션 액세스 신청에 리드타임 추가) 도메인 인증 절차가 더 복잡해 I-016이 요구한 "리드타임
   최소화" 기준에서 밀렸다.
+- **개발 구간 임시 조치(17일차, 팀장·사용자 결정)**: 위 리드타임 때문에 **Resend 도메인 인증이
+  끝나기 전까지 Gmail SMTP 릴레이를 임시로 연결한다.** 근거는 검증 차단이다 — 내장 이메일
+  한도(시간당 2통, 프로젝트 전체)로는 FR-001 E4("시간당 5회 재발송")를 **실측할 방법이 아예
+  없고**, 17일차에 실제로 `over_email_send_rate_limit`(HTTP 429)로 막히는 것을 재현했다
+  (`docs/decisions/auth-integration-030.md` §3). 계정은 `chopin0625@gmail.com`(사용자 본인
+  계정으로 확인), 값은 `.env.local`의 `SMTP_*` 블록에 원본으로 기록해 두었다.
+  - **이 임시 조치는 결정을 바꾸지 않는다** — 공급자는 Resend가 확정이고(위), Gmail은 프로덕션
+    발송 수단이 아니다(일일 한도·발신자 신뢰도·약관 모두 프로덕션 전제가 아니다). **Resend 연결이
+    끝나면 Gmail SMTP 설정과 `.env.local`의 해당 블록을 함께 제거한다.**
+  - Gmail `SMTP_*`가 `.env.local`에 있던 경위는 **I-053**(타 프로젝트에서 흘러온 값)에 있다.
 - **영향**: D-021, CON-11, FR-001 E4·E5, PRD §8.2. I-016을 해결됨으로 닫는다.
+
+### D-043 · `temporal-polyfill` peer 충돌은 `overrides`로 해소한다(버전 다운그레이드·빌드 플래그가 아니라)
+
+- **일자**: 2026-07-25
+- **결정자**: 팀장 (사용자 지시 — Vercel 배포 실패 확인)
+- **맥락**: **I-045**가 12일차에 예고한 대로 Vercel 배포가 **설치 단계에서** 멈췄다. 루트
+  `temporal-polyfill@^1.0.1`과 `@schedule-x/calendar@4.6.1`의 peer `temporal-polyfill@0.3.0`
+  (exact)이 충돌해 플래그 없는 `npm install`이 `ERESOLVE`로 실패한다. 로컬은 `--force`로 채워 둔
+  `node_modules` 덕에 통과하고 있었을 뿐이다. `@schedule-x/calendar`는 4.6.1이 **최신**이라
+  업스트림 수정을 기다릴 여지가 없다(`npm view` 확인).
+- **결정**: `package.json`에 `"overrides": { "temporal-polyfill": "$temporal-polyfill" }`을 둔다.
+  루트 스펙(`^1.0.1`)을 그대로 참조하는 형태라 npm의 "직접 의존 패키지는 동일 스펙일 때만 override
+  가능" 제약을 만족하고, 설치 트리는 지금까지 `--force`로 만들던 것과 **동일**하다.
+  - **이유 1(이 peer는 선언일 뿐 모듈 의존이 아니다)**: `node_modules/@schedule-x/**` 번들에
+    `temporal-polyfill`을 import·require하는 코드가 **한 건도 없다**. 전역 `Temporal.PlainDate`·
+    `ZonedDateTime`·`Now`·`PlainTime`만 참조하고, 그 전역은 우리 쪽
+    `ScheduleXCalendarView.tsx`의 `import "temporal-polyfill/global"`이 채운다. 즉 충돌은 설치
+    해석기에서만 발생하고 런타임 결합은 없다.
+  - **이유 2(검증된 런타임을 바꾸지 않는다)**: 루트를 `0.3.0`으로 낮추는 안은 캘린더가 실제로
+    돌던 전역 구현을 교체하는 것이라 재검증 부담이 크고, `temporal-spec` 버전도 함께 내려가
+    `src/temporal-global.d.ts`의 `/// <reference types="temporal-spec/global" />` 타입 경로가
+    영향을 받는다.
+  - **이유 3(저장소 하나로 닫힌다)**: Vercel 빌드 커맨드에 `--force`를 붙이는 안은 플랫폼 설정에만
+    남아 저장소를 새로 클론하는 팀원·CI에서 그대로 재발한다. `--legacy-peer-deps`는 peer 자동
+    설치를 꺼 `preact`·`@preact/signals`가 빠지므로 애초에 후보가 아니다(I-045 실측).
+- **검증**: 플래그 없는 `npm install`·클린 `npm ci` 모두 통과, `preact 10.29.7`·
+  `@preact/signals 2.10.0` 자동 설치 확인, `temporal-polyfill`은 1.0.1 유지,
+  `package-lock.json` 변경 없음, `npm run build`(Next 16.2.11 Turbopack) 통과.
+- **영향**: I-045를 해결됨으로 닫는다. 앞으로 이 저장소의 설치 커맨드에 `--force`·
+  `--legacy-peer-deps`를 붙이지 않는다 — 붙여야 한다면 그건 새 충돌이 생겼다는 신호다.
