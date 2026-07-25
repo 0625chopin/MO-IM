@@ -1,8 +1,9 @@
+import { AccountWithdrawSection } from "@/components/profile/AccountWithdrawSection";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { ProfileEditForm } from "@/components/profile/ProfileEditForm";
 import { UserSearchField } from "@/components/profile/UserSearchField";
 import type { AuthSession } from "@/components/shell/auth-session";
-import { getProfileById } from "@/lib/data";
+import { getProfileById, listCrewsByProfile } from "@/lib/data";
 import { canChangeHandle } from "@/lib/rules/handle-validation";
 import { strings } from "@/lib/strings";
 
@@ -26,6 +27,14 @@ export async function AccountSettingsContainer({
   session: Extract<AuthSession, { status: "authenticated" }>;
 }) {
   const profile = await getProfileById(session.profileId);
+  // FR-005 AC1(Task 039) — 탈퇴 섹션이 "오너로 있는 활성 크루" 목록을 보여주려면 미리
+  // 조회해 둬야 한다. `listCrewsByProfile`은 소속 크루 전체를 반환하므로 오너·활성 조건은
+  // 여기서(컨테이너) 거른다 — `lib/data`에 이 조합만을 위한 새 쿼리 함수를 추가하지 않았다
+  // (DESIGN 소유 파일 최소 침습 원칙, `request_account_deactivation` RPC가 최종 판정을
+  // 다시 하므로 이 필터링은 표시 전용이다).
+  const ownedActiveCrews = (await listCrewsByProfile(session.profileId))
+    .filter((crew) => crew.ownerId === session.profileId && crew.status === "active")
+    .map((crew) => ({ id: crew.id, name: crew.name }));
 
   if (!profile) {
     return (
@@ -72,6 +81,8 @@ export async function AccountSettingsContainer({
         </div>
         <UserSearchField />
       </section>
+
+      <AccountWithdrawSection ownedActiveCrews={ownedActiveCrews} />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { createJoinRequest, getCrewById, getCrewMembership, initiateCrewMembership } from "@/lib/data";
+import { createJoinRequest, getCrewById, getCrewMembership } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
 import { evaluateJoinRequestEligibility } from "@/lib/rules/join-request-eligibility";
 import { checkPermission } from "@/lib/rules/permission";
@@ -20,9 +20,11 @@ import { strings } from "@/lib/strings";
  * 클라이언트 상태를 신뢰하지 않고 두 판정을 서버에서 다시 한다(Next.js Server Actions 문서
  * "Validate inputs" — `search-user-by-handle.ts`와 같은 이유).
  *
- * 성공하면 `createJoinRequest` + `initiateCrewMembership("request")`를 순서대로 호출해 FR-022
- * 정상 흐름 ③("멤버십 requested 생성")까지 한 번에 만족시킨다 — 앞이 성공했는데 뒤를 호출하는
- * 걸 잊으면 JoinRequest는 생겼는데 크루 홈 버튼은 여전히 "가입 신청"으로 보이는 불일치가 난다.
+ * `createJoinRequest`(`@/lib/data`) 하나가 FR-022 정상 흐름 ③("멤버십 requested 생성")까지
+ * 함께 처리한다 — `join_requests`에는 `invitations`류 자동 프로비저닝 트리거가 없어서(Task 032
+ * 실측) 그 함수 내부가 crew_memberships를 직접 만든다. Mock 시절에는 이 액션이 별도로
+ * `initiateCrewMembership("request")`를 호출해야 했으나, 실 DB에서는 그 호출이 중복 처리가
+ * 되므로 제거했다(`docs/decisions/write-path-realdata-032.md`).
  */
 export interface RequestJoinCrewFormState {
   success?: boolean;
@@ -72,8 +74,6 @@ export async function requestToJoinCrewAction(
   if (!created.ok) {
     return { formError: strings.crew.home.join.errors.already_pending };
   }
-
-  await initiateCrewMembership(crewId, session.profileId, "request");
 
   refresh();
   return { success: true };

@@ -40,6 +40,10 @@ export interface MeetupAttendance {
  *
  * - `success: false, reason: "full"` — 정원 조건부 UPDATE(D-019) 판정에 의한 **실제
  *   실패**(FR-066 E1·E2, AC1·AC2).
+ * - `success: false, reason: "forbidden"` — 크루원이 아닌데도 호출된 경우(Task 032
+ *   교차검증 major 1 수정, 18일차). Server Action이 호출 전에 이미 활성 멤버십을
+ *   확인하므로 정상 UI 흐름에서는 도달하지 않는다 — publishable key로 RPC를 직접
+ *   호출하는 경로(TOCTOU 포함)에 대한 데이터 레이어의 2차 방어선이다.
  * - `success: true, changed: false` — 이미 같은 상태로 응답한 요청을 멱등 처리한
  *   결과(예: 이미 "불참"인데 다시 "불참" 요청). FR-067 E2 "이미 불참 상태 → 무시
  *   (멱등)"가 이를 실패가 아니라 조용한 성공으로 요구하므로 `success: false`로
@@ -49,4 +53,4 @@ export interface MeetupAttendance {
  */
 export type AttendanceJoinResult =
   | { success: true; changed: boolean }
-  | { success: false; reason: "full" };
+  | { success: false; reason: "full" | "forbidden" };

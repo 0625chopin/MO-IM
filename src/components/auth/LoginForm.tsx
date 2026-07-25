@@ -74,6 +74,12 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
         </Field>
       </FieldGroup>
 
+      <p className="text-right text-sm">
+        <Link href="/reset-password" className="font-medium text-foreground underline underline-offset-4">
+          {strings.auth.login.forgotPassword}
+        </Link>
+      </p>
+
       <Button type="submit" disabled={isPending} className="w-full">
         {isPending && <Loader2Icon aria-hidden="true" className="animate-spin" />}
         {isPending ? strings.auth.login.submitPending : strings.auth.login.submit}

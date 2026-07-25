@@ -1,4 +1,4 @@
-import type { Id } from "@/lib/types";
+import type { Id, ISODateTimeString } from "@/lib/types";
 
 /**
  * 인증 경계(D-030 ④)가 소비하는 세션 타입 + 순수 판정 함수. `next/headers`(서버 전용 API)를
@@ -14,6 +14,12 @@ import type { Id } from "@/lib/types";
  * - `error`: 네트워크 실패(`network`)뿐 아니라 RLS 403류의 **도메인 오류**(`forbidden`)를
  *   포함한다(D-030 ③). 셸은 오류 상태에서도 크래시하지 않고 게스트 안전값으로 내비게이션을
  *   내려야 한다 — `nav-items.ts`가 `error`를 `guest`와 동일하게 취급하는 이유다.
+ * - `reason: "deactivated"`(Task 039, FR-005): Supabase Auth 세션 자체는 유효하지만
+ *   `profiles.status === "deactivated"`(30일 유예 중)인 계정이다 — `forbidden`(게스트 취급,
+ *   복구 불가)과 달리 이 상태는 **AC3(복구) 진입점**이 있어야 하므로 별도 판별지로 뺐다.
+ *   `(app)/layout.tsx`가 이 reason만 `/account/restore`로 보내고, 그 밖의 `error`는 계속
+ *   `/login`으로 보낸다(`nav-items.ts`의 "error=guest 취급" 원칙은 내비게이션 표시에 한정되고
+ *   라우팅 목적지 분기와는 별개다).
  * - `profileId`(`authenticated`에만 존재): `lib/data`의 9개 도메인 함수가 전부 `profileId`를
  *   인자로 받는 계약(CON-06)이라, 다음 회차에 컨테이너를 만드는 사람이 세션에서 바로
  *   꺼내 `lib/data` 호출에 넘길 수 있어야 한다(3일차 교차검증에서 DESIGN이 자체 발견, 팀장
@@ -31,7 +37,8 @@ export type AuthSession =
       hasCompletedOnboarding: boolean;
       unreadNotificationCount: number;
     }
-  | { status: "error"; reason: "network" | "forbidden" };
+  | { status: "error"; reason: "network" | "forbidden" }
+  | { status: "error"; reason: "deactivated"; graceEndsAt: ISODateTimeString };
 
 /** `session.status === "authenticated"`를 좁혀 준다. 로그인 필요 페이지 가드에서 쓴다. */
 export function isAuthenticated(

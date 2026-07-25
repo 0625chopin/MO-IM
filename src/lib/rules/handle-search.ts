@@ -19,19 +19,34 @@ import type { Profile } from "@/lib/types";
  * 한다(id를 클라이언트에 노출하지 않는다).
  *
  * 남은 위험(문서화만, 이 함수의 책임 밖): Mock 스토어는 배열 `find`라 두 분기의 실행 시간
- * 차이가 이론상으로도 무시할 수준이다. 진짜 응답 지연 상수화(레이트 리밋 포함, NFR-016)는
- * v0.2·실데이터 연동 이후 대상이다(요구사항 3.6절, R-012 "대응" 절 참고) — 지금은 "같은 코드
- * 경로"까지만 보장한다.
+ * 차이가 이론상으로도 무시할 수준이다. 진짜 응답 지연 상수화는 이 함수의 책임 밖이다 — 지금은
+ * "같은 코드 경로"까지만 보장한다.
+ *
+ * **`rateLimited`(Task 038, D-005·NFR-016)는 이 함수가 만들지 않는다** — `searchUserByHandleAction`
+ * (`lib/actions/search-user-by-handle.ts`)이 `projectHandleSearchResult` 호출 전에 레이트 리밋을
+ * 먼저 판정해 초과 시 이 함수를 아예 호출하지 않고 직접 반환한다. R-012가 막는 것과는 다른
+ * 축이라(자기 계정의 요청 빈도만 드러나고 다른 계정의 존재 여부는 새지 않는다) `found: false`의
+ * "동일 경로" 불변식을 깨지 않는 별도 필드로 얹었다.
+ *
+ * **`status !== "active"`도 이 한 줄로 합류한다(Task 039, 18일차 교차검증 minor 1)** —
+ * `profile_search` RPC(`profile-search.sql`, 029B)는 이미 `status='active'`로 필터하는데,
+ * 이 앱 경로(`getProfileByHandle` 정확 일치 조회)에는 그 필터가 없어 탈퇴 유예 중
+ * (`deactivated`, 파기 전이라 실 PII 보유)인 사용자가 실명·실아바타로 계속 검색됐다. 새
+ * 정책이 아니라 RPC가 이미 가진 규칙에 이 경로를 맞추는 것이다 — `searchOptOut`과 똑같이
+ * "존재하지 않음"과 구분 불가능한 모양으로 합친다(R-012, 사유를 노출하면 열거 공격 표면이
+ * 된다). `profiles` 테이블 직접 조회 경로(예: RLS를 우회하는 service-role 호출)는 이 함수의
+ * 책임 밖이다 — 남은 한계는 I-058 각주 참고.
  */
 export type HandleSearchResult =
   | { found: true; handle: string; displayName: string; avatarUrl: string | null }
-  | { found: false };
+  | { found: false; rateLimited?: boolean; retryAfterSeconds?: number };
 
 export function projectHandleSearchResult(
-  profile: Pick<Profile, "handle" | "displayName" | "avatarUrl" | "searchOptOut"> | null,
+  profile: Pick<Profile, "handle" | "displayName" | "avatarUrl" | "searchOptOut" | "status"> | null,
 ): HandleSearchResult {
-  if (profile === null || profile.searchOptOut) {
-    // 미존재 · 옵트아웃 — 동일한 한 줄. 분기를 나누지 않는 것 자체가 R-012 대응이다.
+  if (profile === null || profile.searchOptOut || profile.status !== "active") {
+    // 미존재 · 옵트아웃 · 비활성(탈퇴 유예 중·정지) — 동일한 한 줄. 분기를 나누지 않는 것
+    // 자체가 R-012 대응이다.
     return { found: false };
   }
   return {

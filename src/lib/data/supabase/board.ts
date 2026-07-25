@@ -2,11 +2,10 @@ import "server-only";
 
 import type { Board, Id, Post, PostType } from "@/lib/types";
 
+import { type CursorPage, type DataResult, err, ok } from "../contracts";
 
 import { toBoard, toPost } from "./mappers";
 import { createSupabaseServerClient } from "./server";
-
-import type { CursorPage } from "../contracts";
 
 /**
  * Board·Post 읽기 전용 실데이터 구현 (Task 031, FR-030~032·034). Mock(`../mock/board.ts`)과
@@ -139,4 +138,77 @@ export async function listPostsByPage(
   const totalCount = count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   return { items: (data ?? []).map(toPost), page, pageSize, totalCount, totalPages };
+}
+
+export interface CreatePostInput {
+  boardId: Id;
+  authorId: Id;
+  type: PostType;
+  title: string;
+  body: string;
+  /** 아래 4개 필드는 전부 type='meetup_proposal'일 때만 의미 있다(FR-034, D-013). */
+  meetupDate?: string | null;
+  startTime?: string | null;
+  place?: string | null;
+  capacity?: number | null;
+}
+
+/** `general` 게시글은 모임 제안 필드 4종을 전부 null로 고정한다(DB CHECK 제약과도 일치). */
+export async function createPost(input: CreatePostInput): Promise<Post> {
+  const supabase = await createSupabaseServerClient();
+  const isProposal = input.type === "meetup_proposal";
+  const { data, error } = await supabase
+    .from("posts")
+    .insert({
+      board_id: input.boardId,
+      author_id: input.authorId,
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      meetup_date: isProposal ? (input.meetupDate ?? null) : null,
+      start_time: isProposal ? (input.startTime ?? null) : null,
+      place: isProposal ? (input.place ?? null) : null,
+      capacity: isProposal ? (input.capacity ?? null) : null,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return toPost(data);
+}
+
+export type UpdatePostInput = Partial<Pick<Post, "title" | "body">>;
+
+/** 게시글 수정(FR-032). `editedAt`을 갱신한다(D-035). `posts_update_author_or_staff_delete`
+ *  RLS + `posts_guard_non_author_delete_only` 트리거가 본인 외의 본문 수정을 막는다. */
+export async function updatePost(id: Id, patch: UpdatePostInput): Promise<DataResult<Post>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("posts")
+    .update({
+      ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.body !== undefined ? { body: patch.body } : {}),
+      edited_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return err("not_found", `post ${id} 를 찾을 수 없다.`);
+  return ok(toPost(data));
+}
+
+/** 게시글 삭제(FR-032). 소프트 삭제 — `deletedAt`만 채운다. */
+export async function deletePost(id: Id): Promise<DataResult<Post>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("posts")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return err("not_found", `post ${id} 를 찾을 수 없다.`);
+  return ok(toPost(data));
 }

@@ -354,6 +354,9 @@ export const ko = {
           self_invite: "자기 자신은 초대할 수 없어요",
           already_member: "이미 크루원이에요",
           already_invited: "이미 초대를 보낸 사용자예요",
+          /** Task 032 교차검증 major 2 — 이미 가입 신청을 넣은 사용자는 초대가 아니라
+           *  승인으로 처리해야 한다(FR-023). */
+          already_requested: "이미 가입 신청을 넣은 사용자예요 — 신청 탭에서 승인해 주세요",
         },
       },
       /** FR-023 가입 신청 승인·반려 탭. `requests.status.*`는 `JoinRequestStatus` 값과 문구를
@@ -585,6 +588,38 @@ export const ko = {
           cooldown: "핸들은 30일에 한 번만 바꿀 수 있어요",
         },
       },
+      /**
+       * FR-005 회원 탈퇴(Task 039, D-010). 계정 설정 화면의 가장 아래 섹션 — 파괴적 행위라
+       * 별도 다이얼로그(비밀번호 재확인)를 거친다. `blockedByOwnership`은 AC1(오너 크루 보유
+       * 시 차단)의 안내 문구다.
+       */
+      withdraw: {
+        heading: "계정 탈퇴",
+        description: "탈퇴하면 계정이 30일간 비활성화된 뒤 개인정보가 파기돼요.",
+        /** D-010 — 정상 흐름 ②(처리 내역 고지)에 쓰는 안내 3줄. */
+        notice: {
+          personalData: "이메일·핸들·표시 이름·아바타·소개는 30일 뒤 파기돼요.",
+          content: "작성한 게시글·투표·채팅은 본문이 유지되고, 작성자는 '탈퇴한 사용자'로 표시돼요.",
+          votes: "투표 기록은 집계 정합성을 위해 그대로 남아요.",
+        },
+        blockedByOwnership: {
+          title: "오너로 있는 크루가 있어요",
+          description: "탈퇴하려면 먼저 아래 크루의 오너를 다른 사람에게 넘기거나 크루를 해산해야 해요.",
+        },
+        confirmDialog: {
+          title: "정말 탈퇴할까요?",
+          description: "비밀번호를 다시 입력하면 탈퇴가 진행돼요. 30일 안에는 다시 로그인해 복구할 수 있어요.",
+          passwordLabel: "현재 비밀번호",
+          submit: "탈퇴하기",
+          submitPending: "처리하는 중…",
+          cancel: "취소",
+        },
+        errors: {
+          incorrectPassword: "비밀번호가 일치하지 않아요",
+          ownsActiveCrew: "오너로 있는 크루가 있어 탈퇴할 수 없어요",
+          unknown: "탈퇴 처리 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+        },
+      },
     },
     /**
      * FR-006 핸들 검색(D-005) — `UserSearchField`·`UserSearchResult`가 쓴다. 계정 설정
@@ -603,10 +638,29 @@ export const ko = {
       /** R-012 — "핸들이 없음"과 "옵트아웃"을 이 문구 하나로 통일한다(`lib/rules/handle-search.ts`
        *  `projectHandleSearchResult`가 두 경우를 같은 값으로 만든 뒤 이 문구가 그 값을 그린다). */
       notFound: "해당 핸들의 사용자가 없습니다",
-      /** NFR-016(v0.2, 분당 20회) 상태를 미리 보여주는 `/sample` 전용 정적 데모 문구 —
-       *  실제 카운팅은 아직 없다(`search-user-by-handle.ts` docstring 참고). */
+      /** D-005·NFR-016(계정당 분당 20회) 초과 시 문구(Task 038). `searchUserByHandleAction`이
+       *  실제로 카운팅한다 — `/sample`의 "오류" 패널은 이 상태의 정적 재현이다. */
       rateLimited: "너무 많이 검색했어요. 잠시 후 다시 시도해 주세요.",
       resultAriaLabel: "검색 결과",
+    },
+    /**
+     * FR-005 AC3(Task 039) — `/account/restore`. `profiles.status==="deactivated"`인 계정이
+     * 로그인했을 때(Supabase Auth 세션 자체는 유효) 도달하는 화면이다. `graceEndsAt`까지
+     * 남은 기간 안내 + 복구 버튼을 보여준다.
+     */
+    restore: {
+      title: "탈퇴 처리 중인 계정이에요",
+      /** {date}는 YYYY.MM.DD 형식(NFR-025, 상대 시각 미사용 관례를 그대로 따른다). */
+      description: "{date}까지 복구하지 않으면 개인정보가 파기되고 되돌릴 수 없어요.",
+      restore: "계정 복구하기",
+      restorePending: "복구하는 중…",
+      restored: "계정을 복구했어요. 다시 로그인해 주세요.",
+      backToLogin: "로그인 화면으로",
+      errors: {
+        graceExpired: "유예 기간이 지나 복구할 수 없어요",
+        notDeactivated: "이미 활성 상태인 계정이에요",
+        unknown: "복구 처리 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+      },
     },
   },
 
@@ -953,6 +1007,8 @@ export const ko = {
       /** FR-002 E4 → FR-001 E4로 이관 — 가입은 됐지만 이메일 인증이 끝나지 않은 계정의
        *  로그인 시도. E1(자격 증명 불일치)과 원인이 다르므로 별도 문구를 쓴다. */
       emailNotVerifiedNotice: "이메일 인증이 아직 완료되지 않았어요. 받은 메일함에서 인증 링크를 확인해 주세요.",
+      /** FR-003(Task 039) — 로그인 폼에서 재설정 화면으로 가는 진입점. */
+      forgotPassword: "비밀번호를 잊으셨나요?",
       noAccount: "아직 계정이 없으신가요?",
       goToSignup: "회원가입",
     },
@@ -1036,6 +1092,63 @@ export const ko = {
         /** 세션 만료 등 — FR-002 E3. */
         sessionExpired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
       },
+    },
+    /**
+     * FR-003 비밀번호 재설정(Task 039). `request`(이메일 입력, `/reset-password`)와
+     * `confirm`(새 비밀번호 입력, `/reset-password/confirm` — `/auth/confirm`이 토큰 교환에
+     * 성공한 뒤 도착하는 화면) 두 단계로 나눈다 — `signup.pendingVerification` 패턴과 같은
+     * 이유로 폼과 완료 안내를 같은 화면 안에서 상태로 갈아 끼운다.
+     */
+    resetPassword: {
+      request: {
+        title: "비밀번호 재설정",
+        description: "가입한 이메일을 입력하면 재설정 링크를 보내드려요.",
+        fields: {
+          email: "이메일",
+        },
+        submit: "재설정 메일 보내기",
+        submitPending: "보내는 중…",
+        /** FR-003 AC1 — 가입 이메일인지 아닌지와 무관하게 항상 이 문구만 보여준다(계정 열거
+         *  방지). Supabase Auth의 `resetPasswordForEmail`이 API 레벨에서 이미 이 성질을
+         *  보장하므로(미가입 이메일에도 에러 없이 성공), 이 문구는 그 API 계약을 그대로
+         *  옮긴 것이다. */
+        sent: "메일함을 확인해 주세요. 가입된 이메일이라면 재설정 링크를 보내드렸어요.",
+        errors: {
+          emailInvalid: "올바른 이메일 형식이 아니에요",
+          unknown: "요청 처리 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+        },
+        backToLogin: "로그인 화면으로",
+      },
+      confirm: {
+        title: "새 비밀번호 설정",
+        description: "새로 쓸 비밀번호를 입력해 주세요.",
+        fields: {
+          password: "새 비밀번호",
+          passwordDescription: "8자 이상으로 입력해 주세요.",
+        },
+        submit: "비밀번호 변경",
+        submitPending: "변경하는 중…",
+        /** 정상 흐름 ⑤~⑥ — 변경 직후 이 브라우저 세션도 함께 종료하고 로그인 화면으로
+         *  보낸다(confirmPasswordReset 문서 참고). */
+        successRedirectNotice: "비밀번호를 변경했어요. 새 비밀번호로 다시 로그인해 주세요.",
+        errors: {
+          passwordTooShort: "비밀번호는 8자 이상이어야 해요",
+          /** FR-003 E2 — 링크 만료(1시간) 또는 이미 사용된 링크(E3). Supabase가 두 경우를
+           *  같은 오류 코드로 구분하지 않아(`session_not_found`) 문구도 하나로 합친다. */
+          linkExpired: "재설정 링크가 만료됐거나 이미 사용됐어요. 다시 요청해 주세요.",
+          unknown: "비밀번호 변경 중 문제가 발생했어요. 잠시 후 다시 시도해 주세요.",
+        },
+        requestNewLink: "재설정 다시 요청하기",
+      },
+    },
+    /**
+     * `/auth/confirm`(PKCE 토큰 교환)이 실패했을 때 도달하는 화면 — 링크 자체가 깨졌거나
+     * 만료된 경우다. 가입 확인·비밀번호 재설정 양쪽에서 공유한다(라우트 자체가 공유되므로).
+     */
+    confirmError: {
+      title: "링크를 확인할 수 없어요",
+      description: "링크가 만료됐거나 이미 사용된 것 같아요.",
+      backToLogin: "로그인 화면으로",
     },
   },
 

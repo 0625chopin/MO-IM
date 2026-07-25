@@ -87,16 +87,31 @@ export async function castVoteAction(
   // Mock인 것은 **이 체크 타이밍**뿐이고, 판정 자체(`decideAndClosePoll` → `lib/rules`)는
   // 100% 프로덕션 코드다 — Task 034가 실제 트리거를 붙이면 이 블록은 그대로 남기거나 그
   // 트리거 핸들러로 옮기기만 하면 된다.
-  const [voters, votes] = await Promise.all([
-    listEligibleVotersWithCurrentStatus(input.pollId),
-    listVotes(input.pollId),
-  ]);
-  const votedProfileIds = new Set(votes.map((v) => v.voterId));
-  const remaining = countRemainingVoters(voters, votedProfileIds);
-  if (shouldAutoCloseByAllVoted(remaining)) {
-    // 자동 종료라 종료 주체는 없다(closedBy: null, D-035와 같은 규약 — createPostAction의
-    // 자동 판정과 대칭).
-    await decideAndClosePoll(input.pollId, null);
+  //
+  // **I-049 해소(Task 032, 18일차)** — 이 블록 전체를 try/catch로 감싼다. 위 `castVote`가
+  // 이미 성공해(`result.ok`) 표가 DB에 반영된 뒤이므로, 이 시점 이후의 어떤 실패(자동 종료
+  // 판정 예외 — `getPollTallyForDecision`의 `tally_hidden` 불변식 위반, 스냅샷 정합성 오류,
+  // 또는 `closePoll`의 RLS 2차 거부 — 마지막 표를 던진 사람이 임원이 아니면 발생 가능,
+  // `poll.ts` `closePoll` docstring 참고)도 이미 성공한 투표 결과를 오류로 뒤집으면 안 된다.
+  // 자동 종료가 실패해도 poll은 여전히 `open`이라 트리거①(기한 도래)이 결국 마무리한다 —
+  // 여기서 재시도하지 않고 로깅만 한다.
+  try {
+    const [voters, votes] = await Promise.all([
+      listEligibleVotersWithCurrentStatus(input.pollId),
+      listVotes(input.pollId),
+    ]);
+    const votedProfileIds = new Set(votes.map((v) => v.voterId));
+    const remaining = countRemainingVoters(voters, votedProfileIds);
+    if (shouldAutoCloseByAllVoted(remaining)) {
+      // 자동 종료라 종료 주체는 없다(closedBy: null, D-035와 같은 규약 — createPostAction의
+      // 자동 판정과 대칭).
+      await decideAndClosePoll(input.pollId, null);
+    }
+  } catch (autoCloseError) {
+    console.error(
+      `poll ${input.pollId} 자동 종료(트리거③) 실패 — 표 저장은 이미 성공했다(voterId=${session.profileId})`,
+      autoCloseError,
+    );
   }
   // --- 트리거③ 끝 ---
 

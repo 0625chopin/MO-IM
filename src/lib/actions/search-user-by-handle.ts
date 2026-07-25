@@ -2,9 +2,11 @@
 
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
+import { getRecentHandleSearchAttempts, recordHandleSearchAttempt } from "@/lib/audit/rate-limit-store";
 import { getProfileByHandle } from "@/lib/data";
 import { projectHandleSearchResult, type HandleSearchResult } from "@/lib/rules/handle-search";
 import { checkPermission } from "@/lib/rules/permission";
+import { evaluateFixedWindowRateLimit, HANDLE_SEARCH_RATE_LIMIT } from "@/lib/rules/rate-limit";
 
 /**
  * FR-006 핸들 검색 Server Action(Task 015B, D-005). `UserSearchField`가 검색 버튼/제출 시점에
@@ -44,9 +46,11 @@ import { checkPermission } from "@/lib/rules/permission";
  * 자신은 "존재하지만 옵트아웃"과 "존재하지 않음"을 구분하는 조건문을 갖지 않는다. 그 판정
  * 함수 안에서 두 경우가 이미 같은 값으로 합쳐진다.
  *
- * **레이트 리밋(NFR-016, 분당 20회)은 여기 없다** — NFR-016은 v0.2 등급이고 "실데이터 연결
- * 전에는 대상이 없다"(요구사항 129행)고 명시한다. `/sample`의 429 오류 패널은 그 미래 상태를
- * **화면 상태로만** 미리 보여주는 정적 데모이며, 이 함수는 그 카운팅을 실제로 하지 않는다.
+ * **레이트 리밋(D-005·NFR-016, 계정당 분당 20회)이 여기 있다(Task 038, 18일차 BOARD)** —
+ * `lib/audit/rate-limit-store.ts`가 `public.handle_search_attempts`를 읽고 쓰기만 하고, 판정은
+ * `lib/rules/rate-limit.ts`의 `evaluateFixedWindowRateLimit`(순수 함수)이 한다. 초과 시
+ * `{ found: false, rateLimited: true }`를 반환한다 — R-012가 요구하는 "미존재·옵트아웃 구분
+ * 불가"와는 다른 축이다(자기 자신의 요청 빈도만 드러날 뿐 다른 계정의 존재 여부를 새지 않는다).
  * (NFR-012의 "권한 검사는 서버·RLS에서" 자체는 v0.2가 아니다 — v0.2로 미뤄도 되는 것은 RLS
  * 구현 쪽이고, 이미 있는 순수 함수 `checkPermission`을 여기서 호출하는 것은 비용이 0이라
  * 미룰 이유가 없었다. 이전 버전 주석이 이 둘을 혼동했던 것을 바로잡는다.)
@@ -55,9 +59,16 @@ export async function searchUserByHandleAction(handleQuery: string): Promise<Han
   const session = await getAuthSession();
   const role = isAuthenticated(session) ? "member" : "guest";
   const permission = checkPermission({ role, action: "search:by_handle" });
-  if (!permission.allowed) {
+  if (!permission.allowed || !isAuthenticated(session)) {
     return { found: false };
   }
+
+  const attempts = await getRecentHandleSearchAttempts(session.profileId);
+  const rateLimit = evaluateFixedWindowRateLimit(attempts, new Date().toISOString(), HANDLE_SEARCH_RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return { found: false, rateLimited: true, retryAfterSeconds: rateLimit.retryAfterSeconds };
+  }
+  await recordHandleSearchAttempt(session.profileId);
 
   const handle = handleQuery.trim();
   if (!handle) {

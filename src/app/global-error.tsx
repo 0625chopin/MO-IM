@@ -4,6 +4,7 @@ import { Geist_Mono, Noto_Sans_KR } from "next/font/google";
 import { useEffect } from "react";
 
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
+import { reportClientErrorAction } from "@/lib/actions/report-client-error";
 
 import "./globals.css";
 
@@ -40,6 +41,12 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
+    // NFR-028 오류 수집(Task 038) — `error.tsx`와 같은 이유·같은 방식(모듈 docstring 참고).
+    void reportClientErrorAction({
+      message: error.message,
+      requestId: error.digest ?? crypto.randomUUID(),
+      stack: error.stack,
+    });
   }, [error]);
 
   return (

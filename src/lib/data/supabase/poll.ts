@@ -4,10 +4,14 @@ import type {
   Id,
   Poll,
   PollEligibleVoter,
+  PollOutcome,
   PollTally,
   PollVote,
   SnapshotVoterStatus,
+  VoteChoice,
 } from "@/lib/types";
+
+import { type DataResult, err, ok } from "../contracts";
 
 import { toPoll, toPollEligibleVoter, toPollVote } from "./mappers";
 import { createSupabaseServerClient } from "./server";
@@ -206,4 +210,129 @@ export async function getPollTallyForDecision(pollId: Id): Promise<PollTally> {
     againstCount: row.against_count ?? 0,
     abstainCount: row.abstain_count ?? 0,
   };
+}
+
+export interface CreatePollInput {
+  postId: Id;
+  opensAt: string;
+  closesAt: string;
+  /** 투표 생성 시각의 대상자 스냅샷(D-025) — 호출자가 크루원 목록에서 미리 계산해 넘긴다. */
+  eligibleVoterIds: Id[];
+}
+
+/**
+ * 찬반 투표 생성(FR-040). `polls_insert_proposal_author` RLS가 제안 글 작성자만 허용한다.
+ * D-025 — 스냅샷을 `poll_eligible_voters` 조인 테이블에 함께 만든다(생성 후 불변, §7.6).
+ */
+export async function createPoll(input: CreatePollInput): Promise<Poll> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("polls")
+    .insert({ post_id: input.postId, opens_at: input.opensAt, closes_at: input.closesAt })
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  if (input.eligibleVoterIds.length > 0) {
+    const { error: votersError } = await supabase.from("poll_eligible_voters").insert(
+      input.eligibleVoterIds.map((profileId) => ({ poll_id: data.id, profile_id: profileId })),
+    );
+    if (votersError) throw votersError;
+  }
+
+  return toPoll(data);
+}
+
+export interface CastVoteInput {
+  pollId: Id;
+  voterId: Id;
+  choice: VoteChoice;
+}
+
+/**
+ * 투표 참여(FR-041). 대상자 스냅샷에 없거나 종료된 투표는 사전 확인해 도메인 오류로 반환한다
+ * (RLS `poll_votes_insert_eligible_self`도 같은 조건을 강제하지만, 여기서 먼저 걸러야
+ * "왜 실패했는지" 구분되는 메시지를 줄 수 있다). 재투표는 upsert로 처리한다 —
+ * `poll_votes_guard_immutability` 트리거가 `open` 동안만 변경을 허용한다(D-003).
+ */
+export async function castVote(input: CastVoteInput): Promise<DataResult<PollVote>> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: poll, error: pollError } = await supabase
+    .from("polls")
+    .select("status")
+    .eq("id", input.pollId)
+    .maybeSingle();
+  if (pollError) throw pollError;
+  if (!poll) return err("not_found", `poll ${input.pollId} 를 찾을 수 없다.`);
+  if (poll.status !== "open") {
+    return err("conflict", `poll ${input.pollId} 는 이미 종료됐다.`);
+  }
+
+  const { data: eligible, error: eligibleError } = await supabase
+    .from("poll_eligible_voters")
+    .select("poll_id")
+    .eq("poll_id", input.pollId)
+    .eq("profile_id", input.voterId)
+    .maybeSingle();
+  if (eligibleError) throw eligibleError;
+  if (!eligible) {
+    return err(
+      "validation_failed",
+      `profile ${input.voterId} 는 poll ${input.pollId} 의 투표 대상이 아니다.`,
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("poll_votes")
+    .upsert(
+      { poll_id: input.pollId, voter_id: input.voterId, choice: input.choice, voted_at: new Date().toISOString() },
+      { onConflict: "poll_id,voter_id" },
+    )
+    .select("*")
+    .single();
+  if (error) throw error;
+  return ok(toPollVote(data));
+}
+
+export interface ClosePollInput {
+  pollId: Id;
+  /** 조기 종료 처리자(제안자/임원/오너). 기한 도래·트리거③ 자동 종료는 null(D-035). */
+  closedBy: Id | null;
+  /** `lib/rules`의 판정 순수 함수가 이미 계산한 결과. */
+  outcome: PollOutcome;
+}
+
+const STATUS_BY_OUTCOME: Record<PollOutcome, "closed_passed" | "closed_rejected" | "closed_invalid"> = {
+  passed: "closed_passed",
+  rejected: "closed_rejected",
+  invalid: "closed_invalid",
+};
+
+/**
+ * 투표 종료 처리(FR-043) + 결과 저장(FR-044). 조건부 UPDATE(`.eq("status","open")`)로 중복
+ * 종료를 막는다. `polls_update_proposal_author_or_staff` RLS는 제안자·임원 이상만 허용한다 —
+ * 트리거③(투표 중 마지막 표를 던진 순간의 자동 종료, `closedBy: null`)은 그 표를 던진 사람이
+ * 임원이 아닐 수 있어 RLS가 조용히 0행을 반환할 수 있다(`err("conflict", …)`로 표현된다) —
+ * `cast-vote.ts`가 이 실패를 표 저장 성공과 분리해 처리한다(I-049).
+ */
+export async function closePoll(input: ClosePollInput): Promise<DataResult<Poll>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("polls")
+    .update({
+      status: STATUS_BY_OUTCOME[input.outcome],
+      closed_by: input.closedBy,
+      result: input.outcome,
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", input.pollId)
+    .eq("status", "open")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    return err("conflict", `poll ${input.pollId} 는 이미 종료됐거나 종료 권한이 없다.`);
+  }
+  return ok(toPoll(data));
 }

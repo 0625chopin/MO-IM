@@ -2,9 +2,10 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-054** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-060** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
+- **새 이슈는 상태와 무관하게 파일 맨 끝(아래 "이슈 기록" 절의 마지막)에 번호순으로 붙인다.** 절 제목을 보고 "열린 이슈" 절에 넣지 않는다 — 그 절은 **외부 입력(고객 답변·요금제 선정 등)을 기다리는 초기 미결 4~11건만 남은 역사적 구획**이고, I-027 이후는 전부 아래 시간순 기록에 쌓여 있다. **각 이슈가 열렸는지 닫혔는지는 절 위치가 아니라 항목 안의 `상태` 필드가 단일 소스다.** (18일차에 한 팀원이 절 제목을 그대로 믿고 열린 이슈를 위쪽 절에 등재해 30건 넘는 기존 항목과 어긋났다 — 팀장이 옮기고 이 규칙을 명시했다.)
 
 ## 기록 형식
 
@@ -21,11 +22,11 @@
 
 상태를 `해결됨`·`무효`로 바꿀 때도 항목을 지우지 않는다. 같은 문제가 다시 올라왔을 때 이전 판단을 찾을 수 있어야 한다.
 
-## 열린 이슈
+## 열린 이슈 (초기 미결 — 외부 입력 대기, 역사적 구획)
 
-개발 중 발견하는 미결 이슈를 여기에 등재한다.
+**이 절에는 새 이슈를 등재하지 않는다.** I-016~I-026은 고객 답변·요금제 선정처럼 **외부 입력이 있어야 닫히는** 초기 미결이라 여기 남아 있다. 새로 발견한 이슈는 상태와 무관하게 아래 "이슈 기록" 절 **맨 끝**에 번호순으로 붙인다(파일 머리말 참고).
 
-**2026-07-23 (1) 고객 검토**로 I-001~I-015가 모두 확정되어 D-001~D-014로 승격됐다(아래 "닫힌 이슈").
+**2026-07-23 (1) 고객 검토**로 I-001~I-015가 모두 확정되어 D-001~D-014로 승격됐다(아래 "이슈 기록").
 **2026-07-23 (2) PRD 기술 검증**(`prd-validator`)에서 26건이 나와 대부분 D-015~D-036으로 확정됐고, **외부 입력이 필요한 4건이 아래에 열려 있다.** 검증 기록 전문은 [`prd/PRD-validation.md`](./prd/PRD-validation.md)에 있다.
 
 ### I-016 · 커스텀 SMTP 공급자를 선정해야 한다
@@ -127,7 +128,10 @@
 - **영향**: 지금은 자리 확보로 충분하지만, 세션 조회가 데이터 접근 로직이라는 점에서 컨벤션상 애매한 위치다.
 - **후속**: 실제 Supabase 세션 연동(Task 029A/030) 시점에 `lib/data` 하위(또는 별도 `lib/session`)로 이관할지 검토한다.
 
-## 닫힌 이슈
+
+## 이슈 기록 (시간순 — 열림·해결됨이 섞여 있다)
+
+**새 이슈는 이 절의 맨 끝에 붙인다.** 절 이름이 오래도록 "닫힌 이슈"였지만 실제로는 I-027 이후 등재분이 상태와 무관하게 여기 쌓여 왔다 — 제목이 내용을 설명하지 못해 18일차에 실제 오등재를 유발했으므로 이름을 사실에 맞게 고쳤다. **열림/해결됨 판정은 항목 안의 `상태` 필드로만 한다.**
 
 
 ### I-001 · "모임"이 그룹인지 일정 이벤트인지 원문에서 뒤섞여 있다
@@ -609,7 +613,7 @@
 
 ### I-046 · `profiles`에 온보딩 완료 여부를 담을 컬럼이 없다
 
-- **상태**: 열림
+- **상태**: 해결됨 (2026-07-25, 18일차 — DESIGN, Task 032)
 - **영역**: 데이터 / 인증
 - **제보**: CREW (2026-07-25, 17일차 — Task 030 실 Supabase Auth 연결 중 발견)
 - **내용**: `AuthSession.hasCompletedOnboarding`(FR-004, 온보딩 재방문 리다이렉트 판정)은 Mock
@@ -626,6 +630,11 @@
   `completeOnboardingAction`이 이를 갱신하도록 교체하는 후속 작업이 필요하다. 스키마 변경이라
   `src/lib/data/**` 소유 담당(다음 회차 이후 CORE/DESIGN)이 맡는 것이 맞다. 상세 근거는
   `docs/decisions/auth-integration-030.md` §5.
+  **해소(18일차)**: 마이그레이션 `profiles_add_onboarding_completed_at`으로 컬럼을 추가하고,
+  `completeProfileOnboarding`(`src/lib/data/supabase/profile.ts`)이 `completeOnboardingAction`에서
+  이를 갱신하도록 교체했다. `get-auth-session.ts`의 `hasCompletedOnboarding`은 이제
+  `profile.onboardingCompletedAt !== null`로 판정한다. 보조 쿠키(`onboarding-flag-cookie.ts`)는
+  삭제했다. 상세: `docs/decisions/write-path-realdata-032.md`.
 
 ### I-047 · Supabase 클라이언트 팩터리(`env`·`server`·`client`)가 데이터 계층이 아니라 인프라인데 `src/lib/data/supabase/` 안에 있다
 
@@ -673,7 +682,7 @@
 
 ### I-049 · `cast-vote.ts` 트리거③이 `decideAndClosePoll` 예외를 감싸지 않아 이미 성공한 투표까지 오류로 보인다
 
-- **상태**: 열림
+- **상태**: 해결됨 (2026-07-25, 18일차 — DESIGN, Task 032)
 - **영역**: 데이터 / 도메인 로직
 - **제보**: BOARD (2026-07-25, 17일차 — `poll-vote-tally-for-decision-hotfix.md` 교체 작업 중
   예외 전파 정적 추적으로 발견)
@@ -705,6 +714,13 @@
   `simulateScheduledPollClosureAction`)는 `decideAndClosePoll`이 이 액션의 **유일한** 목적이라
   결과를 그대로 반환하는 지금 방식이 맞고 고칠 대상이 아니다 — 이 이슈는 `cast-vote.ts`
   트리거③ 블록 하나에 한정된다.
+  **해소(18일차)**: 트리거③ 블록 전체(`listEligibleVotersWithCurrentStatus`·`listVotes`·
+  `decideAndClosePoll` 호출)를 `try/catch`로 감쌌다 — 실패해도 `console.error`로 로깅만 하고
+  이미 저장된 `result`(표)를 그대로 반환한다. `close-poll.ts`의 두 호출부는 예고대로 손대지
+  않았다. 부수 발견: poll 쓰기가 실 Supabase로 옮겨진 지금, `closePoll`의 RLS
+  (`polls_update_proposal_author_or_staff`)는 마지막 표를 던진 사람이 임원이 아니면 트리거③의
+  자동 종료 자체를 조용히 막을 수 있다(0행 → `conflict`) — 이 역시 새 예외 경로 중 하나였고,
+  이번 try/catch가 함께 흡수한다. 상세: `docs/decisions/write-path-realdata-032.md`.
 
 ### I-050 · `CLAUDE.md` D-030 ③ 문구가 읽기/쓰기 범위를 구분하지 않아 오독 소지가 있다
 
@@ -830,3 +846,213 @@
 - **후속**: **`NOTION_API_KEY`는 파일에서 지웠을 뿐 무효화(revoke)되지 않았다** — 그 키가 실제로
   유효하다면 발급처에서 폐기해야 한다. 이건 이 리포지터리 밖의 조치이므로 사용자 판단에 남긴다.
   D-037 기록에 "로컬 환경 파일도 재사용 대상이었다"는 사실을 덧붙일지도 함께 검토할 것.
+
+### I-054 · 일부 쓰기 함수가 여러 SQL 문을 묶어 원자성을 흉내내지만 실제 DB 트랜잭션이 아니다
+
+- **상태**: 열림
+- **영역**: 데이터 / 동시성
+- **제보**: DESIGN (2026-07-25, 18일차 — Task 032 쓰기 경로 실데이터 전환 중 발견)
+- **내용**: `src/lib/data/supabase/join-request.ts`의 `createJoinRequest`(join_requests INSERT +
+  crew_memberships INSERT/UPDATE)와 `poll.ts`의 `createPoll`(polls INSERT + poll_eligible_voters
+  bulk INSERT)은 여러 PostgREST 호출(=여러 개의 독립 트랜잭션)을 순서대로 실행한다 —
+  supabase-js의 `.from()` 호출 하나하나가 별도 네트워크 왕복이자 별도 DB 트랜잭션이라, 클라이언트
+  코드가 "먼저 A, 성공하면 B"로 순서를 지켜도 **A와 B를 하나로 묶는 원자성은 없다.** 두 번째
+  호출이 네트워크 오류 등으로 실패하면 첫 번째 호출의 결과만 커밋된 상태로 남는다(예:
+  `join_requests` 행은 생겼는데 `crew_memberships`는 여전히 이전 상태).
+- **영향**: 드물게(네트워크 순단 등) `join_requests`/`crew_memberships` 또는 `polls`/
+  `poll_eligible_voters`가 서로 어긋난 상태로 남을 수 있다. 정원 원자성(D-019, FR-066·067)이
+  걸린 `respondAttendance`는 이 문제가 **없다** — 카운터 갱신과 attendance upsert를 단일 RPC
+  (`respond_meetup_attendance`, security invoker)로 묶어 진짜 DB 트랜잭션 안에서 처리하도록
+  설계했기 때문이다(같은 파일 docstring 참고). `createCrew`(crews INSERT 하나 + AFTER INSERT
+  트리거가 나머지를 원자적으로 처리)도 이 문제가 없다.
+- **후속**: 이 두 함수도 `respondAttendance`처럼 RPC(security invoker, 여러 INSERT를 한
+  플랫/PLpgSQL 함수 안에 묶기)로 옮기면 해소된다. 이번 회차는 시간 예산상 실제로 발생 확률이
+  낮은(단일 네트워크 왕복 중 순단) 경로라 RPC 전환을 뒤로 미뤘다 — 다음에 이 함수들을 만지는
+  사람이 참고할 것. 근거: `docs/decisions/write-path-realdata-032.md`.
+
+### I-055 · 오류 추적(NFR-028) 도입이 Sentry 계정·DSN 부재로 완결되지 않는다
+
+- **상태**: 열림
+- **영역**: 인프라 / 관측성
+- **제보**: BOARD (2026-07-25, 18일차 — Task 038 운영 기반)
+- **내용**: NFR-028("클라이언트·서버 오류를 수집하고 사용자·크루·요청 식별자로 추적할 수
+  있어야 한다")의 도입 수단을 조사한 결과 **Sentry**(`@sentry/nextjs`)로 결정했다(근거는
+  `docs/decisions/ops-foundation-038.md` §3) — Next.js 16 공식 지원, 클라이언트·서버·엣지를
+  하나로 묶고 `Sentry.setUser`/`setTag`로 사용자·크루 컨텍스트를 붙일 수 있어 NFR-028 측정
+  기준과 정확히 맞는다. 그런데 **SDK 연결에는 Sentry 계정과 프로젝트 DSN**(외부 자격증명)이
+  필요하고, 이번 회차에 그 계정이 없다 — I-016(SMTP 공급자 확정, D-042로 해소)과 같은 성격의
+  외부 의존이다. 또한 Next.js 16(Turbopack 기본) 환경에서 `withSentryConfig`·
+  `instrumentation-client.ts`·`sentry.server.config.ts` 조합이 실제로 빌드를 통과하는지는
+  `npm run build`로만 검증할 수 있는데, 이번 회차 운영 규칙상 build/dev 실행이 팀장 전용이라
+  이 세션에서 직접 검증할 수 없다.
+- **영향**: NFR-028이 "완전 도입" 상태가 아니라 **임시 구현**(`src/lib/audit/error-tracking.ts`의
+  구조화 `console.error`, Vercel 로그 스트림에서 requestId·userId로 검색 가능)에 머문다. 이
+  임시 구현은 "오류 발생 시 추적 가능"이라는 측정 기준 자체는 만족하지만, Sentry가 주는
+  알림·이슈 그룹핑·릴리스 추적은 없다. 크루 컨텍스트(`crewId`)도 오류 경계가 라우트 트리 밖에서
+  실행돼 항상 null로 남는 잔여 위험이 있다(같은 문서 §4).
+- **후속**: ① Sentry 계정·DSN을 발급받아(운영자 수동 조치, I-016과 같은 성격) `.env.local`·
+  Vercel 환경변수에 `SENTRY_DSN` 등을 채운다. ② `@sentry/nextjs` 설치 + 공식 설치 마법사
+  (Next 16 문서 기준)로 `instrumentation.ts`류 파일을 생성한다. ③
+  `src/lib/audit/error-tracking.ts`의 `captureError` 본문만 `Sentry.captureException`
+  호출로 교체한다 — 호출부(`report-client-error.ts`, `error.tsx`, `global-error.tsx`)는
+  이 함수의 시그니처가 바뀌지 않는 한 손대지 않는다. ④ `npm run build`로 Turbopack 빌드
+  통과를 실제로 검증한다(이번 세션엔 못 함).
+
+### I-056 · 탈퇴 계정 파기(`anonymize_expired_deactivated_profiles`)가 `auth.users`를 Admin API가 아니라 직접 SQL로 수정한다
+
+- **상태**: 열림
+- **영역**: 인프라 / 데이터
+- **제보**: CREW (2026-07-25, 18일차 — Task 039 회원 탈퇴 구현 중)
+- **내용**: D-010은 탈퇴 30일 유예 종료 시 이메일 파기를 요구하는데(NFR-031), 이메일은
+  `public.profiles`가 아니라 `auth.users`(GoTrue 관리 스키마)에만 있다. 공식 지원 경로는
+  Supabase Admin API(`supabase.auth.admin.updateUserById`)지만, 파기 배치는 `pg_cron`(순수
+  SQL 실행 환경)이라 HTTP API를 호출할 방법이 없다 — `pg_net` 확장(이 프로젝트에 이미 설치돼
+  있음, 실측 확인)으로 비동기 HTTP 호출을 우회할 수는 있으나 서비스 롤 키를 DB 내부에
+  저장하고 비동기 응답을 별도로 처리해야 해서 이번 회차 범위를 넘었다. 대신
+  `anonymize_expired_deactivated_profiles()`(`postgres` role, `auth.users` UPDATE 권한을
+  실측 확인 — `has_table_privilege('postgres','auth.users','UPDATE') = true`)가 `email`·
+  `raw_user_meta_data`·`banned_until`을 직접 SQL로 갱신한다.
+- **영향**: **정확한 서술(18일차 교차검증 minor 5)** — 앱이 직접 관리하는 개인정보
+  (`profiles`의 표시 필드, `auth.users.email`)는 파기되지만, `auth.identities.identity_data
+  ->>'email'`은 이 갱신 대상이 아니라 원본 이메일이 그 안에 그대로 남는다 — 즉 **GoTrue가
+  내부적으로 보관하는 이 레코드는 파기가 아니라 `banned_until='infinity'`로 로그인 자체가
+  차단돼 무효화**된다. 이 프로젝트 코드는 `identity_data`의 값을 어디서도 읽지 않아(grep
+  확인) 기능적 위험은 낮지만, "이메일이 시스템 어디에도 남지 않는다"는 문자 그대로의 파기는
+  아니다. 또한 GoTrue 내부 캐시·세션 무효화가 Admin API처럼 즉시 보장되지 않을 수 있다(직접
+  SQL이 GoTrue의 공식 지원 경로가 아니므로).
+- **후속**: `pg_net` + Vault(서비스 롤 키 저장) 기반으로 Admin API를 실제로 호출하는 방식으로
+  교체하면 `auth.identities`까지 일관되게 정리된다. 우선순위는 낮다 — 실질적 로그인 차단은
+  `banned_until`로 이미 달성된다.
+
+### I-057 · 비밀번호 재설정 이메일 템플릿(PKCE `token_hash`)이 대시보드에 아직 설정되지 않았을 수 있다
+
+- **상태**: 열림
+- **영역**: 인프라 / 인증
+- **제보**: CREW (2026-07-25, 18일차 — Task 039)
+- **내용**: FR-003(비밀번호 재설정)·FR-001 E4(가입 확인 재발송)의 실제 클릭 링크는
+  Supabase 대시보드의 이메일 템플릿이 `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash
+  }}&type=recovery&next=...` 형태(PKCE 흐름, `mcp__supabase__search_docs`로 조회한 공식
+  Next.js 패턴)로 설정돼 있어야 이번 회차에 만든 `src/app/auth/confirm/route.ts`가 실제로
+  호출된다 — 이 설정은 MCP로 조회·변경할 수 없는 대시보드 전용 설정이라(D-042의 SMTP
+  설정과 같은 성격) **현재 상태를 실측하지 못했다**. 기본 템플릿(구현적 `ConfirmationURL`)이
+  그대로면 이 라우트를 거치지 않고 다른 방식으로 리다이렉트될 수 있다.
+- **영향**: `requestPasswordReset`(`src/lib/auth/session.ts`)·`/auth/confirm` 라우트·
+  `/reset-password/confirm` 화면까지 코드·타입·SQL 계약 수준은 검증했지만(§ 아래
+  `docs/decisions/account-lifecycle-039.md` 실측 범위 참고), **실제 이메일 링크 클릭
+  왕복은 검증하지 못했다** — D-042 Resend 도메인 인증이 끝나지 않았고(임시 Gmail SMTP도
+  시간당 발송 한도가 있어 반복 테스트가 위험하다는 기존 경고, `auth-integration-030.md` §3)
+  대시보드 템플릿 자체도 확인할 방법이 없었다.
+- **후속**: Resend 연결(D-042 잔여 작업)과 같은 타이밍에 운영자가 이메일 템플릿도 함께
+  PKCE 형식으로 갱신해야 한다. 그 전까지 "구현했으나 실제 링크 클릭은 미검증"으로 취급한다.
+
+### I-058 · `profiles` 테이블 직접 조회로 회원 명부 열거·NFR-013 필드 제한·D-005 레이트 리밋이 전부 우회된다
+
+- **상태**: 열림
+- **영역**: 보안 / 데이터
+- **제보**: 팀장 (2026-07-25, 18일차 — CORE가 Task 032/038 교차검증 중 지적받은 #3(`profile_search`
+  레이트 리밋)을 수정한 직후 팀장이 직접 재실측해 발견)
+- **내용**: CORE가 D-005 레이트 리밋(계정당 분당 20회)을 `private.profile_search` +
+  `public.profile_search`(SECURITY DEFINER/INVOKER 2단 구조) 안에 SQL 강제 경계로 넣었다
+  (`docs/decisions/rls-policies-029b.md` §14). 그런데 이 보호는 **`profile_search` RPC를
+  실제로 경유하는 경로에만** 적용되고, 두 가지 이유로 실질 방어가 되지 못한다.
+  1. **앱의 FR-006 검색 경로 자체가 이 RPC를 쓰지 않는다.** `src/lib/actions/
+     search-user-by-handle.ts`는 `getProfileByHandle`을 호출하고, 그 함수(`src/lib/data/
+     supabase/profile.ts:48-57`)는 `public.profiles`를 `.select("*")`로 **직접** 조회한다.
+     RPC를 경유하는 `searchProfilesByHandle`(같은 파일 67행, NFR-013 3필드·정확 일치를
+     지킨다)은 **실제 소비자가 0건**이다 — 그 파일 36~38행 주석도 "이 함수는 현재 실제
+     소비자가 없다"고 이미 적고 있었다.
+  2. **`profiles_select_authenticated`(Task 029A) 정책 자체가 사실상 전체 공개다.**
+     `pg_policies` 실측: `cmd=SELECT`, `roles={authenticated}`, **`qual=true`**(조건 없음,
+     전 컬럼). `set local role authenticated` + `request.jwt.claims`로
+     `select count(*), count(*) filter (where search_opt_out) from profiles`를 실행한 결과
+     **21행 전부 조회되고, 그중 `search_opt_out=true`(옵트아웃) 행도 1건 그대로 포함**됐다.
+     `profiles`에 이메일 컬럼은 없지만(`information_schema.columns` 확인), `handle`·
+     `display_name`·`avatar_url`·`bio`·`status`·`created_at` 등은 로그인한 아무 계정이나
+     publishable key로 한 번의 쿼리로 전부 덤프할 수 있다.
+  - **귀결**: `profile_search` RPC에 아무리 정교한 레이트 리밋·필드 제한을 넣어도, (1) 앱이
+    그 경로를 안 쓰고 (2) 직접 조회가 아예 열려 있는 한 실질적인 방어가 되지 않는다. 이번
+    회차의 수정(§14)은 "RPC를 직접 호출하는 경로"만 보호했을 뿐이라는 것을 정확히 알고
+    있어야 한다 — "핸들 검색 리밋은 끝났다"고 오독하면 안 된다.
+- **영향**: **NFR-013**(핸들 검색 반환 3필드 제한 — 직접 조회는 전 컬럼 노출), **D-005**
+  (계정당 분당 20회 레이트 리밋 — 직접 조회·`getProfileByHandle` 경로 둘 다 우회), **R-012**
+  (사용자 열거 방지 — `count(*)`·`select *`로 전 회원 명부를 한 번에 얻을 수 있다),
+  **FR-006 옵트아웃**(`search_opt_out=true` 사용자도 직접 조회에서는 그대로 노출돼 옵트아웃이
+  실질적으로 무의미해진다).
+- **후속**: 두 갈래를 함께 검토할 것 — 어느 하나만으로는 완결되지 않는다.
+  1. **(설계, 우선)** `profiles_select_authenticated`를 컬럼·행 범위로 좁힌다 — 예: self-row는
+     전 컬럼, 타인-row는 공개 프로필 필드(핸들·표시이름·아바타 등)로 제한하는 컬럼 마스킹
+     뷰나 별도 함수. 게시글·댓글·채팅·멤버 목록·투표 등 "작성자 표기"를 쓰는 모든 읽기
+     경로가 이 정책에 의존하므로 영향 범위가 넓다 — 별도 Task로 설계부터 다시 잡아야 한다
+     (029B §7 "잔여 위험"이 이미 이 필요성을 예고했었다).
+  2. **(저비용, 부분 대책)** `getProfileByHandle`을 쓰는 FR-006 UI 경로(`search-user-
+     by-handle.ts`)를 `searchProfilesByHandle`(RPC 경유, NFR-013·D-005 이미 적용됨)로
+     바꾼다 — 단 **이건 앱 UI 경로만 닫을 뿐 `profiles` 테이블 직접 조회 자체를 막지
+     못한다**(1번을 대체하지 않는다). `getProfileByHandle`은 가입/초대 시 서버가 handle→id를
+     재해석하는 다른 용도(정확 일치, `id` 필요)로도 쓰이므로 단순 치환은 안 되고 호출부별로
+     검토가 필요하다.
+  - 이번 회차(18일차)에는 **의도적으로 고치지 않는다** — `profiles_select_authenticated`는
+    Task 029A의 기존 정책이라 이번 회차가 만든 결함이 아니고, 좁히는 작업은 설계 결정이
+    필요해 범위를 넘는다.
+- **각주(18일차 교차검증, Task 039)**: DESIGN이 지적한 대로 Task 039(회원 탈퇴 30일 유예)로
+  이 이슈의 blast radius가 **`deactivated`(파기 전이라 실 PII를 그대로 보유한 유예 중
+  계정)까지 확대됐다** — 탈퇴를 신청했지만 아직 파기되지 않은 사용자도 이 열려 있는 직접
+  조회 경로로 실명·실아바타가 그대로 노출됐다. **`getProfileByHandle`을 경유하는 FR-006 앱
+  검색 경로만 이번에 닫았다**(`projectHandleSearchResult`가 `status !== "active"`도
+  미존재와 동일하게 처리 — 정확히 위 "후속 2"의 저비용 부분 대책과 같은 성격이다,
+  `docs/decisions/account-lifecycle-039.md` §6.1). **`profiles` 테이블 직접 조회 경로(위
+  "후속 1"이 다루는 근본 원인)는 이번에도 손대지 않았다** — `deactivated` 계정도 여전히
+  그 경로로는 노출된다. 이 이슈의 상태는 "열림"을 유지한다.
+
+
+### I-059 · 게스트가 보호 라우트에 접근하면 서버 로그에 "레이아웃 가드가 깨졌다"는 오진단 예외가 남는다
+
+- **상태**: 열림
+- **영역**: 라우팅 / 관측성
+- **제보**: 팀장 (2026-07-25, 18일차 — 프로덕션 서버(`npm start`) 런타임 확인 중 발견)
+- **내용**: 게스트로 `/home`·`/settings` 등 `(app)/` 보호 라우트에 요청하면 HTTP 200이 오고
+  화면도 정상이다(응답 본문에 로그인 유도 문자열·`RedirectToLogin` 흔적이 있어 클라이언트가
+  `/login`으로 이동한다) — **그런데 서버 로그에 매 요청마다 예외 2건이 남는다**:
+  `⨯ Error: assertAuthenticatedSession: (app) 레이아웃의 인증 가드를 통과했는데 세션이
+  미인증 상태다 — 레이아웃 가드가 깨졌다는 뜻이다.`(digest `2382309832`·`978250293`).
+  **진단(핵심)**: 이 메시지는 원인을 잘못 지목한다 — 레이아웃 가드는 실제로 정상 작동한다.
+  진짜 원인은 **Next.js App Router가 레이아웃과 페이지(자식 서버 컴포넌트)를 병렬로
+  렌더한다**는 것이다. `(app)/layout.tsx`가 `!isAuthenticated(session)`일 때 `{children}`
+  대신 `<RedirectToLogin/>`을 **반환**해도, `children`으로 넘어온 페이지 자신의 서버
+  컴포넌트는 레이아웃과 별개로 이미 실행되고 있다. 그 페이지(`(app)/settings/page.tsx`
+  등)가 `assertAuthenticatedSession(session)`(`src/components/shell/auth-session.ts:69`)을
+  호출하면서 예외가 던져지는데, 그 결과물은 출력 트리(레이아웃이 이미 `<RedirectToLogin/>`을
+  택했다)에 포함되지 않으니 화면은 안 깨지고 로그만 남는다.
+  **왜 17일차부터인가**: `git log`상 `RedirectToLogin.tsx`와 그 배선은 커밋 `4de34c7`(17일차,
+  Task 030·031)에서 들어왔다. 그전에는 레이아웃이 서버 `redirect("/login")`을 직접 호출했고,
+  `redirect()`는 예외를 던져 **렌더 트리 전체를 즉시 중단**시켰으므로 자식 페이지 코드가
+  실행될 여지가 없었다. FR-002 AC3("로그인 성공 후 원래 요청 경로로 복귀")를 살리려고
+  서버 리다이렉트를 클라이언트 컴포넌트(`RedirectToLogin`)로 바꾼 것이 이 부작용을 낳았다
+  — **AC3 수정 자체는 옳고, 되돌리라는 뜻이 아니다.** 이번 회차(18일차) `(app)/layout.tsx`
+  diff는 `deactivated` 분기 +13행뿐이라(팀장이 `git diff --stat`으로 확인) 원인이 아니다.
+- **영향**: 사용자 영향은 없다(화면 정상, 리다이렉트 동작). 실질 피해는 셋이다. ① 게스트
+  요청마다 서버 로그에 오류가 쌓여 **진짜 오류를 묻는다**(로그 신호 대 잡음비 저하). ②
+  이번 18일차 Task 038이 도입한 `captureError`(NFR-028, `src/lib/audit/error-tracking.ts`)가
+  이 경로를 잡으면 **오류 추적에 거짓 양성이 계속 유입된다** — 다만 현재 배선(`error.tsx`·
+  `global-error.tsx`의 클라이언트 오류 경계만 `captureError`를 호출)은 이 서버 콘솔 예외를
+  캡처하지 않는다(별도 경로), 그래도 NFR-028을 서버 예외까지 넓히는 순간 바로 이 잡음이
+  섞여 들어온다는 것을 미리 알아 둬야 한다. ③ **메시지가 원인을 잘못 지목해** 다음 사람이
+  존재하지 않는 "깨진 레이아웃 가드"를 찾아 헤맬 수 있다.
+- **후속(방향만 제시 — 결정은 별도 Task 몫)**:
+  - (가) `assertAuthenticatedSession`의 메시지를 실제 원인(레이아웃·페이지 병렬 렌더)으로
+    고치고, 이 경로에서는 던지는 대신 조용히 게스트 안전값(빈 배열/자리표시자 등)을
+    반환한다 — **희생하는 것**: "런타임에 불변식이 실제로 깨지면 즉시 드러나야 한다"는
+    이 함수의 원래 설계 의도(모듈 docstring 참고, `as` 단언 대신 `throw`를 쓴 이유)가
+    무뎌진다. 진짜 가드 결함과 이 병렬 렌더 부작용을 더 이상 구분하지 못한다.
+  - (나) 보호 페이지가 `assertAuthenticatedSession` 대신 세션을 다시 판정해 자체적으로
+    게스트 분기를 렌더한다(예외를 아예 던지지 않는다) — **희생하는 것**: 지금 이 헬퍼가
+    주는 "레이아웃이 보장하지 않으면 컴파일도, 런타임도 통과 못 한다"는 단순함이 사라지고,
+    보호 페이지마다 게스트 분기 UI를 각자 만들어야 해 D-030 ④가 없애려던 반복 가드
+    패턴(I-025)이 부분적으로 되살아난다.
+  - (다) 레이아웃에서 다시 서버 `redirect()`로 렌더 트리를 즉시 중단시키되, FR-002 AC3의
+    "원래 경로로 복귀"는 `proxy.ts`(D-011, 현재 범위 밖) 같은 다른 계층에서 보존한다 —
+    **희생하는 것**: D-011이 이미 범위 밖으로 미룬 `proxy.ts` 도입을 다시 앞당겨야 하고,
+    그 전까지는 AC3이 다시 깨진다(17일차에 고친 것을 되돌리는 셈).
+  - **I-052(인증 보호 라우트의 `notFound()`가 HTTP 200 — 소프트 404)와 같은 자리에서
+    재검토할 사안**이다 — 두 이슈가 "인증/존재 경계가 렌더를 중단하지 못한다"는 같은 뿌리를
+    공유한다(스트리밍 SSR이 이미 헤더를 보낸 뒤에는 상태 코드도, 예외로 인한 트리 취소도
+    더 이상 되돌릴 수 없다는 Next.js App Router의 구조적 제약).

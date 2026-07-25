@@ -3,7 +3,7 @@
 요구사항의 **우선순위**, **리스크 등록부**, **확정된 결정**을 기록한다.
 
 - 이 파일의 6.3절 **결정 기록(D-\*)**이 확정 결정의 **단일 소스**다. **미결 이슈·개선사항은 여기가 아니라 [`ISSUES.md`](./ISSUES.md)**에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
-- **다음 결정 번호: D-043** / **다음 리스크 번호: R-021** (등재할 때마다 이 줄을 갱신한다)
+- **다음 결정 번호: D-045** / **다음 리스크 번호: R-021** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -nE "^### D-0" docs/prioritization-and-risks.md | tail`로 실제 최댓값을 확인한다 — 18일차에 D-043·D-044가 등재됐는데도 이 줄이 D-043으로 남아 있었다)
 - 리스크는 **누구나 제보**한다. 미결이 확정되면 `ISSUES.md`의 I-\* 를 닫고 여기 6.3절에 D-\* 로 옮긴다.
 - 항목은 상태가 바뀌어도 **지우지 않는다**. 같은 판단이 다시 올라왔을 때 이전 근거를 찾을 수 있어야 한다.
 
@@ -944,3 +944,32 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
   `package-lock.json` 변경 없음, `npm run build`(Next 16.2.11 Turbopack) 통과.
 - **영향**: I-045를 해결됨으로 닫는다. 앞으로 이 저장소의 설치 커맨드에 `--force`·
   `--legacy-peer-deps`를 붙이지 않는다 — 붙여야 한다면 그건 새 충돌이 생겼다는 신호다.
+
+### D-044 · 회원 탈퇴는 `deactivated`(30일 유예, 복구 가능) → `withdrawn`(파기 완료, 종착) 2단계 상태로 모델링한다
+
+- **일자**: 2026-07-25
+- **결정자**: CREW (Task 039 구현 중 — 스키마 확정 필요, 고객 재확인 없이 D-010·FR-005 원문
+  범위 안에서 결정)
+- **맥락**: 029A(Task 028)가 이미 `profiles.status`에 `withdrawn`을 넣어 뒀지만, 그 트리거·
+  Mock 픽스처는 `withdrawn`을 "탈퇴 즉시 익명화까지 끝난 최종 상태"로 다뤘다(자기 전이
+  `active→withdrawn` 1건만 허용). 그런데 FR-005 정상 흐름은 `④ deactivated 전이 + 30일
+  유예 → ⑤ 유예 후 개인정보 파기`로 **2단계**이고, AC3는 "30일 미경과 시 복구"를 요구한다.
+  값 하나로는 "유예 중(복구 가능, PII 원본 보존)"과 "파기 완료(복구 불가)"를 구분할 수 없다.
+- **결정**: `profiles.status`에 `deactivated`를 추가한다. 자기 전이는 `active→deactivated`
+  (탈퇴 요청)와 `deactivated→active`(복구, `deactivated_at` 기준 30일 이내만)로 제한하고,
+  `withdrawn`은 `anonymize_expired_deactivated_profiles()`(pg_cron, 시스템 전용 경로)만
+  도달하는 종착 상태로 재정의한다. 새 컬럼 `deactivated_at`(유예 시작 시각)을 `anonymized_at`
+  (실제 파기 시각)과 분리해서 둔다 — 후자를 유예 시작 시점에 미리 채우면 AC4("anonymizedAt이
+  기록되어 있다")가 파기 전에도 참이 되어 버려 파기 완료 사실을 증언할 수 없게 된다.
+- **대안**: ① **단일 `withdrawn` 상태 유지, 별도 `withdrawnAt`/`anonymizedAt` 두 타임스탬프로
+  유예 여부를 구분** — 상태 값 자체가 "유예 중"과 "파기 완료"를 구분하지 못해 화면·RLS 트리거
+  조건이 항상 두 필드를 함께 봐야 한다(상태 기계로 표현 가능한 것을 조건문으로 흉내내는 셈).
+  ② **탈퇴 요청 시 즉시 PII 파기, 복구는 별도 백업 테이블에서 복원** — AC3("동일 이메일로
+  복구 요청")가 성립하려면 이메일이 살아있어야 하는데, 즉시 파기하면 그 이메일로 재로그인
+  자체가 안 되어 "복구 요청"을 걸 방법이 없다.
+- **영향**: `src/lib/types/profile.types.ts`(`ProfileStatus`에 `"deactivated"` 추가,
+  `deactivatedAt` 필드), 마이그레이션 `profiles_add_deactivation_grace_period`(CHECK 제약
+  확장·컬럼 추가·트리거 재정의, 029A 원 파일은 무수정), RPC 2건(`request_account_deactivation`·
+  `restore_deactivated_account`), pg_cron 1건(`anonymize_expired_deactivated_profiles`,
+  `auth.users.email`/`banned_until`도 함께 파기 — 근거·대안은 **I-056**). 상세 실측은
+  `docs/decisions/account-lifecycle-039.md` 참고.

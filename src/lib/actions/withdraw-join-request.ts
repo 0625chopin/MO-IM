@@ -3,11 +3,7 @@
 import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import {
-  getPendingJoinRequestForRequester,
-  withdrawJoinRequest,
-  withdrawPendingCrewMembership,
-} from "@/lib/data";
+import { getPendingJoinRequestForRequester, withdrawJoinRequest } from "@/lib/data";
 import { strings } from "@/lib/strings";
 
 /**
@@ -22,6 +18,11 @@ import { strings } from "@/lib/strings";
  * 넘기는 경로 자체가 없으므로 role 매트릭스가 아니라 "내가 만든 자원만 조작할 수 있다"는
  * 소유권 자체가 게이트다(`chat:delete_own_message`의 `isSelf` 각주와 같은 종류의 보장을,
  * 여기서는 컨텍스트 필드 대신 조회 조건으로 강제한다).
+ *
+ * **Task 032(18일차) — `withdrawPendingCrewMembership` 호출을 제거했다.** 실 DB의
+ * `withdrawJoinRequest`(`src/lib/data/supabase/join-request.ts`)가 `crew_memberships`
+ * 되돌리기(`requested→rejected`)까지 같은 함수 안에서 처리한다 — `join_requests`에는
+ * 자동 동기화 트리거가 없어 이 레이어가 직접 맡는다(`docs/decisions/write-path-realdata-032.md`).
  */
 export interface WithdrawJoinRequestFormState {
   success?: boolean;
@@ -51,7 +52,6 @@ export async function withdrawJoinRequestAction(
   if (!withdrawn.ok) {
     return { formError: strings.crew.home.join.errors.withdrawFailed };
   }
-  await withdrawPendingCrewMembership(crewId, session.profileId);
 
   refresh();
   return { success: true };

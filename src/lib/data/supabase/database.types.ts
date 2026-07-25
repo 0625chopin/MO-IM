@@ -7,6 +7,17 @@
  * poll-vote-tally-for-decision-hotfix.md`)와 CREW의 `email_resend_attempts` 테이블
  * (`create_email_resend_attempts_table` 마이그레이션)을 반영했다.
  *
+ * **18일차(Task 032, 쓰기 경로) 재생성** — `profiles.onboarding_completed_at`(I-046) 컬럼과
+ * `public.respond_meetup_attendance` RPC(D-019 정원 원자성, `docs/decisions/
+ * write-path-realdata-032.md`)를 반영했다.
+ *
+ * **18일차(Task 039, 계정 생애주기) 재생성** — `profiles.deactivated_at` 컬럼(FR-005 30일
+ * 유예)과 `public.request_account_deactivation`·`public.restore_deactivated_account`·
+ * `public.anonymize_expired_deactivated_profiles` RPC(D-010·NFR-031, `docs/decisions/
+ * account-lifecycle-039.md`)를 반영했다. 이 재생성 시점에 `handle_search_attempts` 테이블도
+ * 함께 나타났다 — BOARD가 병렬로 작업 중인 레이트 리밋 모듈(`src/lib/actions/
+ * search-user-by-handle.ts` 등) 소관이라 이 회차에서 손대지 않는다.
+ *
  * 이 파일은 자동 생성 파일이다 — 손으로 고치지 않는다. 스키마가 바뀌면
  * 새 마이그레이션을 적용한 뒤 다시 생성해 이 파일을 통째로 교체한다.
  *
@@ -18,7 +29,9 @@
  * `private` 스키마(SECURITY DEFINER 헬퍼·RPC 구현체)는 여기 나타나지 않는다 — PostgREST
  * Exposed schemas에 없어 애초에 API 표면이 아니기 때문이다(docs/decisions/rls-policies-029b.md
  * §8 참고). `public.*` RPC 래퍼(`poll_vote_tally`·`poll_vote_tally_for_decision`·
- * `crew_directory_summary`·`profile_search`)만 `Functions`에 나타나는 것이 정상이다.
+ * `crew_directory_summary`·`profile_search`·`respond_meetup_attendance`·
+ * `request_account_deactivation`·`restore_deactivated_account`·
+ * `anonymize_expired_deactivated_profiles`)만 `Functions`에 나타나는 것이 정상이다.
  */
 export type Json =
   | string
@@ -391,6 +404,32 @@ export type Database = {
           requested_at?: string
         }
         Relationships: []
+      }
+      handle_search_attempts: {
+        Row: {
+          id: number
+          identifier: string
+          requested_at: string
+        }
+        Insert: {
+          id?: never
+          identifier: string
+          requested_at?: string
+        }
+        Update: {
+          id?: never
+          identifier?: string
+          requested_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "handle_search_attempts_identifier_fkey"
+            columns: ["identifier"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invitations: {
         Row: {
@@ -861,10 +900,12 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          deactivated_at: string | null
           display_name: string
           handle: string
           handle_changed_at: string | null
           id: string
+          onboarding_completed_at: string | null
           search_opt_out: boolean
           status: string
         }
@@ -873,10 +914,12 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          deactivated_at?: string | null
           display_name: string
           handle: string
           handle_changed_at?: string | null
           id: string
+          onboarding_completed_at?: string | null
           search_opt_out?: boolean
           status?: string
         }
@@ -885,10 +928,12 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          deactivated_at?: string | null
           display_name?: string
           handle?: string
           handle_changed_at?: string | null
           id?: string
+          onboarding_completed_at?: string | null
           search_opt_out?: boolean
           status?: string
         }
@@ -937,6 +982,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      anonymize_expired_deactivated_profiles: {
+        Args: { batch_size?: number; max_duration?: string }
+        Returns: number
+      }
       crew_directory_summary: {
         Args: { p_crew_id: string }
         Returns: {
@@ -985,6 +1034,30 @@ export type Database = {
       purge_expired_chat_messages: {
         Args: { batch_size?: number; max_duration?: string }
         Returns: number
+      }
+      request_account_deactivation: {
+        Args: never
+        Returns: {
+          changed: boolean
+          ok: boolean
+          reason: string
+        }[]
+      }
+      respond_meetup_attendance: {
+        Args: { p_meetup_id: string; p_status: string }
+        Returns: {
+          changed: boolean
+          ok: boolean
+          reason: string
+        }[]
+      }
+      restore_deactivated_account: {
+        Args: never
+        Returns: {
+          changed: boolean
+          ok: boolean
+          reason: string
+        }[]
       }
     }
     Enums: {

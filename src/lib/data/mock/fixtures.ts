@@ -55,7 +55,9 @@ function createSeed() {
       status: "active",
       searchOptOut: false,
       anonymizedAt: null,
+      deactivatedAt: null,
       handleChangedAt: null,
+      onboardingCompletedAt: null,
     },
     {
       id: "profile-2",
@@ -66,7 +68,9 @@ function createSeed() {
       status: "active",
       searchOptOut: false,
       anonymizedAt: null,
+      deactivatedAt: null,
       handleChangedAt: null,
+      onboardingCompletedAt: null,
     },
     {
       id: "profile-3",
@@ -77,7 +81,28 @@ function createSeed() {
       status: "active",
       searchOptOut: false,
       anonymizedAt: null,
+      deactivatedAt: null,
       handleChangedAt: null,
+      onboardingCompletedAt: null,
+    },
+    {
+      // FR-005 30일 유예(Task 039, 18일차 교차검증 minor 2) — 탈퇴 요청 후 파기 전 상태를
+      // Mock으로도 재현할 수단이 없었다. 다른 픽스처를 참조하지 않는 독립 프로필이라
+      // profile-1~3(다른 코드가 하드코딩 참조)과 달리 자유롭게 추가할 수 있었다.
+      // `deactivatedAt`은 이 저장소 기준일(2026-07-25)로부터 10일 전 — 30일 유예 중 절반
+      // 지점을 보여줘 그레이스 카운트다운 화면이 "방금 시작"·"곧 만료" 양극단이 아닌 중간
+      // 상태도 시연하게 한다.
+      id: "profile-4",
+      handle: "withdrawing_user",
+      displayName: "이서연",
+      avatarUrl: null,
+      bio: "곧 탈퇴해요.",
+      status: "deactivated",
+      searchOptOut: false,
+      anonymizedAt: null,
+      deactivatedAt: "2026-07-15T00:00:00.000Z",
+      handleChangedAt: null,
+      onboardingCompletedAt: "2026-06-01T00:00:00.000Z",
     },
   ];
 

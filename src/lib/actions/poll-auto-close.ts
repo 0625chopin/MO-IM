@@ -1,3 +1,4 @@
+import { recordAuditLog } from "@/lib/audit/audit-log";
 import {
   closePoll,
   getPollTallyForDecision,
@@ -65,5 +66,19 @@ export async function decideAndClosePoll(
   });
   const decision = decidePollOutcome({ tally, quorum });
 
-  return closePoll({ pollId, closedBy, outcome: decision.outcome });
+  const result = await closePoll({ pollId, closedBy, outcome: decision.outcome });
+  if (result.ok && closedBy !== null) {
+    // NFR-015 감사 로그(Task 038) — "투표 종료" 대상. 사람이 실제로 트리거한 종료(트리거②
+    // 조기 종료)만 기록한다 — 트리거①(기한 도래)·트리거③(미투표자 0명)은 `closedBy`가 항상
+    // null이라(`cast-vote.ts`·`close-poll.ts`의 시뮬레이터 호출부 참고) 책임 소재가 있는
+    // human actor가 없다. crewId는 이 함수가 poll만 알고(post→crew 조인이 없다) null로
+    // 남긴다 — targetId(pollId)로 추적은 가능하다(`docs/decisions/ops-foundation-038.md` 참고).
+    await recordAuditLog({
+      actorId: closedBy,
+      crewId: null,
+      action: "poll.closed_early",
+      targetId: pollId,
+    });
+  }
+  return result;
 }

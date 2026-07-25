@@ -61,15 +61,19 @@ import { strings, t } from "@/lib/strings";
  * **R-012 시연**: `UserSearchResult`의 "빈 상태" 패널은 `{ found: false }`를 직접 넘긴
  * 실제 컴포넌트다 — 핸들이 존재하지 않는 경우와 존재하지만 옵트아웃인 경우가 **코드 레벨에서
  * 이미 같은 값**이므로(`lib/rules/handle-search.ts`), 이 패널 하나가 두 시나리오를 동시에
- * 대표한다. "오류" 패널(429)은 NFR-016이 아직 v0.2라 실제로 카운팅하지 않는 미래 상태의
- * 정적 미리보기다.
+ * 대표한다. "오류" 패널(429)은 **Task 038(18일차 BOARD)부터 실제로 카운팅하는 상태**의 정적
+ * 재현이다 — `/sample`은 게스트 세션이라 `searchUserByHandleAction`을 20회 넘게 눌러도 권한
+ * 검사(`search:by_handle` guest:deny)에서 먼저 막혀 실제 429를 재현할 수 없으므로, 여기서는
+ * `UserSearchField`가 `rateLimited` 결과를 받았을 때 그리는 것과 같은 `Alert`을 정적으로
+ * 보여준다(실제 429 재현은 로그인 세션에서 분당 21회 검색해 확인, `docs/decisions/
+ * ops-foundation-038.md` 참고).
  */
 export const accountSection = defineSection({
   id: "account",
   label: "계정",
   title: "계정 설정 · 사용자 검색",
   description:
-    "FR-004·006(D-005, R-012). 실제 라우트는 /settings — 프로필 편집 폼은 정적 프리뷰(실제 인터랙션은 /settings에서 확인), 사용자 검색은 실제 컴포넌트를 그대로 등록했습니다. 검색 '오류'(429) 패널은 NFR-016(레이트 리밋)이 아직 구현되지 않은 미래 상태의 정적 미리보기입니다.",
+    "FR-004·006(D-005, R-012). 실제 라우트는 /settings — 프로필 편집 폼은 정적 프리뷰(실제 인터랙션은 /settings에서 확인), 사용자 검색은 실제 컴포넌트를 그대로 등록했습니다. 검색 '오류'(429) 패널은 NFR-016(레이트 리밋, Task 038부터 실제 카운팅)이 게스트 세션인 /sample에서는 재현되지 않아 정적으로 보여주는 상태입니다.",
   items: [
     {
       name: "ProfileCard",
@@ -286,6 +290,91 @@ export const accountSection = defineSection({
                 <AlertTriangleIcon aria-hidden="true" />
                 <AlertDescription>{strings.account.search.rateLimited}</AlertDescription>
               </Alert>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "AccountWithdrawSection",
+      note: "FR-005 회원 탈퇴(D-010, Task 039). 실제 라우트는 /settings 맨 아래 — 실제 컴포넌트를 그대로 렌더하면 다이얼로그 제출이 진짜 Server Action(계정 탈퇴)을 호출하므로, SignupForm과 같은 이유로 정적 프리뷰만 둔다. '오류' 패널은 AC1(오너로 있는 크루 보유 시 차단)입니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={160}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <div className="flex flex-col gap-3 border-t border-border pt-6">
+                <div>
+                  <h2 className="text-sm font-medium text-foreground">{strings.account.settings.withdraw.heading}</h2>
+                  <p className="text-sm text-muted-foreground">{strings.account.settings.withdraw.description}</p>
+                </div>
+                <Button type="button" variant="destructive" className="w-fit">
+                  {strings.account.settings.withdraw.confirmDialog.submit}
+                </Button>
+              </div>
+            </div>
+          </PreviewFrame>
+        ),
+        /** minor 1(팀장 지적, 18일차) — 탈퇴는 서버 왕복이 있는 파괴적 동작이라 제출 중
+         *  구간에 버튼이 재클릭 가능한 상태로 남으면 이중 제출 위험이 있다. 실제
+         *  `AccountWithdrawSection`은 `isPending`일 때 제출 버튼을 비활성화하고 스피너를
+         *  보여준다 — 이 패널은 다이얼로그가 열린 채 그 상태를 보여준다(빈 상태는 폼에
+         *  의미가 없다는 기존 관례 그대로 두지 않는다). */
+        loading: (
+          <PreviewFrame height={320}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <div className="flex flex-col gap-4 rounded-xl bg-popover p-4 text-sm ring-1 ring-foreground/10">
+                <div>
+                  <p className="font-medium text-foreground">
+                    {strings.account.settings.withdraw.confirmDialog.title}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {strings.account.settings.withdraw.confirmDialog.description}
+                  </p>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor="sample-withdraw-password">
+                    {strings.account.settings.withdraw.confirmDialog.passwordLabel}
+                  </FieldLabel>
+                  <Input id="sample-withdraw-password" type="password" disabled defaultValue="••••••••" />
+                </Field>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" disabled>
+                    {strings.account.settings.withdraw.confirmDialog.cancel}
+                  </Button>
+                  <Button type="button" variant="destructive" disabled>
+                    <Loader2Icon aria-hidden="true" className="animate-spin" />
+                    {strings.account.settings.withdraw.confirmDialog.submitPending}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={220}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <div className="flex flex-col gap-3 border-t border-border pt-6">
+                <div>
+                  <h2 className="text-sm font-medium text-foreground">{strings.account.settings.withdraw.heading}</h2>
+                  <p className="text-sm text-muted-foreground">{strings.account.settings.withdraw.description}</p>
+                </div>
+                <Alert>
+                  <AlertTriangleIcon aria-hidden="true" />
+                  <AlertDescription className="flex flex-col gap-2">
+                    <span className="font-medium text-foreground">
+                      {strings.account.settings.withdraw.blockedByOwnership.title}
+                    </span>
+                    <span>{strings.account.settings.withdraw.blockedByOwnership.description}</span>
+                    <ul className="flex flex-col gap-1">
+                      <li>
+                        <span className="font-medium text-foreground underline underline-offset-4">
+                          주말 러닝 크루
+                        </span>
+                      </li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              </div>
             </div>
           </PreviewFrame>
         ),

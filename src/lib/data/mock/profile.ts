@@ -61,9 +61,11 @@ export async function createProfile(input: CreateProfileInput): Promise<DataResu
     status: "active",
     searchOptOut: false,
     anonymizedAt: null,
+    deactivatedAt: null,
     // 가입 시 최초 설정은 "변경"이 아니다(FR-004 AC1, `canChangeHandle` docstring) — 항상 null로
     // 시작해 첫 실제 변경 전까지는 쿨다운이 걸리지 않는다.
     handleChangedAt: null,
+    onboardingCompletedAt: null,
   };
   store.profiles.push(profile);
   return ok(profile);

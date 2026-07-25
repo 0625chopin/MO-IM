@@ -1,9 +1,10 @@
 "use client";
 
-import { Loader2Icon, SearchIcon } from "lucide-react";
+import { AlertTriangleIcon, Loader2Icon, SearchIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { UserSearchResult } from "@/components/profile/UserSearchResult";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -91,11 +92,18 @@ export function UserSearchField({ renderResultFooter }: UserSearchFieldProps) {
       </form>
 
       <div aria-live="polite" aria-atomic="true">
-        {status.kind === "done" && (
-          <UserSearchResult
-            result={status.result}
-            footer={status.result.found ? renderResultFooter?.(status.result) : undefined}
-          />
+        {status.kind === "done" && !status.result.found && status.result.rateLimited ? (
+          <Alert variant="destructive">
+            <AlertTriangleIcon aria-hidden="true" />
+            <AlertDescription>{strings.account.search.rateLimited}</AlertDescription>
+          </Alert>
+        ) : (
+          status.kind === "done" && (
+            <UserSearchResult
+              result={status.result}
+              footer={status.result.found ? renderResultFooter?.(status.result) : undefined}
+            />
+          )
         )}
       </div>
     </div>
