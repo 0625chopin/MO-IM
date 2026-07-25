@@ -22,13 +22,23 @@ import type { Id } from "@/lib/types";
  * 막는 것이라 배보다 배꼽이 커진다(`I-049`의 트리거③ try/catch 격리와 같은 원칙). NFR-015가
  * 요구하는 "100% 기록"에는 못 미치는 잔여 위험이며, 재시도 큐 없이 단발 INSERT만 하는 한계는
  * `docs/decisions/ops-foundation-038.md`에 남는다.
+ *
+ * **19일차 Task 040(CREW)이 `AuditAction`에 `crew.*` 3종(오너 이양·강퇴·해산)을 추가했다** —
+ * 팀장 승인(대화 기록), 나머지 구조는 무변경. 상세: `docs/decisions/crew-lifecycle-040.md`.
  */
 
 export type AuditAction =
   | "crew.staff_appointed"
   | "crew.staff_dismissed"
   | "poll.closed_early"
-  | "post.force_deleted";
+  | "post.force_deleted"
+  // Task 040(크루 생애주기, CREW, 19일차)이 추가 — FR-025 오너 이양·FR-027 강퇴·FR-013 해산은
+  // Task 038 착수 시점엔 아직 감사 로그를 걸 곳(쓰기 경로 자체)이 없었다. 기존 4개 값·
+  // `recordAuditLog` 로직은 건드리지 않은 순수 추가다 — 이 파일 소유팀(BOARD)에 사전 보고 후
+  // 응답 대기 중 착수 지연을 피하려 직접 추가했다(`docs/decisions/crew-lifecycle-040.md` 참고).
+  | "crew.ownership_transferred"
+  | "crew.member_removed"
+  | "crew.disbanded";
 
 export interface RecordAuditLogInput {
   /** 행위를 수행한 사람. `profiles.id` — 시스템 자동 처리(트리거①·③)는 감사 대상이 아니다

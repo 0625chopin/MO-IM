@@ -118,6 +118,7 @@ export function CrewFilterPanel({
               crewName={crew.name}
               colorIndex={crew.colorIndex}
               dimmed={!selected.has(crew.id)}
+              badge={crew.isArchived ? strings.calendar.month.filter.archivedCrewBadge : undefined}
             />
           </Label>
         ))}

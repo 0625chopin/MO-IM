@@ -1,0 +1,21 @@
+-- I-058 major①(19일차 팀장 교차검증) 수정: `public.get_profile_public_by_handle`가 무제한
+-- 핸들 오라클이었다 — `authenticated` EXECUTE가 있고 `STABLE`(부수효과 불가)이라 리밋 체크를
+-- 넣을 수 없는 구조인데, `search_opt_out`까지 반환해 D-005(분당 20회)·R-012(열거 방지)·FR-006
+-- 옵트아웃을 이 새 RPC가 그대로 재현했다(직전 마이그레이션 `profiles_narrow_select_policy_and_
+-- public_profile_rpcs`가 만든 구멍).
+--
+-- 팀장 지시(옵션 b, 채택): "handle→id 내부 재해석"(가입·초대·핸들 가용성 확인)과 "사용자 검색"
+-- (FR-006)을 완전히 다른 경로로 분리한다.
+-- - 내부 재해석은 client-invokable RPC 자체를 없앤다 — `profile.ts`의 getProfileByHandle을
+--   service-role 클라이언트(RLS 완전 우회, publishable key로는 절대 도달 불가)로 재구현한다
+--   (앱 코드 변경, 이 마이그레이션은 SQL만 다룬다). service_role은 이미 rolbypassrls=true라
+--   이 용도에 새 SECURITY DEFINER 함수가 필요 없다 — private.get_profile_public_by_handle도
+--   더 이상 쓰이지 않으므로 함께 제거한다.
+-- - 사용자 검색(FR-006)은 이미 SQL 강제 레이트 리밋 + NFR-013 3필드 제한을 가진
+--   `public.profile_search`/`private.profile_search`(18일차 §14)만 남긴다 —
+--   `search-user-by-handle.ts`를 그쪽으로 재배선한다(앱 코드 변경).
+--
+-- `get_profile_public_by_id`(id 기준)는 이번 수정 대상이 아니다 — UUID는 추측 불가능하고
+-- "작성자 표기" 용도가 명확해 팀장이 그대로 두기로 판단했다(19일차 교차검증 응답).
+drop function if exists public.get_profile_public_by_handle(text);
+drop function if exists private.get_profile_public_by_handle(text);

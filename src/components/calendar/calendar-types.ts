@@ -59,6 +59,14 @@ export interface CalendarMeetupDetail {
   /** FR-063 E3 — 취소된 Meetup도 패널에는 표시하되 배지를 붙인다(월 격자 바에는 애초에 안 뜬다). */
   isCancelled: boolean;
   /**
+   * FR-013 AC2(I-067, 19일차) — 이 Meetup이 속한 크루가 해산(`status='archived'`)됐는지.
+   * `isCancelled`와 독립이다 — archived 크루의 과거 Meetup은 `status='confirmed'`로 실제
+   * 열렸던 일정이라 취소와 다른 사실이다. 월 격자 바에는 반영하지 않는다(그리드는 archived
+   * 여부로 시각을 구분하지 않기로 했다 — 열려 있었던 일정을 다르게 보이게 하면 틀린 신호가
+   * 된다, `docs/ISSUES.md` I-067 "렌더링 판단" 참고). `DayDetailPanel`에서만 배지로 쓴다.
+   */
+  isArchivedCrew: boolean;
+  /**
    * FR-063 AC2 "항목 클릭 시 원 제안글로 이동" — 크루 게시판의 그 제안글 상세 경로.
    * Poll을 못 찾는 등 방어적으로만 null이 될 수 있다(정상 경로에서는 항상 값이 있다).
    */
@@ -89,6 +97,13 @@ export interface CrewFilterOption {
   name: string;
   /** `Crew.colorKey`(D-006 `hash(crewId) mod 12`) 그대로 — 날짜 셀 충돌 회피 이전의 기본값. */
   colorIndex: number;
+  /**
+   * FR-013 AC2(I-067, 19일차) — 이 크루가 해산(`status='archived'`)됐는지. `CrewFilterPanel`이
+   * `CrewLegend`의 범용 `badge` prop에 `strings.calendar.month.filter.archivedCrewBadge`를
+   * 넘길지 결정하는 데만 쓴다 — 기본 체크 상태·목록 노출 여부는 이 필드로 바꾸지 않는다
+   * (해산된 크루도 과거 이력을 계속 볼 수 있어야 하므로 기본은 다른 크루와 동일하게 켜짐).
+   */
+  isArchived: boolean;
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, GitCompare, Lock, SearchX, Users, WifiOff } from "lucide-react";
+import { AlertTriangle, CircleHelp, GitCompare, Lock, SearchX, Users, WifiOff } from "lucide-react";
 import Link from "next/link";
 
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -25,6 +25,9 @@ const KIND_META: Record<RouteErrorKind, { icon: LucideIcon; content: { title: st
   conflict: { icon: GitCompare, content: strings.error.conflict },
   validation_failed: { icon: AlertTriangle, content: strings.error.validationFailed },
   full: { icon: Users, content: strings.error.capacityFull },
+  /** 19일차, I-069 완화 — `network`(WifiOff, "연결 문제"로 원인을 단정)와 시각적으로도
+   *  구분한다. `error.tsx`의 `classifyError`가 분류에 실패했을 때만 쓴다. */
+  unknown: { icon: CircleHelp, content: strings.error.unknown },
 };
 
 export interface RouteErrorBoundaryProps {

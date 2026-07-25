@@ -1,4 +1,4 @@
-import type { CrewVisibility } from "./crew.types";
+import type { CrewMembershipRole, CrewVisibility } from "./crew.types";
 
 /**
  * 3.1절 전역 역할. `CrewMembershipRole`(owner/staff/member, crew.types.ts)과
@@ -75,8 +75,14 @@ export interface PermissionCheckContext {
   isProposalAuthor?: boolean;
   /** ² 오너의 크루 탈퇴·회원 탈퇴 전제조건 — 오너 이양 또는 크루 해산이 이미 처리됐는지. */
   hasOwnerSuccessorOrDisband?: boolean;
-  /** ⁴ 강퇴 대상의 role — 임원은 일반 크루원만 강퇴할 수 있다(오너·임원 강퇴는 오너 전용). */
-  targetRole?: UserRole;
+  /**
+   * ⁴ 강퇴 대상의 **크루 스코프** role(`CrewMembershipRole` — owner/staff/member) — 임원은
+   * 일반 크루원만 강퇴할 수 있다(오너·임원 강퇴는 오너 전용). Task 040 이전에는 타입만
+   * `UserRole`로 선언돼 있었고 실제 호출부가 없었다 — Task 040(FR-027 강퇴 구현)에서 처음
+   * 값을 채우며 대상이 실제로는 `CrewMembershipRole`이어야 함을 발견해 바로잡았다(전역
+   * `UserRole`에는 "staff"·"owner"가 없어 컴파일 타임에 드러났다).
+   */
+  targetRole?: CrewMembershipRole;
   /**
    * ³ 대상 크루의 공개 범위 — public이면 비회원도 검색·소개 열람 가능(D-007).
    * `crew:browse`(FR-014)·`crew:read`(FR-011) 두 액션이 이 필드를 본다.

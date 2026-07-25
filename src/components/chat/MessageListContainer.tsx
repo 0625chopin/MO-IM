@@ -4,7 +4,7 @@ import { MESSAGE_PAGE_SIZE } from "@/components/chat/message-view-models";
 import { MessageRoomContainer } from "@/components/chat/MessageRoomContainer";
 import { resolveChatViewer } from "@/components/chat/resolve-chat-viewer";
 import { toMessageViewModel } from "@/components/chat/resolve-message-view-model";
-import { getChatRoomByCrewId, getProfileById, listMessages } from "@/lib/data";
+import { getChatRoomByCrewId, getCrewById, getProfileById, listMessages } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import type { Id } from "@/lib/types";
 
@@ -53,7 +53,13 @@ export async function MessageListContainer({ crewId }: { crewId: Id }) {
   );
   const initialMessages = [...items].reverse(); // listMessages는 최신순 → 화면 표시는 오름차순.
 
-  const canSend = checkPermission({ role, action: "chat:send_message" }).allowed;
+  // 19일차(Task 040 UI/게이트 절반, I-066 해소) — 해산된 크루는 열람(위 accessPermission)은
+  // 그대로 두고 전송만 막는다(FR-013 AC2). `accessPermission`(읽기 게이트를 겸한다, 위 모듈
+  // docstring 참고)에는 이 조건을 넣지 않는다 — 넣으면 archived 크루의 채팅 기록 열람까지
+  // 막혀 "열람 전용으로 남는다"는 요구사항과 어긋난다. 실제 강제 경계는 CORE가
+  // chat_messages INSERT RLS에 추가하는 `crews.status='active'` 조건이다(SQL이 최종 경계).
+  const crew = await getCrewById(crewId);
+  const canSend = checkPermission({ role, action: "chat:send_message" }).allowed && crew?.status === "active";
 
   return (
     <MessageRoomContainer

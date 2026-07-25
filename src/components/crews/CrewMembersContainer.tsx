@@ -53,6 +53,7 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
   const canInvite = checkPermission({ role: viewerRole, action: "crew:invite_member" }).allowed;
   const canApprove = checkPermission({ role: viewerRole, action: "crew:approve_join_request" }).allowed;
   const canAppoint = checkPermission({ role: viewerRole, action: "crew:appoint_staff" }).allowed;
+  const canTransferOwnership = checkPermission({ role: viewerRole, action: "crew:transfer_ownership" }).allowed;
   const leavePermission = checkPermission({
     role: viewerRole,
     action: "crew:leave",
@@ -67,6 +68,13 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
     memberships.map(async (membership) => {
       const profile = await getProfileById(membership.profileId);
       const isSelf = membership.profileId === session.profileId;
+      // FR-027 각주⁴ — 임원은 일반 크루원만 강퇴 가능. targetRole 컨텍스트로 오너/staff 대상을
+      // 여기서 걸러낸다(Server Action이 최종 판정을 다시 하므로 여기서는 버튼 노출용).
+      const removePermission = checkPermission({
+        role: viewerRole,
+        action: "crew:remove_member",
+        context: { targetRole: membership.role },
+      });
       return {
         profileId: membership.profileId,
         displayName: profile?.displayName ?? strings.common.profile.unknownAuthor,
@@ -80,6 +88,8 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
           isSelf && !leavePermission.allowed
             ? strings.crew.members.leave.errors.ownerMustTransferOrDisband
             : null,
+        canTransferOwnership: canTransferOwnership && !isSelf && membership.role !== "owner",
+        canRemove: !isSelf && membership.role !== "owner" && removePermission.allowed,
       };
     }),
   );
@@ -119,7 +129,7 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
         {canInvite && <InviteMemberDialog crewId={crewId} />}
       </header>
 
-      <MemberList crewId={crewId} members={members} />
+      <MemberList crewId={crewId} crewName={crew.name} members={members} />
 
       {canApprove && <JoinRequestPanel crewId={crewId} pending={pendingRequests} history={historyRequests} />}
     </div>

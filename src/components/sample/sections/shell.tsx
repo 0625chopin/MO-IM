@@ -24,6 +24,13 @@ const AUTHED_EMPTY: AuthSession = { ...AUTHED, unreadNotificationCount: 0 };
 // RLS 403류 도메인 오류(D-030 ③) — 네트워크 실패가 아니라 "접근 권한 없음"으로 세션 조회가
 // 실패한 경우를 흉내낸다. 셸은 크래시하지 않고 게스트 안전값으로 내비게이션을 내려야 한다.
 const SESSION_ERROR: AuthSession = { status: "error", reason: "forbidden" };
+// 탈퇴 유예 중(Task 039, I-060) — `forbidden`과 다른 세 번째 오류 원인이다. HeaderNav는 이
+// reason에 별도 문구를 쓴다(`getSessionErrorBannerMessage`, `/account/restore`에서만 숨김).
+const SESSION_DEACTIVATED: AuthSession = {
+  status: "error",
+  reason: "deactivated",
+  graceEndsAt: "2026-08-24T00:00:00.000Z",
+};
 
 export const shellSection = defineSection({
   id: "shell",
@@ -75,7 +82,7 @@ export const shellSection = defineSection({
     },
     {
       name: "HeaderNav",
-      note: "768px 이상에서 인라인 링크가 보입니다. 활성 항목은 배경 칠이 아니라 하단 잉크 바로 표시합니다 — 색 면적은 크루 식별에 배정된 자원이라 크롬이 쓰지 않습니다. 배지 숫자는 aria-hidden이고 개수는 링크 이름에 문장으로 붙습니다.",
+      note: "768px 이상에서 인라인 링크가 보입니다. 활성 항목은 배경 칠이 아니라 하단 잉크 바로 표시합니다 — 색 면적은 크루 식별에 배정된 자원이라 크롬이 쓰지 않습니다. 배지 숫자는 aria-hidden이고 개수는 링크 이름에 문장으로 붙습니다. \"오류\"는 reason 2종을 모두 보여줍니다 — 위는 forbidden(접근 권한 없음), 아래는 deactivated(탈퇴 유예 중, I-060 수정) — 같은 error 상태라도 배너 문구가 달라야 함을 대조합니다.",
       panels: {
         default: (
           <PreviewFrame height={64}>
@@ -93,8 +100,11 @@ export const shellSection = defineSection({
           </PreviewFrame>
         ),
         error: (
-          <PreviewFrame height={92}>
-            <HeaderNav session={SESSION_ERROR} />
+          <PreviewFrame height={196} resizable>
+            <div className="flex flex-col gap-2">
+              <HeaderNav session={SESSION_ERROR} />
+              <HeaderNav session={SESSION_DEACTIVATED} />
+            </div>
           </PreviewFrame>
         ),
       },

@@ -391,3 +391,348 @@ DEFINER 헬퍼 없이 직접 서브쿼리로 처리했다 — 이 정책을 통�
 - 본 문서.
 - `docs/ROADMAP/team/01.CORE.md` Task 029B 완료 마커.
 - `src/lib/data/supabase/README.md` 갱신(profile_search 시그니처 변경·FR-020 인계·§2.4 경고 반영).
+
+## 16. 19일차 후속 — I-058 해소: `profiles_select_authenticated` self-row 좁히기 + 공개 프로필 RPC 2종
+
+**배경**: §7·§11-3·18일차 §14가 이미 "잔여 위험"으로 이월해 온 것 — `profiles_select_
+authenticated`(029A, `qual=true`)는 로그인한 계정이면 누구나 `profiles` 테이블을
+`.select("*")`로 직접 조회할 수 있게 열려 있었다. 팀장이 실측으로 재확인(18일차 I-058
+제보): `set local role authenticated`로 21행 전부(옵트아웃 1건 포함) 덤프 가능. Task
+039(계정 생애주기)로 `deactivated`(파기 전, 실 PII 보유) 계정까지 blast radius가 확대돼
+19일차에 직접 배정받아 해소했다.
+
+### 16.1 조사 — 어느 경로가 `profiles`의 어떤 컬럼을 읽는가(전수)
+
+`src/lib/data/supabase/*.ts` 중 `profiles`를 직접 참조하는 파일은 **`profile.ts` 하나뿐**이다
+(board·chat·crew·meetup·poll·notification·invitation·join-request 도메인 모듈은 임베디드 FK
+join을 쓰지 않는다 — grep 확인, `database.types.ts`의 `referencedRelation` 문자열만 걸린다).
+따라서 실제 소비 지점은 `getProfileById`·`getProfileByHandle`·`searchProfilesByHandle`
+(모두 `profile.ts`)을 호출하는 컨테이너·Server Action 쪽이다.
+
+| 호출부 | 함수 | 대상 행 | 실제로 읽는 필드 |
+| --- | --- | --- | --- |
+| `getAuthSession`(세션 부트스트랩) | `getProfileById` | **self** | 전 컬럼(`status`·`deactivatedAt`·`onboardingCompletedAt` 등 판정에 사용) |
+| `AccountSettingsContainer`·`OnboardingFormContainer` | `getProfileById` | **self** | 전 컬럼 |
+| `BoardListContainer`·`PostDetailContainer`(게시글 작성자) | `getProfileById` | 타인 | `displayName`·`avatarUrl` |
+| `MessageListContainer`·`load/resync/send-chat-message`(발신자)·`resolve-post-link-card`(원글 작성자) | `getProfileById` | 타인 | `displayName`·`avatarUrl` |
+| `CrewMembersContainer`(멤버·가입신청자 2곳) | `getProfileById` | 타인 | `displayName`·`handle`·`avatarUrl` |
+| `InvitationInboxContainer`(초대자) | `getProfileById` | 타인 | `displayName`·`avatarUrl` |
+| `MeetupDetailContainer`(참석자 3구분) | `getProfileById` | 타인 | `displayName`·`avatarUrl` |
+| `check-handle-availability.ts` | `getProfileByHandle` | 자기 자신 또는 타인 | `id`만(중복 판정용, 화면 미노출) |
+| `invite-crew-member.ts` | `getProfileByHandle` | 타인 | `id`만(초대 레코드 생성용, 화면 미노출) |
+| `signup.ts` | `getProfileByHandle` | 타인(가입 전이라 대부분 anon 컨텍스트) | 존재 여부(truthy)만 |
+| `search-user-by-handle.ts`(FR-006) → `projectHandleSearchResult` | `getProfileByHandle` | 타인 | `handle`·`displayName`·`avatarUrl`·`status`·`searchOptOut` |
+
+**결론**: 타인 행에서 `bio`·`search_opt_out`(FR-006 경로 제외)·`anonymized_at`·
+`deactivated_at`·`handle_changed_at`·`onboarding_completed_at`을 읽는 호출부는 **0건**이다.
+self 행만 전 컬럼이 필요하다. `pg_policies` 실측(변경 전)은 §11의 `qual=true` 그대로였고,
+`set local role authenticated`로 재현한 덤프 결과는 아래 16.4 참고.
+
+### 16.2 설계 대안 비교
+
+| 대안 | 설명 | 회귀 위험 | 구현 비용 | 채택 |
+| --- | --- | --- | --- | --- |
+| A. RLS만으로 self 전체/타인 공개 필드 분리 | 정책 `qual`을 행별 조건으로 표현 | **불가능** — RLS는 행 단위 필터만 표현하고 컬럼 단위 마스킹을 지원하지 않는다. 컬럼 단위 GRANT/REVOKE는 역할 전역이라 "self면 전체 허용"과 공존할 수 없다 | — | 기각(이론적으로 성립하지 않음) |
+| B. 컬럼 마스킹 뷰(`public.profiles`를 뷰로, 원본을 `private.profiles`로 이관) | `CASE WHEN id = auth.uid() THEN col ELSE NULL END`로 컬럼별 마스킹 | 테이블명 자체를 바꾸는 대규모 변경 — FK 참조 12개(§ 마이그레이션 파일 목록의 `references public.profiles`) 전부 재확인 필요, PostgREST의 뷰 через INSERT/UPDATE 처리(`instead of` 트리거) 추가 필요, 029A·029B가 이미 검증한 58개 정책·헬퍼 전체에 영향 가능 | 높음(테이블 이관 + 트리거) | 기각 — 이번 회차 범위 대비 과함, 기존 검증 자산을 흔든다 |
+| **C. RLS self-row 좁히기 + 타인 조회 전용 SECURITY DEFINER RPC 2종(채택)** | `profiles_select_authenticated`를 `id = auth.uid()`로 좁히고, `crew_directory_summary`(029B, D-007)와 같은 패턴으로 `private.get_profile_public_by_{id,handle}`(SECURITY DEFINER, 컬럼 제한) + `public.*` 얇은 INVOKER 래퍼 신설 | **없음(전수 조사로 확인)** — `getProfileById`/`getProfileByHandle`을 "직접 조회 실패 시 공개 RPC 폴백" 2단으로 바꿔 함수 시그니처·반환 타입·모든 호출부(컨테이너·Server Action)를 그대로 유지 | 낮음 — 마이그레이션 1건 + `profile.ts` 내부 구현만 변경 | **채택** |
+
+C를 채택한 결정적 이유: **호출부를 전혀 바꾸지 않고 닫을 수 있다.** 16.1 조사가 확인한 대로
+모든 "타인 행" 소비자가 정확히 `handle`·`displayName`·`avatarUrl`(+ 내부용 `id`, FR-006용
+`status`·`searchOptOut`)만 쓰므로, 그 합집합만 반환하는 RPC 폴백이 기존 동작을 바이트 단위로
+재현한다 — CLAUDE.md D-030 "조회부만 교체" 원칙과 같은 결의 적용이다.
+
+### 16.3 적용
+
+마이그레이션 `profiles_narrow_select_policy_and_public_profile_rpcs`
+(`supabase/migrations/20260725085327_*.sql`):
+
+1. `profiles_select_authenticated`를 `drop`+`create`로 재정의 — `qual: id = (select auth.uid())`.
+2. `private.get_profile_public_by_id(p_id uuid)`(SECURITY DEFINER, `stable`) — `id·handle·
+   display_name·avatar_url·status` 5필드. **상태 필터 없음** — 게시글·채팅·모임 참석자 등
+   "작성자 표기"는 계정이 탈퇴 유예·익명화 상태여도 계속 보여야 한다(익명화 시점에
+   `display_name` 자체가 이미 "탈퇴한 사용자"로 바뀌므로 필터가 필요 없다). `public.*` 얇은
+   INVOKER 래퍼, `authenticated`에게만 EXECUTE(`anon` 배제 — 기존에도 `anon`은 `profiles`에
+   정책이 없었으므로 노출 범위를 넓히지 않는다).
+3. `private.get_profile_public_by_handle(p_handle text)`(SECURITY DEFINER, `stable`) —
+   `id·handle·display_name·avatar_url·status·search_opt_out` 6필드. handle 정확 일치. 상태
+   필터 없음 — 핸들 유일성 확인(가입·초대)은 탈퇴·정지 계정이 쓰던 핸들도 "사용 중"으로
+   봐야 한다. `search_opt_out`·`status`를 반환하는 이유는 FR-006 경로
+   (`projectHandleSearchResult`)가 그 두 값으로 옵트아웃·비활성 판정을 계속하기 때문 — 이
+   RPC 자신은 그 판정을 하지 않는다(R-012 "동일 코드 경로" 불변식은 앱 레이어 몫 그대로).
+   같은 2단 구조, `authenticated`에게만 EXECUTE.
+4. `src/lib/data/supabase/profile.ts` — `getProfileById`·`getProfileByHandle`을 "원본 테이블
+   직접 조회 → (self면 성공, 타인이면 RLS가 0행) → 0행이면 위 RPC로 폴백" 2단으로 재구현.
+   호출부(컨테이너 7개·Server Action 4개) **무변경**. `database.types.ts` 재생성(`npx tsc
+   --noEmit` exit 0).
+
+### 16.4 실측(트랜잭션 롤백, `chopin0625` 계정으로 impersonate)
+
+| 시나리오 | 변경 전 | 변경 후 |
+| --- | --- | --- |
+| `authenticated`로 `select count(*), count(*) filter(where search_opt_out) from profiles` | **`total=21`, `opted_out=1`**(팀장 18일차 실측과 일치 재현) | **`total=1`, `opted_out=0`**(self 1행만) |
+| `authenticated`로 타인 행(`seed_outsider02`, 옵트아웃) 직접 `select * from profiles where handle=...` | `display_name`·`bio`·`status`·`search_opt_out` 전부 노출 | **0행**(RLS 차단) |
+| `authenticated`로 self 행 직접 조회 | 전 컬럼 노출(변경 없음) | **전 컬럼 그대로 노출**(회귀 없음 확인) |
+| `authenticated`로 `get_profile_public_by_id(타인 id)` | (RPC 부재) | `id·handle·display_name·avatar_url·status`만(`bio`·`search_opt_out` 없음) |
+| `authenticated`로 `get_profile_public_by_handle('seed_outsider02')` | (RPC 부재) | `id·handle·display_name·avatar_url·status·search_opt_out=true` — FR-006 앱 필터가 여전히 이 값으로 옵트아웃을 걸러낼 수 있음 확인 |
+| 존재하지 않는 id/handle로 두 RPC 호출 | — | 0행(에러 아님) |
+| `anon`으로 직접 조회·두 RPC 호출 | 0행(정책 없음) | **동일하게 0행/`permission denied for function`**(노출 범위 확대 없음) |
+| `get_advisors(security)` | WARN 1건(`auth_leaked_password_protection`, 기존) | **동일 1건, 신규 0건** |
+| `pg_policies`(profiles) | 3건(`insert_self`·`select_authenticated`·`update_self`) | **동일 3건**(정책 개수 불변, `select_authenticated`의 `qual`만 변경) |
+
+### 16.5 회귀 확인 — 읽기 경로(코드 레벨)
+
+`npx tsc --noEmit` exit 0(변경 후). 16.1 조사표의 7개 컨테이너·4개 Server Action 전부 함수
+시그니처·반환 타입이 그대로라 **코드 변경 없이** 계속 동작한다 — 실제 화면
+렌더(브라우저 실행)로 재확인하지는 못했다(`npm run dev`/`build`는 팀장 전용, 이번 회차
+제약). 이 재확인은 DESIGN의 브라우저 검증이나 다음 회차 실사용 트래픽에서 대신 확인되어야
+한다 — 이 문서가 코드 레벨 정적 확인까지만 했다는 한계를 명시해 둔다.
+
+### 16.6 남은 위험·의도적으로 손대지 않은 것
+
+- **`signup.ts`의 핸들 중복 사전 확인(87행)은 이번 변경과 무관하게 이미 무력화돼 있었다** —
+  `getProfileByHandle`이 `signUpWithPassword` **이전**(세션 없음, `anon` 컨텍스트)에 호출된다.
+  `anon`은 이번에도 이전에도 `profiles`·신규 RPC 어디에도 접근 권한이 없어(`roles=
+  {authenticated}`만 부여) 이 사전 확인은 실제로는 "항상 미사용"으로 응답했을 가능성이 있다
+  — 최종 방어는 `createProfile`의 `23505` 유니크 제약 처리(이미 있음)가 맡는다. **이번
+  회차가 만든 결함이 아니고, I-058의 범위(인증된 사용자의 과다 노출) 밖이라 손대지 않았다**
+  — 새 이슈로 등재할지는 팀장 판단에 맡긴다.
+- **`get_profile_public_by_id`/`by_handle`은 상태·탈퇴 필터가 없다** — "작성자 표기" 용도에는
+  의도된 설계이지만, 이 두 RPC를 다른 용도(예: 향후 "회원 검색" 기능 확장)로 재사용하면
+  `profile_search`가 가진 R-012 방어(옵트아웃·비활성 배제)가 없다는 것을 그 시점 구현자가
+  반드시 인지해야 한다 — 이름에 `public`이 들어가지만 "검색 안전"을 의미하지 않는다.
+- **id 기반 RPC는 UUID 하나씩만 조회**하므로 자원 존재 확인(다른 사람의 UUID를 알면 그
+  사람이 가입돼 있다는 사실 자체는 확인 가능)이 이론상 남는다 — 이는 예전에도 동일했고
+  (qual=true가 이미 그 확인을 허용했다), UUID는 추측 불가능한 값이라 실질 위험은 낮다고
+  판단해 범위에 넣지 않았다.
+- **컬럼 마스킹 뷰(대안 B)는 채택하지 않았다** — 위 16.2 표 참고. 향후 `profiles` 테이블
+  자체의 구조를 바꿀 계획이 생기면 재검토 대상이다.
+
+## 17. 19일차 같은 날 팀장 교차검증 — major① 수정: `get_profile_public_by_handle` 삭제
+
+**§16이 만든 `get_profile_public_by_handle`가 팀장 교차검증에서 새로운 구멍으로 지적됐다.**
+실측(`pg_get_functiondef`·`information_schema.routine_privileges`·`provolatile`): 이 함수는
+`authenticated` EXECUTE가 있고 `STABLE`(부수효과 불가 — 그래서 리밋 카운터 INSERT를 넣을 수
+없는 구조)이며 `search_opt_out`까지 포함한 6필드를 반환했다. 귀결: 로그인한 아무 계정이나
+publishable key로 **임의 핸들을 무제한 조회**할 수 있었고, 그 핸들의 존재 여부는 물론
+**옵트아웃 여부**까지 얻을 수 있었다 — D-005(분당 20회)·R-012(열거 방지)·FR-006 옵트아웃이
+`profiles` 대신 이 새 RPC에서 다시 우회됐다. 18일차 §14가 `profile_search`에 대해 남긴 한계
+문장("이 리밋은 RPC를 직접 호출하는 경로만 보호한다")이 그대로 반복된 것 — 이번엔 그 RPC를
+만든 사람(CORE) 스스로가 같은 실수를 반복했다는 뜻이다.
+
+### 17.1 부수적으로 발견한 라이브 회귀
+
+§16의 2단 폴백(`getProfileByHandle`도 `getProfileById`와 같은 "직접조회 → RPC 폴백" 구조)은
+`signup.ts`(87행)에서 실제로 실행되면 문제가 있었다 — 이 호출은 `signUpWithPassword`
+**이전**, 즉 세션이 없는 `anon` 컨텍스트에서 일어난다. `anon`은 `get_profile_public_by_handle`
+에 EXECUTE가 없으므로 그 RPC 호출이 `permission denied for function` 오류를 반환하고,
+`profile.ts`의 `if (pubError) throw pubError`가 이를 그대로 던져 **회원가입 핸들 중복 검사
+자체가 예외로 깨지는 상태**였다(실측: `set local role anon`으로 재현). 배포·실사용 노출 전에
+팀장 교차검증에서 발견됐다 — `docs/ISSUES.md` **I-062**로 등재(상태: 해소).
+
+### 17.2 수정 — 옵션 (b) 채택: 내부 재해석과 사용자 검색을 다른 경로로 분리
+
+팀장이 제시한 두 옵션 중 (b)를 채택했다(옵션 (a) — `by_handle`을 `VOLATILE`로 바꿔 리밋
++ FR-006 필터를 그 안에 넣는 안 — 은 기각):
+
+- **채택 이유**: 내부 판정용(handle→id 재해석)과 사용자 노출용(FR-006 검색)이 한 함수에
+  섞여 있던 것이 이 결함의 근인이다 — 분리하면 "이 함수는 누구에게 무엇을 노출하는가"가
+  함수 단위로 자명해진다. 비용도 낮았다 — `getProfileByHandle`의 실 소비자가 3곳뿐이고
+  (`check-handle-availability.ts`·`invite-crew-member.ts`·`signup.ts`), FR-006 소비자는
+  `search-user-by-handle.ts` 1곳뿐이라 재배선 범위가 작았다(옵션 (b)가 비용 크면 (a)로
+  가라는 단서가 있었으나 필요 없었다).
+
+**적용**(마이그레이션 `profiles_drop_public_handle_lookup_rpc_i058_major1`):
+
+1. `public.get_profile_public_by_handle`·`private.get_profile_public_by_handle` **완전
+   삭제**(drop function). 이제 handle 기준으로 임의 프로필을 조회할 수 있는 client-invokable
+   엔드포인트가 하나도 없다.
+2. `src/lib/data/supabase/profile.ts` — `getProfileByHandle`을 service-role 클라이언트로
+   직접 조회하도록 재구현(2단 폴백 제거, RLS 자체를 우회하므로 self/타인/anon 컨텍스트 구분이
+   필요 없다). 모듈 docstring에 "FR-006 검색에 쓰면 안 된다"를 명시.
+3. `src/lib/actions/search-user-by-handle.ts` — `getProfileByHandle` 대신
+   `searchProfilesByHandle`(`profile_search` RPC 경유)을 쓰도록 재배선. RPC가 0~1건만
+   반환하므로 배열의 첫 항목만 `projectHandleSearchResult`에 넘긴다.
+4. `src/lib/rules/handle-search.ts` — `status !== "active"` 필터가 이제 이 경로에서는
+   방어적 이중 확인(RPC가 이미 필터)이 됐다는 설명으로 docstring 갱신(제거는 하지 않음 —
+   이 함수는 여전히 다른 호출부가 상태 필터 없는 값을 넘길 가능성에 대비해야 하는 순수
+   함수다, D-029 정신).
+5. `database.types.ts` 재생성 — `get_profile_public_by_handle`이 `Functions`에서 사라짐.
+   `get_profile_public_by_id`는 그대로(팀장 판단으로 수정 대상 제외 — 아래 17.4).
+
+### 17.3 실측(트랜잭션 롤백)
+
+| 시나리오 | 결과 |
+| --- | --- |
+| `authenticated`로 `public.get_profile_public_by_handle(...)` 호출 | `42883 undefined_function` — 완전 삭제 확인 |
+| `service_role`로 `select * from profiles where handle=...`(= 새 `getProfileByHandle`이 실제로 하는 것) | 정상 조회, self/타인 구분 없음(RLS 완전 우회) |
+| `service_role`로 `request.jwt.claims`를 비운 채(= `auth.uid()` null, `signup.ts`의 실제 anon 컨텍스트 재현) 같은 조회 | **정상 조회**(`found:true`) — 이전엔 여기서 예외가 났던 지점 |
+| `authenticated`로 `profile_search('seed_outsider02')`(옵트아웃 계정) | 0건(기존과 동일, 이번 수정과 무관해 회귀 없음 재확인) |
+| `authenticated`로 `profile_search('seed_owner02')`(일반 계정) | 3필드 정상 반환(회귀 없음) |
+| `pg_policies`(profiles) | 3건 그대로(이번 수정은 함수만 다뤘다) |
+| `get_advisors(security)` | 신규 WARN 0건(기존 `auth_leaked_password_protection` 1건 + CREW `disband_crew`의 `authenticated_security_definer_function_executable` 1건은 각각 기존/타 팀원 소관, 이번 수정과 무관) |
+| `npx tsc --noEmit` | 내가 바꾼 4개 파일(`profile.ts`·`search-user-by-handle.ts`·`handle-search.ts`·`database.types.ts`) 관련 에러 0건. 무관한 에러 2건(`NotificationItem.tsx`·`simulate-notification-event.ts`, `NotificationType`에 `ownership_transferred`·`crew_disbanded` 누락 — CREW의 Task 040 동시 작업으로 보임)은 확인만 하고 손대지 않았다(파일 소유권 밖) |
+
+### 17.4 minor② — 타인 프로필 조회가 왕복 2회가 된 것에 대해
+
+`getProfileById`는 "직접조회(0행) → `get_profile_public_by_id` RPC 폴백" 구조라 **타인
+프로필 조회는 항상 왕복 2회**다(self 조회는 1회). `BoardListContainer`·`MessageListContainer`
+·`CrewMembersContainer`처럼 게시글/메시지/멤버마다 작성자를 조인하는 화면은 N명이면 최대
+2N회 왕복이 된다(현재 구현이 `Promise.all`로 병렬화하므로 순차 합산은 아니다).
+
+**고치지 않는다** — 측정 근거 없이 최적화하지 않는다(D-029 정신, CLAUDE.md). 폴백 순서를
+뒤집는 대안(타인 행은 처음부터 RPC로 가고, self만 직접 조회를 시도)도 검토했으나 채택하지
+않았다 — 어차피 호출 시점에는 "이 id가 self인지 타인인지" 앱 레이어가 미리 알지 못해(각
+컨테이너가 `session.profileId`와 대상 id를 비교하는 코드를 새로 추가해야 한다) 결국 호출부
+변경이 필요해지고, 이는 §16.2에서 대안 C를 채택한 핵심 이유("호출부 무변경")와 충돌한다.
+INP(NFR-001) 목표에 실제로 영향을 주는지는 이번 회차에서 측정하지 않았다 — **알려진 비용으로
+문서에 남기고, 실측(브라우저 프로파일링) 없이는 손대지 않는다.** 다음에 이 경로가 성능
+문제로 제보되면 이 문단이 원인 후보 1순위다.
+
+### 17.5 by_id는 왜 그대로인가(팀장 확인)
+
+`get_profile_public_by_id`는 이번 수정 대상이 아니다 — UUID는 추측 불가능하고(오라클 공격에
+필요한 "낮은 비용의 총당량" 전제가 성립하지 않는다), "작성자 표기"라는 용도가 명확해 리밋이
+없어도 실질 위험이 낮다고 팀장이 판단했다. §16.6의 잔여 위험 1·2번 서술은 그대로 유효하다.
+
+### 17.6 절차 사고(정직하게 남긴다) — drop 마이그레이션의 로컬 파일이 한동안 없었다
+
+**무엇이 잘못됐나**: `apply_migration`으로 `get_profile_public_by_handle` 삭제를 원격에
+적용한 뒤(원격 version `20260725090854`), 곧바로 로컬에 같은 이름의 파일을 만들었어야
+했는데(CLAUDE.md I-051 절차) **만들지 않고 넘어갔다** — 실측·앱 코드 수정·문서화(17.1~17.4)에
+집중하다 이 단계 자체를 빠뜨렸다. 팀장이 `supabase/migrations/`를 직접 뒤져 `090854`로
+시작하는 파일이 0개임을 발견하고서야 드러났다.
+
+**왜 위험했나**: 로컬 마이그레이션 디렉터리를 새 환경(다른 개발자·CI·재해복구)에 리플레이하면
+`20260725085327`(`get_profile_public_by_handle`을 **생성**하는 마이그레이션)까지만 적용되고,
+그것을 지우는 마이그레이션이 로컬에 없으니 **무제한 핸들 오라클 RPC가 그 새 환경에 다시
+만들어진다** — 원격 DB만 안전하고 저장소(코드) 이력은 취약한 상태로 남아 있었다. I-051이
+경고한 "원격 적용이 로컬 파일을 만들지 않는다"는 한계가 실제로 보안 결함을 재도입할 수 있는
+형태로 나타난 사례다.
+
+**수정**: `supabase_migrations.schema_migrations`에서 `version='20260725090854'`의
+`statements`를 그대로 읽어 `supabase/migrations/20260725090854_profiles_drop_public_handle_
+lookup_rpc_i058_major1.sql`을 새로 만들었다(내용이 내가 `apply_migration`에 넘긴 SQL과
+바이트 단위로 일치함을 원격 조회로 재확인). `20260725085327` 파일은 **수정하지 않았다** —
+이미 그 내용 그대로 원격에 적용된 상태라, 파일을 고치면 "적용된 것과 다른 이력"이 되어
+오히려 더 나빠진다(삭제는 후속 마이그레이션으로 표현하는 것이 정석이고, 지금 두 파일 구성이
+바로 그 형태다). `list_migrations` 원격 목록과 로컬 파일을 1:1 대조: `20260725085327`↔
+`..._profiles_narrow_select_policy_and_public_profile_rpcs.sql`,
+`20260725090854`↔`..._profiles_drop_public_handle_lookup_rpc_i058_major1.sql` — 내 소관
+두 건 모두 일치 확인.
+
+**새 절차(이번 사고로 확정)**: `apply_migration` 호출 직후, 다른 어떤 작업(앱 코드 수정·문서화
+등)보다 **먼저** `list_migrations`로 그 호출이 만든 정확한 `version`을 확인하고, 그 값을
+그대로 파일명 타임스탬프로 써서 로컬 파일을 즉시 만든다 — 나중에 몰아서 하지 않는다. 이번
+회차 두 번째 마이그레이션(`090854`)에서 이 순서를 건너뛴 것이 사고 원인이었다.
+
+## 18. 19일차 추가 배정 — I-066 해소(SQL 절반): 해산된 크루의 쓰기 차단
+
+**배경**: CREW가 Task 040(크루 생애주기) 구현 중 등재하고 BOARD가 교차검증(리뷰 짝)에서
+"API 우회가 필요한 게 아니라 평상시 UI 클릭만으로 항상 재현된다"고 심각도를 올린 결함 —
+`(app)/crews/[crewId]/layout.tsx`(D-039 게이트)도 `crews.status`를 보지 않아, 해산된 크루의
+이전 멤버가 URL 이동만으로 글쓰기 폼에 도달한다. 팀장이 이 사실로 최초의 "다음 회차 이월"
+판단을 뒤집어 이번 회차에 SQL 절반을 배정했다(UI/라우트 게이트 절반은 BOARD 소관).
+
+### 18.1 전수 조사와 범위 판정
+
+`crew_memberships.status`(멤버십 상태)만 확인하고 `crews.status`(크루 자체 상태)는 보지
+않는 INSERT/UPDATE 정책을 `pg_policies` 전수 조회로 찾았다. 판정:
+
+- **포함**: `posts_insert_members`·`comments_insert_members`·`chat_messages_insert_members`
+  (I-066 원문이 명시한 "게시글 작성·채팅 발신"), `invitations_insert_staff_or_owner`·
+  `join_requests_insert_self_public_crew`(팀장이 "초대 등"으로 예시를 든 범위).
+- **제외 ①**: `crews`·`crew_memberships` 테이블 자체의 정책. 팀장 지시 — CREW가 `disband_crew`
+  를 029B 2단 구조로 재구성 중(`disband_crew_move_to_private_wrapper`, 20260725093855)이라
+  같은 SQL 영역이다. "크루 정보 수정" 차단(`crews_update_staff_or_owner`)은 이 제외에 걸려
+  이번 범위 밖으로 이월한다 — I-066 원문 3대 증상(게시글 작성·채팅 발신·크루 정보 수정) 중
+  마지막 하나는 이번에 닫지 못했다.
+- **제외 ②**: `posts`/`comments`/`chat_messages`의 UPDATE(수정·소프트삭제). I-066 원문의
+  핵심 증상은 "새로 쓴다"(INSERT)이지 "기존 걸 고친다"가 아니다 — 편집·모더레이션까지
+  차단하면 팀장이 경고한 "과잉"이 된다.
+- **제외 ③ poll_votes INSERT**: 실측(`private.disband_crew` 본문 확인) — 해산 시 진행 중
+  poll을 전부 `cancelled`로 전이시키고, `poll_votes_insert_eligible_self`는 이미
+  `poll_id IN (select id from polls where status='open')`를 요구한다 — 해산 후 투표는 이미
+  불가능하다(투명 커버, 새 조건 불필요).
+- **제외 ④ polls INSERT(새 제안)**: `meetup_proposal` 타입 post가 있어야 성립하는데 이번
+  수정으로 posts INSERT 자체가 막히므로 사실상 도달 불가.
+- **제외 ⑤ meetup_attendances INSERT**: `m.status='confirmed'` 요구 + disband가 미래
+  Meetup을 `cancelled`로 바꾸므로 대부분 커버되나, **과거(date < today) confirmed Meetup에는
+  여전히 응답 가능**하다 — 실사용 가치가 낮은 좁은 잔여 위험으로 판단해 넣지 않았다(문서화만).
+
+### 18.2 설계 — 새 헬퍼 `private.is_crew_active`, 기존 헬퍼는 그대로
+
+`private.is_active_crew_member`를 고쳐 "크루도 active일 것"까지 의미를 넓히는 안을
+검토했으나 **기각했다** — 이유 둘:
+
+1. 이번에 손댄 INSERT 정책 대부분이 애초에 이 헬퍼를 호출하지 않는다(`crew_memberships`를
+   직접 서브쿼리로 인라인한다) — 헬퍼를 고쳐도 이 정책들에는 효과가 없다.
+2. `is_active_crew_member`는 **읽기 경로**에서도 쓰인다 —
+   `crew_memberships_select_self_or_fellow_member`(동료 멤버십 조회)·`poll_vote_tally`·
+   `poll_vote_tally_for_decision`(투표 집계 열람)·`realtime_messages_select_crew_broadcast`
+   (Broadcast 구독 인가)·`respond_meetup_attendance`(참석 응답 RPC 내부 권한 확인). 이 헬퍼의
+   의미를 바꾸면 해산된 크루의 **과거 투표 집계 조회·동료 목록 조회·Broadcast 구독**까지
+   전부 막혀 FR-013 AC2("과거 항목은 열람 전용으로 남는다")를 정면으로 위반한다.
+
+그래서 새 헬퍼 `private.is_crew_active(p_crew_id uuid) returns boolean`(SECURITY DEFINER,
+`crews.status='active'`만 확인)을 신설해 **새 콘텐츠 INSERT 정책에만** 붙였다. 029A crews↔
+crew_memberships 상호 재귀(42P17) 걱정은 없다 — 이 함수는 `crews`만 직접 조회하고 다른
+정책을 경유하지 않는다(SECURITY DEFINER가 RLS 자체를 우회).
+
+### 18.3 적용 (마이그레이션 `crews_block_writes_in_archived_crew_i066`, 원격 version
+`20260725094141`)
+
+`private.is_crew_active` 신설(`authenticated`에게만 EXECUTE) + 5개 INSERT 정책 재정의
+(drop+create, 18일차 `invitations_block_requested_target_at_rls`가 추가한 `requested` 대상
+차단 조건은 그대로 보존):
+
+1. `posts_insert_members` — `board → crews` 경로에 `private.is_crew_active(b.crew_id)` 추가.
+2. `comments_insert_members` — `post → board → crews` 경로에 동일 조건 추가.
+3. `chat_messages_insert_members` — `chat_room → crews` 경로에 동일 조건 추가.
+4. `invitations_insert_staff_or_owner` — `private.is_crew_active(crew_id)` 최상위 조건 추가.
+5. `join_requests_insert_self_public_crew` — 이미 `crews c where c.visibility='public'`을
+   직접 서브쿼리하므로 헬퍼 없이 같은 자리에 `and c.status = 'active'`만 추가.
+
+### 18.4 회귀 실측(트랜잭션 롤백, 9개 시나리오)
+
+`chopin_0625`(fb70ff1c, 크루A `주말 러닝 클럽` 21fb8c31 소속)·`chopin0625`(30f44dd9, 크루A
+오너·크루B `심야 독서 모임` 32aca4a8 staff)·아웃사이더 2명으로 구성. 크루 상태 전환은
+`crews_guard_owner_only_fields` 트리거(CREW, Task 040) 때문에 **오너 권한(auth.uid()=owner_id)
+으로만** 가능했다(처음 `postgres`로 직접 UPDATE 시도 시 트리거가 거부 — 실측 중 발견, 오너
+jwt claims로 전환해 해소).
+
+| 시나리오 | 크루 상태 | 기대 | 실측 |
+| --- | --- | --- | --- |
+| A1 게시글 작성(활성 크루, 소속 멤버) | active | 성공 | ✅ 성공 |
+| A2 댓글 작성(활성 크루) | active | 성공 | ✅ 성공 |
+| A3 채팅 발신(활성 크루) | active | 성공 | ✅ 성공 |
+| A4 가입 신청(활성·공개 크루, 비멤버) | active | 성공 | ✅ 성공 |
+| B1 게시글 작성(해산 크루, 소속 staff) | archived | 거부 | ✅ RLS 위반으로 거부 |
+| B2 댓글 작성(해산 크루) | archived | 거부 | ✅ RLS 위반으로 거부 |
+| B3 채팅 발신(해산 크루) | archived | 거부 | ✅ RLS 위반으로 거부 |
+| B4 초대 발송(해산 크루, staff) | archived | 거부 | ✅ RLS 위반으로 거부 |
+| A5 가입 신청(해산·공개 크루, 비멤버) | archived | 거부 | ✅ RLS 위반으로 거부 |
+
+**활성 크루 회귀 없음(4/4) + 해산 크루 차단(5/5) 전부 확인.** 테스트 후 `rollback` — 잔여
+행 0건, 크루 상태 원복(`active` 유지) 재확인. `get_advisors(security)` 신규 WARN 0건(기존
+`auth_leaked_password_protection` 1건뿐 — CREW의 `disband_crew` WARN은 이번 확인 시점에
+이미 그쪽 재구성으로 해소돼 있었다, 무관).
+
+### 18.5 앱 레이어와의 역할 분담 (18일차 교훈 재확인)
+
+**SQL(이 5개 정책)이 강제 경계다** — 라우트 게이트가 무엇을 하든 실제 쓰기는 여기서 최종
+결정된다. **BOARD가 맡을 라우트 게이트(`(app)/crews/[crewId]/layout.tsx`에 `crews.status`
+확인 추가)는 UX만 담당한다** — "이 크루는 해산되었습니다"를 글쓰기 폼 진입 전에 미리
+안내하는 조기 반환일 뿐, 이게 없어도 SQL이 최종적으로 막는다(지금 이 순간에도 UI는 폼을
+보여주지만 제출은 RLS 위반으로 실패한다 — 사용자 경험은 나쁘지만 데이터 무결성은 이미
+보장된다). 두 계층의 판정 조건(`crews.status='active'`)은 반드시 같은 의미를 유지해야
+한다 — 이번 회차처럼 SQL이 앱보다 먼저 닫히는 순서도 있을 수 있고, 그 반대도 있을 수
+있다는 것을 다음 사람이 알아야 한다.
+
+### 18.6 남은 것
+
+1. **"크루 정보 수정" 차단**(`crews_update_staff_or_owner`)은 이번 범위 밖 — `crews`
+   테이블 자체 정책이라 CREW의 동시 작업과 겹쳐 다음 회차로 이월한다.
+2. **과거 confirmed Meetup의 출석 응답**은 해산 후에도 여전히 가능하다(18.1 제외 ⑤) —
+   실사용 가치가 낮은 잔여 위험으로 문서화만 하고 손대지 않았다.
+3. **라우트 게이트(UX)**는 BOARD 소관 — SQL이 먼저 닫혔으니 UX 개선이 늦어져도 데이터
+   무결성 문제는 없다.

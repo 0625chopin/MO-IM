@@ -12,6 +12,7 @@ import { resolveNotificationHref } from "@/components/notifications/notification
 import { getNotificationMessage } from "@/components/notifications/notification-view-models";
 import { toast } from "@/components/ui/toast";
 import { markNotificationReadAction } from "@/lib/actions/mark-notification-read";
+import { describeRealtimeError } from "@/lib/realtime";
 import { strings } from "@/lib/strings";
 import type { Id } from "@/lib/types";
 
@@ -54,7 +55,8 @@ export function ToastHostContainer({ profileId }: { profileId: Id }) {
         });
       },
       (error) => {
-        console.error("[notifications] toast subscription error", error);
+        // `cause`(원본 소켓 에러) 노출 폭을 줄인다(19일차 CORE 교차검증 후속, 같은 이유).
+        console.error("[notifications] toast subscription error", describeRealtimeError(error));
       },
     );
     return unsubscribe;

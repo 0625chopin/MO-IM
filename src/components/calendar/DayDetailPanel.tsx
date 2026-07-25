@@ -151,9 +151,18 @@ function DayDetailMeetupRow({ meetup }: { meetup: CalendarMeetupDetail }) {
     <div className="flex flex-col gap-1 rounded-lg border border-border bg-background p-3">
       <div className="flex items-center justify-between gap-2">
         <CrewLegend crewName={meetup.crewName} colorIndex={meetup.colorIndex} />
-        {meetup.isCancelled && (
-          <Badge variant="secondary">{strings.calendar.month.detail.cancelledBadge}</Badge>
-        )}
+        {/* FR-013 AC2(I-067) — 두 배지는 배타적이지 않다(해산 전에 이미 취소됐던 Meetup은
+         *  둘 다 뜬다, 사실이 둘 다 참이면 그대로 보여준다). archived 배지가 "취소됨"과
+         *  혼동되면 안 되므로 독립 문구를 쓴다(calendar-types.ts의 `isArchivedCrew`
+         *  docstring 참고). */}
+        <div className="flex shrink-0 items-center gap-1">
+          {meetup.isArchivedCrew && (
+            <Badge variant="secondary">{strings.calendar.month.detail.archivedCrewBadge}</Badge>
+          )}
+          {meetup.isCancelled && (
+            <Badge variant="secondary">{strings.calendar.month.detail.cancelledBadge}</Badge>
+          )}
+        </div>
       </div>
       <p className="truncate text-sm font-medium text-foreground">{meetup.title}</p>
       <p className="tnum text-xs text-muted-foreground">

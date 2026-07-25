@@ -1,5 +1,6 @@
 import { Loader2Icon } from "lucide-react";
 
+import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
 import type { CrewCardViewModel } from "@/components/crews/crew-explore-view-models";
 import type {
   JoinRequestRowViewModel,
@@ -16,6 +17,7 @@ import { CrewMembersSkeleton } from "@/components/crews/CrewMembersSkeleton";
 import { CrewSearchBar } from "@/components/crews/CrewSearchBar";
 import { CrewSettingsSkeleton } from "@/components/crews/CrewSettingsSkeleton";
 import { CrewVisibilityForm } from "@/components/crews/CrewVisibilityForm";
+import { DisbandCrewForm } from "@/components/crews/DisbandCrewForm";
 import { InviteMemberDialog } from "@/components/crews/InviteMemberDialog";
 import { JoinRequestButton } from "@/components/crews/JoinRequestButton";
 import { JoinRequestPanel } from "@/components/crews/JoinRequestPanel";
@@ -74,6 +76,8 @@ const SAMPLE_MEMBER_ROWS: MemberRowViewModel[] = [
     canAppoint: false,
     canLeave: false,
     leaveBlockedReason: strings.crew.members.leave.errors.ownerMustTransferOrDisband,
+    canTransferOwnership: false,
+    canRemove: false,
   },
   {
     profileId: "profile-2",
@@ -85,6 +89,8 @@ const SAMPLE_MEMBER_ROWS: MemberRowViewModel[] = [
     canAppoint: true,
     canLeave: false,
     leaveBlockedReason: null,
+    canTransferOwnership: true,
+    canRemove: true,
   },
   {
     profileId: "profile-3",
@@ -96,6 +102,8 @@ const SAMPLE_MEMBER_ROWS: MemberRowViewModel[] = [
     canAppoint: true,
     canLeave: false,
     leaveBlockedReason: null,
+    canTransferOwnership: true,
+    canRemove: true,
   },
 ];
 
@@ -418,12 +426,12 @@ export const crewsSection = defineSection({
     },
     {
       name: "멤버 관리 — 역할 정렬 목록 (MemberList)",
-      note: "실제 컴포넌트입니다(FR-015·FR-024·FR-026, D-002, Task 017A). 정렬(오너 > 임원 > 일반)·권한 판정은 CrewMembersContainer가 끝낸 값을 props로만 받습니다. 오너(본인) 행은 오너 이양·해산 기능이 아직 없어 탈퇴 버튼 대신 안내 문구가 뜨고, 임원·일반 행은 '임원으로 임명'/'임원 해임' 버튼이 실제 setCrewMemberRoleAction을 호출합니다 — 게스트 세션이라 눌러도 세션 만료 오류로 막힙니다.",
+      note: "실제 컴포넌트입니다(FR-015·FR-024·FR-025·FR-026·FR-027, D-002·D-003, Task 017A·040). 정렬(오너 > 임원 > 일반)·권한 판정은 CrewMembersContainer가 끝낸 값을 props로만 받습니다. 오너(본인) 행은 탈퇴 버튼 대신 안내 문구가 뜨고, 임원·일반 행은 '임원으로 임명'/'임원 해임'·'오너로 임명'(FR-025, 크루명 재입력 확인)·'강퇴'(FR-027, 사유 선택 입력) 버튼이 실제 Server Action을 호출합니다 — 게스트 세션이라 눌러도 세션 만료 오류로 막힙니다.",
       panels: {
         default: (
           <PreviewFrame height={340}>
             <div className="p-4">
-              <MemberList crewId="crew-1" members={SAMPLE_MEMBER_ROWS} />
+              <MemberList crewId="crew-1" crewName="주말 러닝 크루" members={SAMPLE_MEMBER_ROWS} />
             </div>
           </PreviewFrame>
         ),
@@ -435,7 +443,7 @@ export const crewsSection = defineSection({
         empty: (
           <PreviewFrame height={140}>
             <div className="p-4">
-              <MemberList crewId="crew-1" members={SAMPLE_MEMBER_ROWS_OWNER_ONLY} />
+              <MemberList crewId="crew-1" crewName="주말 러닝 크루" members={SAMPLE_MEMBER_ROWS_OWNER_ONLY} />
             </div>
           </PreviewFrame>
         ),
@@ -556,6 +564,40 @@ export const crewsSection = defineSection({
           </PreviewFrame>
         ),
       },
+    },
+    {
+      name: "크루 설정 — 크루 해산 (DisbandCrewForm)",
+      note: "실제 컴포넌트입니다(FR-013, D-009 후반, Task 040). CrewSettingsContainer가 crew:disband(오너 전용)를 통과한 사람에게만 렌더합니다. 다이얼로그를 열면 크루명 재입력 확인 필드가 있습니다 — 되돌릴 수 없는 조작(진행 중 투표 전부 취소·미래 Meetup 전부 취소·채팅 로그 즉시 파기)이라 오클릭을 막는 용도이며, 실제 강제 경계는 SQL(public.disband_crew RPC)입니다. 게스트 세션이라 제출하면 세션 만료 오류로 막힙니다. '오류' 패널은 이름 불일치 도메인 오류(D-030 ③)를 보여줍니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={220}>
+            <div className="mx-auto w-full max-w-md p-4">
+              <DisbandCrewForm crewId="crew-1" crewName="주말 러닝 크루" />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={200}>
+            <CrewSettingsSkeleton />
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={160}>
+            <div className="p-4">
+              <ErrorState title={strings.crew.settings.disband.errors.nameMismatch} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "해산된 크루 안내 (ArchivedCrewBanner)",
+      note: "FR-013 AC2, Task 040 UI/게이트 절반(BOARD, 19일차, I-066·I-067 해소). `(app)/crews/[crewId]/layout.tsx`가 `crews.status==='archived'`일 때 하위 화면 공통 상단에 띄우는 실제 컴포넌트입니다 — 게시판·채팅 등 어디서나 같은 배너가 보입니다. 열람은 그대로 되고(과거 게시글·채팅 기록), 쓰기만 막힙니다 — 게시판의 '새 글쓰기' 버튼은 `BoardListContainer`의 canWrite가 crews.status까지 확인해 숨고(위 '멤버 관리' 근처가 아니라 board.tsx 섹션의 BoardList 항목 참고), 채팅 입력창은 `Composer`의 canSend가 false가 되어 렌더 자체가 사라집니다(chat.tsx 섹션 참고). 실제 강제 경계는 CORE가 posts·chat_messages INSERT RLS에 추가하는 crews.status='active' 조건입니다 — 이 배너·버튼 숨김은 UX 안내일 뿐입니다.",
+      content: (
+        <PreviewFrame height={140}>
+          <ArchivedCrewBanner />
+        </PreviewFrame>
+      ),
     },
   ],
 });

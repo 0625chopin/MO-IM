@@ -1,5 +1,6 @@
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
 import type { PollBallotViewer, PollViewModel } from "@/components/poll/poll-view-models";
+import { PollLiveContainer } from "@/components/poll/PollLiveContainer";
 import { PollPanel } from "@/components/poll/PollPanel";
 import {
   getCrewMembership,
@@ -111,5 +112,15 @@ export async function PollPanelContainer({ crewId, postId }: PollPanelContainerP
     canCloseEarly,
   };
 
-  return <PollPanel crewId={crewId} poll={viewModel} />;
+  // 실시간 갱신(FR-042 AC2, Task 033)은 진행 중(open) 투표에서만 의미가 있다 — 종료된 투표는
+  // 더 이상 집계가 바뀌지 않으므로 굳이 채널을 열지 않는다(연결당 채널 100 한도, R-019).
+  if (poll.status !== "open") {
+    return <PollPanel crewId={crewId} poll={viewModel} />;
+  }
+
+  return (
+    <PollLiveContainer crewId={crewId} pollId={poll.id}>
+      <PollPanel crewId={crewId} poll={viewModel} />
+    </PollLiveContainer>
+  );
 }

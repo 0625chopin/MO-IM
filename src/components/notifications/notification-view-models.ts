@@ -21,6 +21,8 @@ const NOTIFICATION_MESSAGE_BY_TYPE: Record<NotificationType, string> = {
   meetup_created: strings.notification.messages.meetupCreated,
   meetup_cancelled: strings.notification.messages.meetupCancelled,
   post_commented: strings.notification.messages.postCommented,
+  ownership_transferred: strings.notification.messages.ownershipTransferred,
+  crew_disbanded: strings.notification.messages.crewDisbanded,
 };
 
 export function getNotificationMessage(type: NotificationType): string {

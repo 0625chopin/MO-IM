@@ -4,7 +4,7 @@ import { getBoardListHref } from "@/components/board/board-links";
 import type { BoardPostSummary } from "@/components/board/board-view-models";
 import { BoardList } from "@/components/board/BoardList";
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
-import { getBoardByCrewId, getPollByPostId, getProfileById, listPostsByPage } from "@/lib/data";
+import { getBoardByCrewId, getCrewById, getPollByPostId, getProfileById, listPostsByPage } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
 import type { Id } from "@/lib/types";
@@ -16,6 +16,11 @@ import type { Id } from "@/lib/types";
  * `board:read` 판정이 거부되면 `cause: { code: "forbidden" }`를 실어 던진다 — 가장 가까운
  * `error.tsx`가 `classifyError`로 이를 읽어 `RouteErrorBoundary(kind="forbidden")`를 그린다
  * (Task 014, D-030 ③). 크루 자체가 없으면(게시판도 없음) `notFound()`로 404 처리한다.
+ *
+ * **19일차(Task 040 UI/게이트 절반, I-066 해소)** — `canWrite`는 `post:create` role 판정에
+ * `crews.status==='active'`를 추가로 요구한다. 해산된 크루는 열람(이 컨테이너의 나머지 전부)은
+ * 그대로 되지만 "새 글쓰기" 버튼은 숨는다(FR-013 AC2 "과거 항목은 열람 전용으로 남는다") —
+ * `(app)/crews/[crewId]/layout.tsx`의 `ArchivedCrewBanner`가 이유를 안내한다.
  */
 export async function BoardListContainer({ crewId, page }: { crewId: Id; page: number }) {
   const board = await getBoardByCrewId(crewId);
@@ -31,7 +36,8 @@ export async function BoardListContainer({ crewId, page }: { crewId: Id; page: n
     });
   }
 
-  const canWrite = checkPermission({ role, action: "post:create" }).allowed;
+  const crew = await getCrewById(crewId);
+  const canWrite = checkPermission({ role, action: "post:create" }).allowed && crew?.status === "active";
 
   const postsPage = await listPostsByPage(board.id, { page });
   const posts: BoardPostSummary[] = await Promise.all(

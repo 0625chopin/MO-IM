@@ -124,6 +124,27 @@ select has_table_privilege('postgres', 'auth.users', 'UPDATE');  -- true
 `listCrewsByProfile` 결과를 그대로 표시만 한다 — 규칙이 TS·SQL 두 곳에 따로 존재하는
 중복이 남는다(§6).
 
+**정정 2건(19일차, DESIGN 브라우저 검증·팀장 확인·CREW 수정 — 원 서술은 지우지 않고
+이력으로 남긴다)**:
+
+- **I-061**: `lib/actions/restore-account.ts`가 성공 경로에서 `redirect("/home")`만
+  호출하고 `refresh()`를 호출하지 않았다 — CLAUDE.md "쓰기 후 갱신은 Server Action +
+  `refresh()` 패턴" 원칙과 다른 배선이었다. 증상: 복구 후 `/home` 본문은 정상 인증 데이터를
+  보여주지만 헤더(`HeaderNav`, 루트 레이아웃 공유 세그먼트)가 클라이언트 라우터 캐시를
+  재사용해 로그아웃 상태로 보였다(주소창 재로드로만 정상화). `redirect()`는 예외를 던져
+  렌더를 즉시 종료시키므로 `refresh()`는 그 **이전**에 호출해야 효과가 있다는 것이 원인이다
+  — `refresh()`를 `redirect()` 앞으로 옮겨 수정했다. 같은 파일에 있는 `deactivate-account.ts`
+  도 같은 배선이었다(증상은 이번 검증에서 관찰되지 않았지만 — "목적지 페이지가 매번 서버에서
+  세션을 다시 읽어 드러나지 않았을 뿐" — 같은 원인이라 함께 고쳤다). 상세: `docs/ISSUES.md`
+  I-061.
+- **I-068**: `AccountWithdrawSection.tsx`의 탈퇴 확인 다이얼로그 카피
+  (`account.settings.withdraw.notice.content`)가 "작성자는 '탈퇴한 사용자'로 표시돼요"라고
+  시점을 밝히지 않아 "탈퇴 즉시"로 읽혔다. 실제로는 §1.2의 `request_account_deactivation()`
+  이 `display_name` 등을 건드리지 않고, `anonymize_expired_deactivated_profiles()`(30일
+  경과 후 pg_cron)가 그제서야 바꾼다 — **이건 D-044 설계(유예 중 PII 원본 보존) 그대로다,
+  동작은 정확하고 카피만 부정확했다.** `ko.ts`에 "30일 유예가 끝난 뒤 바뀌고, 그 전까지는
+  그대로 보여요"로 시점을 명시해 수정했다. 상세: `docs/ISSUES.md` I-068.
+
 ## 3. FR-003 — 비밀번호 재설정
 
 ### 3.1 PKCE 흐름(Supabase 공식 Next.js 패턴)

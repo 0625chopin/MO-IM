@@ -3,7 +3,7 @@ import "server-only";
 import { crewColorIndex } from "@/lib/rules/crew-color-hash";
 import type { Crew, CrewMembership, CrewMembershipRole, CrewVisibility, Id } from "@/lib/types";
 
-import { type CursorPage, type DataResult, err, ok } from "../contracts";
+import { type CursorPage, type DataErrorCode, type DataResult, err, ok } from "../contracts";
 
 import { escapeForIlikeOr, toCrew, toCrewMembership } from "./mappers";
 import { createSupabaseServerClient } from "./server";
@@ -128,13 +128,38 @@ export async function listCrewMembers(crewId: Id): Promise<CrewMembership[]> {
   return (data ?? []).map(toCrewMembership);
 }
 
+export interface ListCrewsByProfileOptions {
+  /**
+   * FR-013 AC2(Task 040 후속, I-067) — 해산된(`archived`) 크루도 포함할지. 기본값 `false`로
+   * **기존 호출자 전부의 동작을 그대로 유지한다**(전수 조사 결과는 `docs/decisions/
+   * crew-lifecycle-040.md` §11 참고): `HomeCalendarSummaryContainer`(다가오는 모임 — archived
+   * 크루는 미래 Meetup이 없으므로 포함해도 결과가 안 바뀌지만 의미상 "현재 소속"만 다루는 게
+   * 맞다)·`fetch-crew-cards.ts`("가입됨" 배지 — 해산된 크루를 탐색 결과에 다시 노출할 이유가
+   * 없다)·`AccountSettingsContainer`(FR-005 AC1 "오너로 있는 **활성** 크루" 차단 목록 — 이미
+   * 해산된 크루는 탈퇴를 막을 이유가 없다) 셋 다 `active`만 봐야 하므로 옵션을 생략한다.
+   * **`MonthCalendarContainer`(FR-061·FR-013 AC2, 캘린더 과거 이력 열람)만** `true`로
+   * 호출해야 한다 — 캘린더는 크루가 해산돼도 과거 Meetup을 "열람 전용"으로 계속 보여줘야
+   * 하는데, 그 Meetup의 크루명·색상(`crewById` 조인)을 해석하려면 해산된 크루 자체가 이
+   * 목록에 있어야 한다(그렇지 않으면 크루명이 빈 문자열로 렌더된다).
+   */
+  includeArchived?: boolean;
+}
+
 /**
  * 프로필이 속한 크루 목록(FR-061, Task 021A). 두 단계 조회(멤버십 → 크루)로 나눴다 — Supabase
  * embedded select(`crews!inner(*)`)로 한 번에 묶을 수도 있었지만, 필터 대상 테이블이 바뀌는
  * 임베드 필터(`.eq("crews.status", ...)`) 문법은 이 프로젝트에서 실측 검증할 방법이 없어(테스트
  * 러너 없음, R-002) 단순하고 검증하기 쉬운 2단계 조회를 택했다(설계 문서 §4).
+ *
+ * **1단계(멤버십)는 옵션과 무관하게 항상 `status='active'`만 본다** — "지금 이 크루에 속해
+ * 있는가"는 `includeArchived`가 결정할 문제가 아니다(탈퇴·강퇴된 사용자에게는 여전히 안
+ * 보여야 한다). `includeArchived`는 **2단계(크루 자체)에서만** `crews.status` 필터를
+ * 생략할지 결정한다 — Task 040 후속(I-067), `docs/decisions/crew-lifecycle-040.md` §11.
  */
-export async function listCrewsByProfile(profileId: Id): Promise<Crew[]> {
+export async function listCrewsByProfile(
+  profileId: Id,
+  opts: ListCrewsByProfileOptions = {},
+): Promise<Crew[]> {
   const supabase = await createSupabaseServerClient();
   const { data: memberships, error: membershipError } = await supabase
     .from("crew_memberships")
@@ -146,11 +171,11 @@ export async function listCrewsByProfile(profileId: Id): Promise<Crew[]> {
   const crewIds = [...new Set((memberships ?? []).map((m) => m.crew_id))];
   if (crewIds.length === 0) return [];
 
-  const { data: crews, error: crewError } = await supabase
-    .from("crews")
-    .select("*")
-    .in("id", crewIds)
-    .eq("status", "active");
+  let query = supabase.from("crews").select("*").in("id", crewIds);
+  if (!opts.includeArchived) {
+    query = query.eq("status", "active");
+  }
+  const { data: crews, error: crewError } = await query;
   if (crewError) throw crewError;
   return (crews ?? []).map(toCrew);
 }
@@ -273,6 +298,77 @@ export async function setCrewMembershipRole(
   if (error) throw error;
   if (!data) return err("not_found", `crew ${crewId} 의 멤버십(${profileId})을 찾을 수 없다.`);
   return ok(toCrewMembership(data));
+}
+
+/**
+ * 오너 이양(FR-025, D-002). `crews.owner_id`를 바꾸는 단일 UPDATE 하나가 곧 트랜잭션 경계다
+ * (운영 규칙 2 — 여러 PostgREST 호출로 나누지 않는다). 부수효과(구오너→staff 강등, 신오너→owner
+ * 승격)는 `trg_crews_sync_membership_on_owner_transfer`(029A)가 같은 문장 안에서 처리한다.
+ *
+ * **대상이 활성 크루원이어야 한다(FR-025 E1)는 SQL이 강제한다** — Task 040이 확장한
+ * `crews_guard_owner_only_fields` 트리거가 `new.owner_id`를 검증하므로, 이 함수는 대상을
+ * 미리 조회하지 않는다(호출자 `transfer-crew-ownership.ts`가 UX용으로 먼저 확인하지만, 그건
+ * 이중화된 안내일 뿐 강제 경계가 아니다 — SQL 우회 시에도 이 트리거가 막는다).
+ */
+export async function transferCrewOwnership(id: Id, newOwnerId: Id): Promise<DataResult<Crew>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("crews")
+    .update({ owner_id: newOwnerId })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  if (error) {
+    // crews_guard_owner_only_fields(FR-025 E1 포함)·crews_update_staff_or_owner RLS가
+    // 여기서 거부될 수 있다 — D-030 ③에 따라 예외를 던지지 않고 도메인 오류로 표현한다.
+    return err("forbidden", error.message);
+  }
+  if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
+  return ok(toCrew(data));
+}
+
+/**
+ * 크루 해산(FR-013). `public.disband_crew` SECURITY DEFINER RPC(Task 040) 하나로 크루
+ * `archived` 전이 + 진행 중 투표 전부 `cancelled` + 미래 Meetup 전부 `cancelled` + 채팅 로그
+ * 즉시 파기(D-009 후반)를 원자화한다(운영 규칙 2 — I-054 재발 방지). 인가(오너 본인·크루명
+ * 재입력 확인)도 함수 내부에서 재구현되어 있어(SECURITY DEFINER가 RLS를 우회하므로) 실패는
+ * 예외가 아니라 함수 자신의 `ok:false`+`reason`으로 돌아온다 — `respond_meetup_attendance`
+ * (`meetup.ts`)와 같은 패턴이다. `error`(진짜 예외 — 네트워크·grant 문제 등)는 그대로 던진다.
+ */
+export type DisbandCrewReason = "forbidden" | "not_found" | "already_disbanded" | "name_mismatch";
+
+export interface DisbandCrewResult {
+  cancelledPolls: number;
+  cancelledMeetups: number;
+  purgedMessages: number;
+}
+
+export async function disbandCrew(
+  id: Id,
+  confirmName: string,
+): Promise<DataResult<DisbandCrewResult>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .rpc("disband_crew", { p_crew_id: id, p_confirm_name: confirmName })
+    .single();
+  if (error) throw error;
+  if (!data.ok) {
+    const reason = (data.reason ?? "forbidden") as DisbandCrewReason;
+    const code: DataErrorCode =
+      reason === "not_found"
+        ? "not_found"
+        : reason === "already_disbanded"
+          ? "conflict"
+          : reason === "name_mismatch"
+            ? "validation_failed"
+            : "forbidden";
+    return err(code, reason);
+  }
+  return ok({
+    cancelledPolls: data.cancelled_polls,
+    cancelledMeetups: data.cancelled_meetups,
+    purgedMessages: data.purged_messages,
+  });
 }
 
 /**

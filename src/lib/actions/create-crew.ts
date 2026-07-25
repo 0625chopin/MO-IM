@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getCrewHomeHref } from "@/components/crews/crew-links";
@@ -25,6 +26,14 @@ import type { CrewVisibility } from "@/lib/types";
  * **색상은 이 액션이 다루지 않는다(D-016)** — `createCrew`(`lib/data/mock/crew.ts`)가 크루
  * id를 만든 직후 내부에서 `hash(crew.id) mod 12`를 계산한다. 이 액션은 크루명·소개·카테고리·
  * 공개 범위 넷만 검증한다(FR-010 "개설 폼의 입력 항목은 크루명·소개·카테고리·공개 범위 넷이다").
+ *
+ * **`refresh()`를 `redirect()` 앞에 추가(19일차, I-061 점검 확대)** — 원래는 `redirect()`만
+ * 호출했다. `leave-crew.ts` docstring이 "createCrewAction과 같은 이유로 refresh() 대신
+ * redirect()를 쓴다"고 이 파일을 근거로 인용하고 있었는데, 그 가정 자체가
+ * `restore-account.ts`(I-061)에서 실제로 틀렸다고 확인됐다 — `redirect()`는 예외를 던져
+ * 렌더를 즉시 끝내므로 `refresh()`는 반드시 그 앞에 있어야 한다. 이 액션 자체에서 헤더 미갱신
+ * 같은 증상을 직접 관찰하지는 못했다(Playwright 세션 제약, 배선만 선제 수정) — 상세는
+ * `docs/ISSUES.md` I-061.
  */
 export interface CreateCrewFieldErrors {
   name?: string;
@@ -98,5 +107,6 @@ export async function createCrewAction(
     ownerId: session.profileId,
   });
 
+  refresh();
   redirect(getCrewHomeHref(crew.id));
 }
