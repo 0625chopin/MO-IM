@@ -6,9 +6,11 @@ import { usePathname } from "next/navigation";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logoutAction } from "@/lib/actions/logout";
 import { strings, t } from "@/lib/strings";
 import { cn } from "@/lib/utils";
 
+import { isAuthenticated } from "./auth-session";
 import { getAccountNavItems, getPrimaryNavItems, type NavItem } from "./nav-items";
 
 import type { AuthSession } from "./auth-session";
@@ -114,6 +116,18 @@ export function HeaderNav({
           {accountItems.map((item) => (
             <NavLink key={item.key} item={item} active={pathname === item.href} />
           ))}
+          {/* FR-002 로그아웃(Task 030) — 세션 폐기는 Server Action 하나로 충분해 별도
+              nav-items.ts 항목(링크)이 아니라 폼 버튼으로 둔다. */}
+          {isAuthenticated(session) && (
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              >
+                {strings.auth.logout}
+              </button>
+            </form>
+          )}
         </nav>
 
         {/* 데스크톱에서는 flex-1 주 내비가 이 묶음을 오른쪽으로 밀어 계정 메뉴 옆에 붙는다.

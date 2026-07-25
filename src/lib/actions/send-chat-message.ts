@@ -1,7 +1,7 @@
 "use server";
 
-import { toMessageViewModel } from "@/components/chat/message-view-models";
 import type { MessageViewModel } from "@/components/chat/message-view-models";
+import { toMessageViewModel } from "@/components/chat/resolve-message-view-model";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getChatRoomByCrewId, getCrewMembership, getProfileById, sendMessage } from "@/lib/data";
 import { CHAT_MESSAGE_MAX_LENGTH, validateChatMessageBody } from "@/lib/rules/chat-message-validation";

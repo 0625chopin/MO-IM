@@ -128,6 +128,42 @@ const eslintConfig = defineConfig([
     },
   },
 
+  // zone 7: src/lib/auth/** — 인증 세션·계정 잠금 (Task 030, CREW, 17일차). `src/lib/realtime/**`와
+  // 대칭 — data 배럴 밖에 있으면서 Supabase 클라이언트를 직접 다루는 독립 계층이다. `src/lib/data/
+  // contracts.ts`의 CON-05·CON-06("이 레이어의 어떤 함수도 쿠키·세션·요청 객체를 직접 읽지 않는다")
+  // 을 지키려면 세션은 데이터 배럴에 섞을 수 없다는 것이 팀장 판정(17일차)이었다 — 그래서
+  // `src/lib/data/supabase/`가 아니라 여기 둔다. 다만 클라이언트 팩터리를 중복 구현하지 않도록
+  // `@/lib/data/supabase/server`·`client`·`env`(인프라 3개)만 **읽기 전용으로 재사용**하도록 허용하고,
+  // 도메인 구현(`board`·`crew`·`profile`·`database.types` 등) 딥 임포트는 그대로 막는다 — 부정
+  // 패턴(`!`)으로 인프라 3개만 예외 처리한다. 근본적으로는 이 팩터리들 자체가 "데이터가 아니라
+  // 인프라"라 `src/lib/supabase/`로 올라가야 맞다는 것이 이 zone의 임시성을 낳은 근거다(등재:
+  // `docs/ISSUES.md`, 이동은 DESIGN이 `src/lib/data/supabase/`를 대대적으로 고치는 이번 회차가
+  // 끝난 뒤로 미룬다). 부정 패턴이 의도대로 동작하는지는 프로브 파일로 실측했다 —
+  // `docs/decisions/auth-integration-030.md` §1 참고.
+  {
+    files: ["src/lib/auth/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noMockImpl,
+            {
+              group: [
+                "@/lib/data/supabase/*",
+                "!@/lib/data/supabase/server",
+                "!@/lib/data/supabase/client",
+                "!@/lib/data/supabase/env",
+              ],
+              message:
+                "src/lib/auth/**는 Supabase 클라이언트 팩터리(server·client·env)만 재사용한다 — 도메인 구현(database.types 포함)은 직접 참조하지 않는다.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // zone 4: src/components/** 중 표현 컴포넌트(ui/, *Container.tsx 제외) — D-030 ①.
   {
     files: ["src/components/**/*.tsx"],
@@ -182,6 +218,7 @@ const eslintConfig = defineConfig([
       "src/lib/rules/**",
       "src/lib/data/**",
       "src/lib/realtime/**",
+      "src/lib/auth/**",
       "src/components/**/*.tsx",
     ],
     rules: {

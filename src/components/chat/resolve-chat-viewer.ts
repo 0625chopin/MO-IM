@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { AuthSession } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewMembership } from "@/lib/data";

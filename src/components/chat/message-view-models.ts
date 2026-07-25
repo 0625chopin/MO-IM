@@ -1,7 +1,5 @@
 import type { PostLinkCardViewModel } from "@/components/chat/post-link-card-view-models";
-import { resolvePostLinkCard } from "@/components/chat/resolve-post-link-card";
-import { strings } from "@/lib/strings";
-import type { ChatMessage, ChatMessageType, Id, ISODateTimeString, Profile } from "@/lib/types";
+import type { ChatMessageType, Id, ISODateTimeString } from "@/lib/types";
 
 /**
  * 표현 컴포넌트(`MessageBubble.tsx`·`MessageList.tsx`)가 받는 메시지 모양. `ChatMessage`와
@@ -9,6 +7,15 @@ import type { ChatMessage, ChatMessageType, Id, ISODateTimeString, Profile } fro
  * `BoardPostSummary`(`components/board/board-view-models.ts`)와 같은 패턴이다. 전부 직렬화
  * 가능한 원시값이다(NFR-037) — 이 값은 `RealtimeEvent.payload`(Broadcast)로도 그대로 실려
  * 나가야 하므로 클래스 인스턴스·함수를 담지 않는다.
+ *
+ * **이 파일은 클라이언트 안전(client-safe)하다 — `@/lib/data`를 (직접이든 전이적이든) import하지
+ * 않는다.** `MessageRoomContainer.tsx`(`"use client"`)가 `createOptimisticTimelineItem`을 값으로
+ * import하므로, 실제 데이터 조인 함수 `toMessageViewModel`(`resolvePostLinkCard` → `@/lib/data`를
+ * 물고 있다)은 이 파일이 아니라 `resolve-message-view-model.ts`(서버 전용)에 둔다. 두 파일이
+ * 합쳐져 있던 동안은 `@/lib/data`가 순수 Mock이라 서버 전용 API가 없어 증상이 드러나지 않았을
+ * 뿐, `npm run build`를 깨뜨리는 경계 누수였다(Task 020C 산출물, 17일차 CORE 수정). 새 타입·
+ * 상수를 이 파일에 추가할 때 `@/lib/data`를 import하는 무언가를 끌어들이면 이 성질이 다시
+ * 깨진다 — 그런 로직은 `resolve-message-view-model.ts` 쪽에 둔다.
  */
 export interface MessageViewModel {
   id: Id;
@@ -19,8 +26,9 @@ export interface MessageViewModel {
   type: ChatMessageType;
   body: string | null;
   refPostId: Id | null;
-  /** `type === "post_link"`이고 `refPostId`가 있을 때만 값이 있다 — `toMessageViewModel`이
-   *  `resolvePostLinkCard`(Task 020C, FR-052)로 조인해 채운다. `PostLinkCard`가 그대로 받는다. */
+  /** `type === "post_link"`이고 `refPostId`가 있을 때만 값이 있다 — `toMessageViewModel`
+   *  (`resolve-message-view-model.ts`, Task 020C, FR-052)이 `resolvePostLinkCard`로 조인해
+   *  채운다. `PostLinkCard`가 그대로 받는다. */
   postLinkCard: PostLinkCardViewModel | null;
   clientKey: string;
   createdAt: ISODateTimeString;
@@ -61,6 +69,9 @@ export interface OptimisticMessageInput {
  * 본인 메시지에서만 만들어지고(`MessageBubble`은 `isOwn`일 때 발신자 이름·아바타를 그리지
  * 않는다) `senderDisplayName`·`senderAvatarUrl`은 화면에 실제로 나타나지 않는 자리표시자다.
  * `type`은 텍스트로 고정한다 — 게시글 공유 카드(FR-052)의 낙관적 렌더는 Task 020C 범위다.
+ *
+ * 순수 함수라 `@/lib/data`가 필요 없다 — `MessageRoomContainer.tsx`(`"use client"`)가 직접
+ * 호출할 수 있는 이유다(위 모듈 docstring 참고).
  */
 export function createOptimisticTimelineItem(input: OptimisticMessageInput): ChatTimelineItem {
   return {
@@ -77,39 +88,5 @@ export function createOptimisticTimelineItem(input: OptimisticMessageInput): Cha
     createdAt: input.createdAt,
     deletedAt: null,
     deliveryStatus: "pending",
-  };
-}
-
-/**
- * `MessageListContainer`(초기 조회)·`send-chat-message.ts`·`load-earlier-messages.ts`(Server
- * Action) 세 곳이 공유하는 조인 로직. 한 곳에서만 바뀌면 되도록 여기 모아 둔다.
- *
- * `crewId`는 이 메시지가 속한 채팅방의 크루다(`ChatRoom.crewId`, 방 하나는 크루 하나에
- * 고정) — `type === "post_link"`일 때 `resolvePostLinkCard`(Task 020C, FR-052)가 "다른 크루
- * 게시글인가"를 판정하는 기준으로 쓴다. `Promise`를 반환하도록 바뀐 것은 이 조인이 추가된
- * Task 020C부터다 — 세 호출부 모두 이미 `Promise.all`/`map(async ...)` 안에서 부르고 있어
- * 호출 형태 자체는 바뀌지 않는다(`await`만 그대로 유효하다).
- */
-export async function toMessageViewModel(
-  message: ChatMessage,
-  author: Pick<Profile, "displayName" | "avatarUrl"> | null,
-  crewId: Id,
-): Promise<MessageViewModel> {
-  return {
-    id: message.id,
-    roomId: message.roomId,
-    senderId: message.senderId,
-    senderDisplayName: author?.displayName ?? strings.common.profile.unknownAuthor,
-    senderAvatarUrl: author?.avatarUrl ?? null,
-    type: message.type,
-    body: message.body,
-    refPostId: message.refPostId,
-    postLinkCard:
-      message.type === "post_link" && message.refPostId
-        ? await resolvePostLinkCard(message.refPostId, crewId)
-        : null,
-    clientKey: message.clientKey,
-    createdAt: message.createdAt,
-    deletedAt: message.deletedAt,
   };
 }

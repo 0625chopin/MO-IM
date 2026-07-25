@@ -1,9 +1,11 @@
 "use client";
 
-import { CheckCircle2Icon, EyeIcon, EyeOffIcon, Loader2Icon } from "lucide-react";
+import { AlertTriangleIcon, CheckCircle2Icon, EyeIcon, EyeOffIcon, Loader2Icon, MailCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState, useTransition, type FocusEvent } from "react";
 
+import { ResendSignupEmailButton } from "@/components/auth/ResendSignupEmailButton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -19,7 +21,7 @@ import { checkHandleAvailabilityAction } from "@/lib/actions/check-handle-availa
 import type { SignupFormState } from "@/lib/actions/signup";
 import { signupAction } from "@/lib/actions/signup";
 import { validateHandleFormat } from "@/lib/rules/handle-validation";
-import { strings } from "@/lib/strings";
+import { strings, t } from "@/lib/strings";
 
 /** `'use server'` 파일(`signup.ts`)은 async 함수만 export할 수 있어 초기 상태 상수를 거기
  *  둘 수 없다 — 타입만 가져와 여기서 리터럴을 만든다. */
@@ -84,8 +86,35 @@ export function SignupForm() {
   const submitDisabled =
     isPending || isCheckingHandle || handleStatus.kind === "taken" || handleStatus.kind === "invalid_format";
 
+  // FR-001 정상 흐름 ⑤ — 가입은 성공했으나 세션은 아직 없다(이메일 인증 대기, Task 030 실측
+  // 결과: 이 프로젝트는 "Confirm email"이 켜져 있다). 폼 대신 안내 패널을 보여준다.
+  if (state.status === "pendingVerification" && state.email) {
+    return (
+      <div className="flex flex-col items-center gap-4 text-center">
+        <MailCheckIcon aria-hidden="true" className="size-10 text-primary" />
+        <div className="flex flex-col gap-1">
+          <p className="text-base font-medium text-foreground">{strings.auth.signup.pendingVerification.title}</p>
+          <p className="text-sm text-muted-foreground">
+            {t((s) => s.auth.signup.pendingVerification.description, { email: state.email ?? "" })}
+          </p>
+        </div>
+        <ResendSignupEmailButton email={state.email} />
+        <Link href="/login" className="text-sm font-medium text-foreground underline underline-offset-4">
+          {strings.auth.signup.pendingVerification.backToLogin}
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <form action={formAction} noValidate className="flex flex-col gap-6">
+      {state.formError && (
+        <Alert variant="destructive">
+          <AlertTriangleIcon aria-hidden="true" />
+          <AlertDescription>{state.formError}</AlertDescription>
+        </Alert>
+      )}
+
       <FieldGroup>
         <Field data-invalid={Boolean(state.fieldErrors.email)}>
           <FieldLabel htmlFor="signup-email">{strings.auth.signup.fields.email}</FieldLabel>

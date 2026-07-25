@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { PostLinkCardViewModel } from "@/components/chat/post-link-card-view-models";
 import { getBoardById, getPollByPostId, getPostById, getProfileById } from "@/lib/data";
 import { getPollRemainingMs, isPollAwaitingClosure } from "@/lib/rules/poll-timezone";

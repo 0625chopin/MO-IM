@@ -1,6 +1,6 @@
 import {
   closePoll,
-  getPollTally,
+  getPollTallyForDecision,
   listEligibleVotersWithCurrentStatus,
 } from "@/lib/data";
 import type { DataResult } from "@/lib/data/contracts";
@@ -29,13 +29,30 @@ import type { Id, Poll } from "@/lib/types";
  * 파이프라인")가 명시적으로 소유한다. 그래서 `closed_passed`가 되어도 Meetup 레코드가 즉시
  * 따라오지 않는다 — `PollResult`가 그 간극을 "Meetup이 아직 없으면 링크를 보여주지 않는다"로
  * 방어적으로 다룬다(`getMeetupByPollId`가 null을 정상 상태로 반환).
+ *
+ * **집계는 `getPollTallyForDecision`을 쓴다 — `getPollTally`(화면 표시용, D-031 숨김 적용)가
+ * 아니다.** 이 함수가 `open` 상태에서 호출된다는 사실 때문에 표시용 함수를 쓰면 대상자 5명
+ * 미만 크루의 집계가 항상 0으로 보여 정족수·가결이 실제 표와 무관하게 계산되는 결함이
+ * 있었다(17일차 핫픽스). 두 함수는 이름이 비슷하지만 계약이 다르므로 되돌리지 말 것 — 아래
+ * 호출부 주석과 `docs/decisions/poll-vote-tally-for-decision-hotfix.md`에 전체 경위가 있다.
  */
 export async function decideAndClosePoll(
   pollId: Id,
   closedBy: Id | null,
 ): Promise<DataResult<Poll>> {
   const [tally, voters] = await Promise.all([
-    getPollTally(pollId),
+    // **`getPollTally`가 아니라 `getPollTallyForDecision`** (17일차 핫픽스, CORE·DESIGN·BOARD
+    // 3단 작업). `getPollTally`는 D-031(대상자 5명 미만 + `open`이면 진행 중 집계 숨김)을
+    // 강제하는 표시용 함수라 숨김 구간에서 for/against/abstain을 0으로 반환한다 — 그런데 이
+    // 함수는 poll이 아직 `open`인 동안 호출되므로(트리거③은 물론, 트리거②로 조기 종료할 때도
+    // 호출 시점엔 여전히 `open`이다) 숨김 조건이 그대로 걸려 **실제 표와 무관하게 0 집계로
+    // 정족수·가결을 계산**하는 결함이 있었다(`poll.ts`의 `getPollTally` docstring 참고). 두
+    // 함수 이름이 비슷해 보여도 되돌리지 말 것 — `getPollTallyForDecision`은 D-003의 세 종료
+    // 트리거 중 하나가 지금 참일 때만 실제 집계를 반환하고, 그 조건이 거짓이면(=이 함수가
+    // 호출될 정상 상황이 아니면) 예외를 던진다(불변식 위반, `tally_hidden`). 그 예외는 여기서
+    // 잡지 않고 호출부(`cast-vote.ts`·`close-poll.ts`)까지 그대로 전파한다 — `DataResult`로
+    // 감싸 "그럴 수도 있는 실패"로 취급하면 원래 결함이 형태만 바꿔 되살아난다.
+    getPollTallyForDecision(pollId),
     // 스냅샷×현재 멤버십 조인이 깨지면(정합성 오류) 이 함수가 예외를 던진다 — 의도된 동작이다
     // (poll.ts의 docstring 참고, D-030 ③ "스냅샷 이탈"). 여기서 잡지 않고 호출부까지 그대로
     // 전파한다.

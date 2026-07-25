@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-046** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-053** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
 
@@ -30,12 +30,12 @@
 
 ### I-016 · 커스텀 SMTP 공급자를 선정해야 한다
 
-- **상태**: 열림
+- **상태**: 해결됨
 - **영역**: 인프라
 - **제보**: prd-validator (2026-07-23)
 - **내용**: **D-021**이 커스텀 SMTP를 필수 외부 의존성으로 확정했으나 **공급자가 미정**이다. Supabase 내장 이메일은 시간당 2통(프로젝트 전체)이라 FR-001 E4의 "시간당 5회 재발송"을 만족할 수 없고, 공식 문서도 프로덕션에는 커스텀 SMTP를 권한다. 후보는 Resend·SendGrid·Amazon SES 등이며 비용·발송 한도·도메인 인증 절차가 갈린다.
 - **영향**: FR-001 E4·E5, PRD §8. **발송 도메인 인증(SPF/DKIM)에 리드타임이 있어** 늦게 정하면 v0.2 릴리스를 막는다.
-- **후속**: 확정되면 D-\* 로 승격하고 PRD §8 "도입 예정" 구획에 등재한다(D-036).
+- **후속**: 17일차(Task 030 착수 전) 사용자 확인을 받아 **Resend**로 확정됐다 — **D-042**로 승격, PRD §8.2 "도입 예정" 구획에 등재. Supabase 대시보드의 커스텀 SMTP 시크릿 입력·발송 도메인(SPF/DKIM) 인증은 MCP로 수행할 수 없는 대시보드 전용 설정이라 **운영자 수동 조치로 남아 있다**(D-042 참고).
 
 ### I-017 · Supabase 요금제를 확정해야 한다
 
@@ -593,3 +593,200 @@
   `--force`(또는 필요한 최소 플래그)를 명시. 어느 쪽이든 `@schedule-x` 캘린더(Task 021·022, DESIGN
   담당)를 건드리므로 CORE 단독으로 결정하지 않는다 — 이 이슈는 발견만 하고 고치지 않았다(Task 026
   범위 밖). 다음 배포 검증 전에 반드시 확인할 것.
+
+### I-046 · `profiles`에 온보딩 완료 여부를 담을 컬럼이 없다
+
+- **상태**: 열림
+- **영역**: 데이터 / 인증
+- **제보**: CREW (2026-07-25, 17일차 — Task 030 실 Supabase Auth 연결 중 발견)
+- **내용**: `AuthSession.hasCompletedOnboarding`(FR-004, 온보딩 재방문 리다이렉트 판정)은 Mock
+  단계에서 세션 쿠키 필드 하나로 존재했다. 그런데 `public.profiles`(Task 028 스키마, `list_tables`
+  실측)에는 이 사실을 담을 컬럼이 없다 — 온보딩(FR-004)이 실제로 갱신하는 건 `display_name`·
+  `search_opt_out`뿐이고 둘 다 가입 시점에 이미 값이 있어 "온보딩을 마쳤다"와 "아직 안 마쳤다"를
+  구분할 수 없다. Task 030은 이 회차 범위(`profiles` 스키마 변경은 DESIGN/CORE 소관)를 넘지
+  않기 위해 임시로 별도의 보조 쿠키(`src/components/shell/onboarding-flag-cookie.ts`, 세션
+  인증 쿠키와 무관·httpOnly)로 근사했다.
+- **영향**: 브라우저를 바꾸거나 쿠키를 지우면 이미 온보딩을 마친 사용자도 온보딩 화면을 다시
+  보게 된다(세션 자체는 안전 — 인증 실패가 아니라 UX 힌트만 잃는 안전한 열화). FR-004, Task 039
+  (계정 생애주기)가 이 필드를 더 쓰게 될 가능성이 있다.
+- **후속**: `profiles`에 `onboarding_completed_at timestamptz null`류 컬럼을 추가하는 마이그레이션 +
+  `completeOnboardingAction`이 이를 갱신하도록 교체하는 후속 작업이 필요하다. 스키마 변경이라
+  `src/lib/data/**` 소유 담당(다음 회차 이후 CORE/DESIGN)이 맡는 것이 맞다. 상세 근거는
+  `docs/decisions/auth-integration-030.md` §5.
+
+### I-047 · Supabase 클라이언트 팩터리(`env`·`server`·`client`)가 데이터 계층이 아니라 인프라인데 `src/lib/data/supabase/` 안에 있다
+
+- **상태**: 열림
+- **영역**: 아키텍처 / 데이터
+- **제보**: 팀장 (2026-07-25, 17일차 — Task 030 CREW의 세션 연결 블로커를 판정하며 발견)
+- **내용**: `src/lib/data/contracts.ts`(CON-05·CON-06)는 "이 레이어의 어떤 함수도 쿠키·세션·요청
+  객체를 직접 읽지 않는다"고 못박는데, Task 030에서 세션(`getSupabaseAuthUser` 등)을 만들려니
+  Supabase 클라이언트 생성 자체가 `src/lib/data/supabase/{server,client,env}.ts`(Task 026, 인프라
+  성격)에 갇혀 있었다. 지금은 `src/lib/auth/`(신설, Task 030)가 이 세 파일만 예외적으로
+  import하도록 `eslint.config.mjs` zone 7이 부정 패턴(`!@/lib/data/supabase/server` 등)으로
+  구멍을 뚫어 뒀다 — **소비자가 data·realtime·auth 셋으로 늘어난 지금은 이 팩터리들이
+  `src/lib/supabase/`(도메인 데이터가 아닌 인프라 전용) 로 올라가는 것이 맞다.**
+- **영향**: zone 7의 부정 패턴 예외가 "임시 조치"로 남아 있는 근거이자, 다음에 이 팩터리를 쓰는
+  소비자가 하나 더 생기면(예: Route Handler) 같은 예외를 또 뚫어야 하는 확장성 문제.
+- **후속**: DESIGN이 `src/lib/data/supabase/`를 대대적으로 고치는 이번 회차(Task 031·032)가
+  끝난 뒤 `env.ts`·`server.ts`·`client.ts`를 `src/lib/supabase/`로 옮기고, `src/lib/data/**`·
+  `src/lib/auth/**`·`src/lib/realtime/**`가 전부 그쪽을 import하도록 정리한다. 그때
+  `eslint.config.mjs` zone 3·7의 부정 패턴 예외도 걷어낼 수 있다. 경위는
+  `docs/decisions/auth-integration-030.md` §1 참고.
+
+### I-048 · Turbopack 영속 캐시(`next dev`/`next build`)가 `/mnt/e`(WSL DrvFs 마운트)에서 불안정하다
+
+- **상태**: 열림
+- **영역**: 빌드 / 개발 환경
+- **제보**: CREW (2026-07-25, 17일차 — Task 030 실측 검증 중 3회 재현)
+- **내용**: `npm run dev`(Turbopack)가 이 저장소 경로(`/mnt/e/...`, Windows 드라이브를 WSL이 마운트)
+  에서 종종 `Persisting failed: Unable to write SST file … / Compaction failed: Another write
+  batch or compaction is already active`를 던지며 영속 캐시가 깨진다 — 이후 `routes-manifest.json`
+  등 필수 산출물이 아예 생성되지 않아 모든 라우트가 500을 반환한다. 재현 조건: ① 같은 저장소에서
+  `next dev`와 `next build`를 동시에 실행 ② 정상 종료되지 않은 프로세스를 `kill`한 뒤 재시작
+  ③ 단일 프로세스 상태에서도 드물게 자연 발생(원인 미확정). `rm -rf .next` 후 재시작하면 매번
+  복구된다.
+- **영향**: 이 저장소를 공유하는 여러 세션(팀원별 에이전트)이 각자 `npm run dev`/`build`를 띄우면
+  서로의 `.next` 캐시를 손상시킬 수 있다 — 17일차에 실제로 CREW의 `npm run build` 시도가 공유
+  `next dev`를 두 번 다운시켰다(재기동으로 복구).
+  - **후속**: ① 팀원 간에 "같은 저장소에서 `dev`와 `build`를 동시에 돌리지 않는다"는 관례를 정한다.
+  ② 가능하면 `next.config.ts`에서 Turbopack 영속 캐시를 끄거나(`experimental.turbopackPersistentCaching:
+  false`류 옵션 확인 필요, 이번 회차에 조사만 하고 설정은 바꾸지 않았다) 캐시 디렉터리를 WSL
+  네이티브 파일시스템(`/home/...`)으로 옮기는 방안을 검토한다.
+- **운영 규칙(17일차, 팀장 확정)**: 17일차부터 `npm run build`는 팀장만 실행한다(팀원은 `tsc`·
+  `lint`까지만 하고 빌드 결과가 필요하면 팀장에게 요청한다). 여러 에이전트가 같은 작업 디렉터리에서
+  Turbopack을 동시에 돌리면 서로의 `.next`를 깨뜨려 **코드와 무관한 실패를 코드 문제로 오진**하게
+  된다 — 이 이슈가 실제로 그 오진 위험의 근거다.
+
+### I-049 · `cast-vote.ts` 트리거③이 `decideAndClosePoll` 예외를 감싸지 않아 이미 성공한 투표까지 오류로 보인다
+
+- **상태**: 열림
+- **영역**: 데이터 / 도메인 로직
+- **제보**: BOARD (2026-07-25, 17일차 — `poll-vote-tally-for-decision-hotfix.md` 교체 작업 중
+  예외 전파 정적 추적으로 발견)
+- **내용**: `src/lib/actions/cast-vote.ts`의 `castVoteAction`은 `castVote(...)`로 표를 저장해
+  성공(`result.ok`)을 확인한 **뒤에** D-003 종료 트리거③("미투표자 0명이면 즉시 자동 종료")
+  블록에서 `await decideAndClosePoll(input.pollId, null)`을 호출한다. 이 호출이
+  `try/catch`로 감싸여 있지 않다(`grep -n "try\|catch" src/lib/actions/cast-vote.ts` → 매치
+  0건, 17일차 정적 확인). `decideAndClosePoll`이 예외를 던지면(예: `getPollTallyForDecision`이
+  판정 시점이 아닌데 호출된 것을 감지해 `tally_hidden` 불변식 위반으로 예외를 던지는 경우,
+  또는 스냅샷×멤버십 조인 정합성 오류) 그 예외가 `castVoteAction` 밖으로 그대로 전파되어 **이미
+  저장된 투표 결과(`result`)가 호출자에게 반환되지 않고 액션 전체가 오류로 끝난다.** 사용자는
+  화면에서 "투표 실패"로 인지하지만 실제로는 표가 이미 DB에 반영된 상태다 — 다시 시도하면
+  D-003의 "투표 변경 허용" 규칙에 따라 재기록되거나 화면 상태가 실제 서버 상태와 어긋날 수 있다.
+- **오늘 발현하지 않는 이유**: `castVote`가 아직 Mock 쓰기 저장소를 쓰고 있어(Task 032 이전) 실
+  Supabase UUID에 대해서는 애초에 `result.ok`가 `true`가 되는 지점까지 도달하지 못하거나, 도달해도
+  후속 `decideAndClosePoll` 호출 대상 poll이 Mock 저장소 기준이라 트리거③ 조건 계산 경로가 오늘
+  구성에서는 예외를 던지는 조건에 놓이지 않는다(정상 흐름에서는 `tally_hidden`이 참이 될 수 없다는
+  것이 이 핫픽스의 불변식이기도 하다) — 즉 "우연히 드러나지 않는 것"이지 이 파일이 방어하고
+  있어서가 아니다. **`getPollTally`의 0집계 결함과 정확히 같은 구조**("Mock 쓰기가 우연히
+  결과를 폐기해 방어처럼 보인다")다.
+- **영향**: Task 032가 poll 쓰기(`castVote`·`closePoll`)를 Supabase로 옮기면 이 경로가 실제로
+  살아난다 — 트리거③이 발동하는 매 순간(대상자 전원이 막 투표를 마친 순간)마다
+  `decideAndClosePoll`의 어떤 예외든 사용자에게 "방금 던진 표가 실패한 것처럼" 보이는 사용자
+  경험 결함이 된다. FR-041(투표 참여)의 정상 흐름이 깨지는 것으로 봐야 한다.
+- **후속**: Task 032(poll 쓰기 실데이터 전환) 담당자가 `cast-vote.ts`의 트리거③ 블록을
+  `try/catch`로 감싸 `decideAndClosePoll` 실패와 무관하게 이미 성공한 `castVote` 결과를
+  반환하도록 고쳐야 한다(자동 종료 실패는 표 저장 성공과 분리해 다뤄야 한다 — 예: 로깅만 하고
+  poll은 다음 트리거(①기한 도래)로 넘긴다). `close-poll.ts`의 두 호출부(`closePollEarlyAction`·
+  `simulateScheduledPollClosureAction`)는 `decideAndClosePoll`이 이 액션의 **유일한** 목적이라
+  결과를 그대로 반환하는 지금 방식이 맞고 고칠 대상이 아니다 — 이 이슈는 `cast-vote.ts`
+  트리거③ 블록 하나에 한정된다.
+
+### I-050 · `CLAUDE.md` D-030 ③ 문구가 읽기/쓰기 범위를 구분하지 않아 오독 소지가 있다
+
+- **상태**: 열림
+- **영역**: 문서
+- **제보**: CREW (2026-07-25, 17일차 — Task 031 교차검증 항목 5 "RLS 0행 판단 vs D-030 ③"
+  검증 중 발견, 팀장 지시로 이슈 등재)
+- **내용**: `CLAUDE.md`의 D-030 절은 "③ `/sample` 4상태의 '오류'에 도메인 오류를 포함합니다.
+  네트워크 실패뿐 아니라 RLS 403·정원 마감·동시 수정 충돌을 상태로 만듭니다"라고 적는다. 그런데
+  이 조항의 실제 근거인 `src/lib/data/contracts.ts` 모듈 docstring은 `forbidden`/`DataResult`
+  요구를 "## 왜 모든 **쓰기**가 예외를 던지지 않는가" 절 아래에 명시적으로 한정한다 — **읽기
+  함수(`T | null`/`T[]` 반환)는 애초에 이 계약 대상이 아니다.** Task 031(DESIGN)이 9개 도메인
+  읽기를 실 Supabase로 옮기며 "RLS 0행은 `not_found`와 구분하지 않는다"고 결정했는데, 이 결정은
+  `contracts.ts`(쓰기 전용 조항)와는 충돌하지 않지만 `CLAUDE.md` 최상위 문구(범위를 명시하지
+  않음)만 보면 "읽기도 forbidden을 구분해야 하는 것 아닌가"로 오독할 소지가 있다(CREW의 Task 031
+  교차검증 결과, 상세는 `docs/decisions/read-path-realdata-031.md` §4 참고 — 실제 결론은
+  "충돌 아님").
+- **영향**: 다음에 이 문구만 보고 판단하는 사람이 읽기 함수에도 `forbidden` 구분을 요구하며
+  불필요한 리팩터링을 하거나, 반대로 쓰기 함수의 `forbidden` 요구를 "이미 읽기에서 안 지켰으니
+  안 지켜도 되는 관례"로 오해할 수 있다.
+- **후속**: `CLAUDE.md`는 프로젝트 지침 파일이라 CREW가 임의로 고치지 않는다 — 사용자(팀장 상위)
+  판단으로 D-030 ③ 문구에 "쓰기 함수에 한정" 또는 유사한 범위 표시를 추가할지 결정한다.
+
+### I-051 · `mcp__supabase__apply_migration`은 원격에만 적용하고 로컬 마이그레이션 파일을 만들지 않는다
+
+- **상태**: 열림
+- **영역**: 빌드 / 데이터 / 재현성
+- **제보**: 팀장 (2026-07-25, 17일차 — 로컬 `supabase/migrations/`와 원격
+  `supabase_migrations.schema_migrations`를 전수 대조해 발견. 같은 회차에 CREW·CORE 두 사람이
+  각각 독립적으로 같은 함정에 걸렸다)
+- **내용**: `mcp__supabase__apply_migration`을 호출하면 SQL이 **원격 Supabase 프로젝트에는
+  바로 적용되고 `supabase_migrations.schema_migrations`에 버전이 기록되지만, 로컬
+  `supabase/migrations/*.sql` 파일은 자동으로 생성되지 않는다.** 이 도구가 로컬 파일 시스템에
+  아무것도 쓰지 않는다는 사실이 도구 설명만 봐서는 드러나지 않아, "마이그레이션을 적용했다"를
+  "로컬에도 기록을 남겼다"로 착각하기 쉽다. 17일차에 CREW(`create_email_resend_attempts_table`,
+  버전 `20260725040400`)와 CORE(`poll_vote_tally_for_decision_function`, 버전 `20260725035543`)
+  둘 다 이 함정에 걸려 원격에만 있고 로컬 파일이 없는 상태로 한동안 남아 있었다 — 팀장이
+  전수 대조로 발견해 각자에게 되돌렸다.
+- **영향**: 로컬 마이그레이션 파일이 누락된 채로 방치되면 **이 저장소로 새 환경을 재현할 수
+  없다**(`supabase db reset`/`db push`를 하는 사람의 DB에 해당 테이블·함수가 생기지 않는다) —
+  그 테이블을 참조하는 애플리케이션 코드는 로컬에서 런타임 오류로 깨진다. CI가 없어(R-002)
+  이 격차가 빌드·타입 검사로는 잡히지 않는다.
+- **후속(규약으로 남긴다)**: `apply_migration`을 쓴 직후 **반드시 같은 버전명으로 로컬 파일을
+  커밋한다.** 확인 방법: ① `ls supabase/migrations/`로 로컬 버전 목록을 뽑는다 ②
+  `select version, name from supabase_migrations.schema_migrations order by version`으로 원격
+  목록을 뽑아 대조한다 ③ 원격에만 있는 버전이 있으면 `select statements from
+  supabase_migrations.schema_migrations where version='<그 버전>'`으로 실제 적용된 SQL을 그대로
+  꺼내 **파일명의 버전을 정확히 맞춰**(어긋나면 `db push`가 미적용으로 오판해 재적용을 시도한다)
+  로컬 파일로 만든다.
+
+### I-052 · 인증 보호 라우트의 `notFound()`가 HTTP 200으로 응답된다("소프트 404")
+
+- **상태**: 열림
+- **영역**: 라우팅 / 데이터
+- **제보**: 팀장 (2026-07-25, 17일차 — Task 031 최종 프로덕션 빌드(`npm run build` → `npm start`)
+  런타임 검증 중 `GET /crews/00000000-0000-0000-0000-000000000001`(인증 상태, 존재하지 않는
+  크루 ID)에서 발견)
+- **내용**: 인증된 세션으로 존재하지 않는 크루 ID에 접근하면 `getCrewById`가 `null`을 반환하고
+  `CrewHomeContainer`가 `notFound()`를 던져 `app/crews/[crewId]/not-found.tsx`(또는 상위
+  세그먼트의 `not-found` 파일)의 404 UI가 화면에 정상 렌더된다 — **그런데 HTTP 응답 상태 코드가
+  404가 아니라 200이다.** 팀장이 프로덕션 빌드(`npm run build` → `npm start`)에서 응답 헤더로
+  직접 재현·확인했다:
+  ```
+  GET /crews/00000000-0000-0000-0000-000000000001   (인증 세션, 존재하지 않는 크루)
+  → HTTP/1.1 200 OK          ← 본문은 404 페이지, 상태는 200
+  ```
+  원인은 **확인됨** — Next.js 공식 문서가 이 정확한 동작을 문서화하고 있다:
+  `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/not-found.md` 13행
+  "Next.js will return a `200` HTTP status code for streamed responses, and `404` for
+  non-streamed responses", 그리고 같은 문서가 링크하는
+  `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/loading.md`
+  103~113행("Status Codes" 절)이 이 현상을 크롤러 업계 용어 그대로 **"soft 404s"라고 직접
+  부른다** — "Because the response headers have already been sent to the client, the status
+  code of the response cannot be updated." 즉 스트리밍 SSR로 응답 헤더(200)가 이미 전송된
+  뒤에 본문에서 `notFound()`가 던져지면 상태 코드를 더 이상 바꿀 수 없다는 것이 Next.js의
+  **설계된(문서화된) 동작**이다 — 이번 세션에서 새로 생긴 회귀가 아니고, Task 031이 읽기 경로를
+  Supabase로 바꾸기 전부터 `notFound()`를 쓰는 모든 라우트에 존재했을 동작이다. 같은 문서가
+  완화책도 명시한다: `<meta name="robots" content="noindex">`를 자동 주입해 검색엔진 색인은
+  막지만(109행), **HTTP 상태 자체를 404로 내려면 스트리밍 이전에 리소스 존재 여부를 확인해야
+  하고, 이는 `proxy`(113~115행)에서 처리하라고 권고한다** — `proxy.ts`는 D-011로 v0.1 범위
+  밖이라 이 저장소에서는 이 완화책을 아직 적용하지 않는다.
+- **영향**: I-044(라우트 권한 거부가 500으로 응답되는 문제)와 같은 계열의 "화면은 맞는데 HTTP
+  계약이 요구사항과 다른" 문제다. ① `requirements.md`가 404를 명시하는 지점(존재하지 않는
+  리소스 접근 시나리오)이 있다면 그 AC가 실측과 어긋난다. ② 크롤러·모니터링이 존재하지 않는
+  크루 URL을 "정상 200 페이지"로 오인해 색인하거나(다만 noindex 메타로 색인 자체는 막힌다),
+  가동률 모니터링이 실제 오류를 정상으로 집계한다. ③ RLS 403(D-030 ③, 도메인 오류로 표현)과
+  존재하지 않는 리소스(`notFound()`)가 화면상으로는 구분되지만 HTTP 계층에서는 둘 다 200이라
+  I-044가 지적한 "RLS 403과 라우트 게이트 403이 다른 상태로 나간다"는 우려와 같은 뿌리의 문제다.
+  ④ **결함의 반대 효과도 있다 — D-007과 조합하면 열거 방어에 유리하다.** D-007은 "private 크루는
+  URL을 알아도 이름+초대 전용 안내만 보인다"고 규정하는데, 존재하지 않는 크루(200+404 페이지)와
+  존재하는 private 크루(200+초대 전용 안내)가 **HTTP 상태 코드만으로는 똑같이 200**이라, 외부에서
+  상태 코드만 훑어 "이 크루 ID가 존재하는지"를 구분해낼 수 없다 — 이 결함이 의도치 않게 크루 ID
+  열거(enumeration) 공격을 한 겹 더 어렵게 만든다.
+- **후속**: 해결하려면 D-011(v0.1 로케일/`proxy.ts` 범위 제외)을 먼저 재검토해야 한다 —
+  문서가 권고하는 유일한 완화책이 `proxy`에서 스트리밍 전에 리소스 존재를 확인하는 것이기
+  때문이다. D-040(I-044, 라우트 레벨 권한 거부의 HTTP 상태 결정)과 같은 자리에서 함께 재검토할
+  것을 제안한다 — 둘 다 "화면은 요구사항대로인데 HTTP 상태만 어긋난다"는 동일 패턴이고, 후보
+  ②(`proxy.ts` 도입)가 해결되면 이 이슈도 함께 풀릴 가능성이 크다.
