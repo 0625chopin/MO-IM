@@ -1,5 +1,11 @@
 import { toCrewCardViewModel, type CrewCardViewModel } from "@/components/crews/crew-explore-view-models";
-import { listCrewMembers, listCrews, listCrewsByProfile, type ListCrewsQuery } from "@/lib/data";
+import {
+  getPublicCrewMemberCount,
+  listCrewMembers,
+  listCrews,
+  listCrewsByProfile,
+  type ListCrewsQuery,
+} from "@/lib/data";
 import { isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import type { Id } from "@/lib/types";
 
@@ -30,9 +36,16 @@ export async function fetchCrewCardsPage(
 
   const items = await Promise.all(
     page.items.map(async (crew) => {
-      const members = await listCrewMembers(crew.id);
-      const memberCount = members.filter((m) => isActiveMembership(m.status)).length;
-      return toCrewCardViewModel(crew, memberCount, memberCrewIds.has(crew.id));
+      const isMember = memberCrewIds.has(crew.id);
+      // I-081 해소 — 비소속 방문자(anon 포함)에게는 listCrewMembers(직접 select)가 crew_
+      // memberships RLS에 걸려 항상 0행을 준다. 이 목록에 비소속자 기준으로 뜨는 크루는
+      // 정의상 항상 public이므로(listCrews가 private을 애초에 걸러 준다, D-007) RLS를
+      // 우회하는 crew_directory_summary RPC(getPublicCrewMemberCount)로 정확한 값을 받는다
+      // — 소속 크루(isMember)는 listCrewMembers가 원래 정확하므로 그대로 둔다.
+      const memberCount = isMember
+        ? (await listCrewMembers(crew.id)).filter((m) => isActiveMembership(m.status)).length
+        : await getPublicCrewMemberCount(crew.id);
+      return toCrewCardViewModel(crew, memberCount, isMember);
     }),
   );
 

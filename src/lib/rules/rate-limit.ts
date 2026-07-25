@@ -47,3 +47,11 @@ export function evaluateFixedWindowRateLimit(
 
 /** D-005·NFR-016 — 핸들 검색은 계정당 분당 20회, 초과 시 429. */
 export const HANDLE_SEARCH_RATE_LIMIT: RateLimitWindow = { limit: 20, windowSeconds: 60 };
+
+/** D-047 · I-065 — 익명(미인증) 회원가입 흐름의 핸들 존재 확인(blur)은 IP당 분당 10회.
+ *  `HANDLE_SEARCH_RATE_LIMIT`(계정당·인증 위협 모델)과 **의도적으로 다른 숫자**다 — 이 값을
+ *  그대로 재사용하지 않은 근거는 `docs/prioritization-and-risks.md` D-047 참고. */
+export const ANONYMOUS_HANDLE_AVAILABILITY_RATE_LIMIT: RateLimitWindow = {
+  limit: 10,
+  windowSeconds: 60,
+};

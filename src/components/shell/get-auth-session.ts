@@ -73,5 +73,6 @@ export async function getAuthSession(): Promise<AuthSession> {
     displayName: profile.displayName,
     hasCompletedOnboarding: profile.onboardingCompletedAt !== null,
     unreadNotificationCount,
+    isSystemAdmin: profile.isSystemAdmin,
   };
 }

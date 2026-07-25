@@ -6,8 +6,15 @@
  *
  * E3(대상자가 나를 차단)·E4(옵트아웃)는 이 함수의 대상이 아니다 — 옵트아웃은
  * `handle-search.ts`가 검색 결과 자체를 `found: false`로 합류시켜 이미 걸러내고(초대 대상을
- * 특정할 수조차 없다), 차단(`Block`, `moderation.types.ts`)은 v0.2까지 데이터 모델만
- * 선반영된 상태라 판정할 데이터가 없다(Task 042A 이후 대상).
+ * 특정할 수조차 없다), **차단(E3)은 Task 042A(FR-081)가 이 순수 함수가 아니라 DB RLS
+ * 경계에서 구현했다** — `invitations_insert_staff_or_owner` 정책에
+ * `not private.is_blocked(invitee_id, inviter_id)`가 추가됐다(`supabase/migrations/
+ * 20260725114157_report_block_rpcs_042a.sql`). 여기서 판정하지 않은 이유는 클라이언트가
+ * "상대가 나를 차단했는가"를 알 수 있는 안전한 경로가 없기 때문이다 — `blocks_select_self`
+ * RLS는 본인이 만든 차단만 보여주므로, 이 함수에 그 값을 넘기려면 별도로 상대의 차단 여부를
+ * 노출하는 조회가 필요한데 그 자체가 "차단됐다"는 사실을 초대자에게 알려줘 requirements.md
+ * FR-020 E3("사유는 노출하지 않음")을 어긴다. `createInvitation`(`invitation.ts`)이 RLS
+ * 거부를 `DataResult`로 감싸 일반 오류로 보여준다.
  *
  * **`requested`(대기 중 가입 신청)는 초대 불가로 차단한다(Task 032 교차검증 major 2 수정,
  * 18일차)** — `requirements.md` 2.4절 멤버십 상태도에 `requested → invited` 전이가 없다

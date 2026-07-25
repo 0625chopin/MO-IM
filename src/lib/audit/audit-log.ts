@@ -25,6 +25,15 @@ import type { Id } from "@/lib/types";
  *
  * **19일차 Task 040(CREW)이 `AuditAction`에 `crew.*` 3종(오너 이양·강퇴·해산)을 추가했다** —
  * 팀장 승인(대화 기록), 나머지 구조는 무변경. 상세: `docs/decisions/crew-lifecycle-040.md`.
+ *
+ * **21일차 Task 042B(CREW)가 `report.*` 5종을 추가했다(D-050).** FR-082 AC1 "감사 로그가
+ * 남는다"의 근거. **이 5종은 `recordAuditLog()`를 호출하지 않는다** — `report-block-042a.md`
+ * §6이 "관리자 콘솔은 service_role 경로로 status를 바꾼다"고 전제했던 것과 달리, 042B는
+ * `admin_resolve_report`(SECURITY DEFINER SQL RPC)가 `reports.status` 전이·콘텐츠
+ * 소프트삭제/계정 제재·`audit_logs` INSERT를 **단일 SQL 트랜잭션**으로 처리한다(I-054 회피
+ * 원칙의 연장 — 여러 왕복을 순서대로 하지 않는다). 그래서 이 5개 값은 TS 쪽에서 실제로 호출되는
+ * 자리가 없고, `docs/decisions/admin-console-042b.md`가 정한 어휘를 이 파일에도 동기화해 두는
+ * 문서적 역할만 한다 — SQL 리터럴과 이 유니온이 따로 놀지 않게 하기 위해서다.
  */
 
 export type AuditAction =
@@ -38,7 +47,26 @@ export type AuditAction =
   // 응답 대기 중 착수 지연을 피하려 직접 추가했다(`docs/decisions/crew-lifecycle-040.md` 참고).
   | "crew.ownership_transferred"
   | "crew.member_removed"
-  | "crew.disbanded";
+  | "crew.disbanded"
+  // Task 041(BOARD, 21일차) 추가 — FR-033 타인 댓글 강제 삭제(`post.force_deleted`와 대칭)·
+  // FR-065 Meetup 취소(제안자 본인도 호출하지만 "취소"는 되돌릴 수 없는 상태 전이라 본인
+  // 여부와 무관하게 항상 기록한다 — `post.force_deleted`가 본인 삭제를 감사 대상에서 빼는
+  // 것과는 다른 판단이다: 게시글 삭제는 흔한 CRUD지만 Meetup 취소는 이미 캘린더에 확정 노출된
+  // 일정을 뒤집는 행위라 "누가 취소했는지" 자체가 항상 기록 가치가 있다고 봤다).
+  | "comment.force_deleted"
+  | "meetup.cancelled"
+  // Task 042B(관리자 콘솔, CREW, 21일차) 추가 — FR-082 AC1. 위 docstring 참고: 실제 INSERT는
+  // `admin_resolve_report` SQL RPC 안에서 일어나므로 이 값들을 인자로 `recordAuditLog()`를
+  // 호출하는 TS 코드는 없다. `report.dismissed`의 targetId는 reports.id(부수효과가 없는
+  // 처리라 다른 도메인 엔티티가 없다), 나머지 넷은 실제로 바뀐 엔티티(글/댓글/메시지/계정)의
+  // id다 — `post.force_deleted`·`comment.force_deleted`(크루 임원·오너의 강제 삭제, 크루
+  // 스코프)와 별개 값을 쓴 이유는 admin-console-042b.md(D-050) 참고 — 행위 주체(관리자 vs
+  // 임원)가 다르면 같은 "삭제됨"이라도 감사 로그에서 구분 가능해야 한다는 판단이다.
+  | "report.dismissed"
+  | "report.post_removed"
+  | "report.comment_removed"
+  | "report.chat_message_removed"
+  | "report.account_suspended";
 
 export interface RecordAuditLogInput {
   /** 행위를 수행한 사람. `profiles.id` — 시스템 자동 처리(트리거①·③)는 감사 대상이 아니다

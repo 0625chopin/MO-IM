@@ -239,6 +239,24 @@ export const chatSection = defineSection({
       },
     },
     {
+      name: "메시지 목록 — 차단한 사용자 포함 (FR-081 AC1, Task 042A)",
+      note: "blockedProfileIds에 '김유나'(profile-2)를 넣은 데모입니다 — 그가 보낸 텍스트·게시글 공유 메시지 둘 다 접혀서 보입니다. 실시간으로 새로 도착하는 메시지도 같은 blockedProfileIds를 참조하는 동일한 렌더 경로를 타므로 구조적으로 동일하게 접힙니다(MessageRoomContainer.tsx 모듈 docstring — 다만 실 브라우저 소켓으로 확인하지는 못했습니다).",
+      panels: {
+        default: (
+          <PreviewFrame height={440}>
+            <div className="flex h-full flex-col">
+              <ChatMessageListPreview
+                roomId="room-1"
+                messages={SAMPLE_MESSAGES}
+                viewerProfileId={VIEWER_PROFILE_ID}
+                blockedProfileIds={new Set(["profile-2"])}
+              />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
       name: "연결 상태 배너 (ConnectionBanner)",
       note: "FR-051 E2, NFR-009. 상태는 MessageRoomContainer가 브라우저 online/offline + 구독 onError를 lib/rules/chat-connection-state.ts 상태 기계로 판정해 내려주는 실제 prop이라 /sample 전용 escape hatch 없이 리터럴만 바꿔 넣었다(ConnectionBanner.tsx 모듈 docstring 참고).",
       panels: {
@@ -329,6 +347,34 @@ export const chatSection = defineSection({
               { message: SAMPLE_MESSAGES[3], isOwn: false },
               { message: SAMPLE_PENDING_MESSAGE, isOwn: true },
               { message: SAMPLE_FAILED_MESSAGE, isOwn: true },
+            ]}
+          />
+        </PreviewFrame>
+      ),
+    },
+    {
+      name: "말풍선 — 차단한 사용자의 메시지 (FR-081 AC1, Task 042A)",
+      note: "isSenderBlocked=true인 상대 메시지는 BlockedContentNotice로 감싸져 말풍선 내용만 접힙니다 — 아바타·이름·시각은 그대로 보입니다(누구 메시지인지 알아야 신고·차단 판단이 가능하므로). 본인 메시지(isOwn)는 자기 자신을 차단할 수 없으므로 이 변형이 적용되지 않습니다.",
+      content: (
+        <PreviewFrame height={200}>
+          <MessageBubblePreview
+            items={[
+              { message: SAMPLE_MESSAGES[0], isOwn: false, isSenderBlocked: true },
+              { message: SAMPLE_MESSAGES[2], isOwn: false, isSenderBlocked: true },
+            ]}
+          />
+        </PreviewFrame>
+      ),
+    },
+    {
+      name: "말풍선 — 삭제 가능 (FR-054, Task 041)",
+      note: "canDelete=true면 타임스탬프 옆에 삭제 아이콘 버튼이 붙는다 — 본인 메시지는 항상, 타인 메시지는 임원·오너·관리자(chat:delete_any_message)일 때만 MessageList가 이 값을 계산해 내려준다. 클릭하면 확인 다이얼로그(PostActions·CommentItem과 같은 패턴)가 뜬다. 전송 중(pending)·실패(failed) 메시지에는 애초에 삭제 버튼이 뜨지 않는다(MessageBubble.tsx의 showDelete 판정) — 아래 예시엔 그래서 포함하지 않았다.",
+      content: (
+        <PreviewFrame height={200}>
+          <MessageBubblePreview
+            items={[
+              { message: SAMPLE_MESSAGES[1], isOwn: true, canDelete: true },
+              { message: SAMPLE_MESSAGES[0], isOwn: false, canDelete: true },
             ]}
           />
         </PreviewFrame>

@@ -23,6 +23,15 @@ export interface MessageListProps {
   onLoadMore: () => void;
   /** 실패한 메시지의 재전송(FR-051 E1) — `clientKey`로 대상을 지목한다. */
   onRetry?: (clientKey: string) => void;
+  /** 메시지 삭제(FR-054, Task 041) — 메시지 id로 대상을 지목한다. */
+  onDelete: (messageId: string) => void;
+  /** FR-054 — `chat:delete_any_message` 판정 결과(임원·오너·관리자). 본인 메시지는 이 값과
+   *  무관하게 항상 지울 수 있다(`isOwn`으로 항목별 판정, 아래 map). */
+  canDeleteAnyMessage: boolean;
+  /** FR-081 AC1(Task 042A) — 뷰어가 차단한 프로필 id 집합. `MessageBubble`에 항목별로
+   *  `blockedProfileIds.has(message.senderId)`를 넘긴다(`MessageRoomContainer` 모듈 docstring
+   *  참고 — 실시간 메시지도 이 판정을 그대로 탄다). */
+  blockedProfileIds: ReadonlySet<Id>;
 }
 
 /**
@@ -60,6 +69,9 @@ export function MessageList({
   isLoadingMore,
   onLoadMore,
   onRetry,
+  onDelete,
+  canDeleteAnyMessage,
+  blockedProfileIds,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -208,14 +220,20 @@ export function MessageList({
         )}
         {/* 안정적인 key(NFR-003·007, D-029) — 메시지 id(낙관적 항목은 clientKey)는 재전송돼도
             바뀌지 않는다. */}
-        {messages.map((message) => (
-          <MessageBubble
-            key={message.id}
-            message={message}
-            isOwn={message.senderId === viewerProfileId}
-            onRetry={onRetry ? () => onRetry(message.clientKey) : undefined}
-          />
-        ))}
+        {messages.map((message) => {
+          const isOwn = message.senderId === viewerProfileId;
+          return (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isOwn={isOwn}
+              onRetry={onRetry ? () => onRetry(message.clientKey) : undefined}
+              isSenderBlocked={blockedProfileIds.has(message.senderId)}
+              canDelete={isOwn || canDeleteAnyMessage}
+              onDelete={() => onDelete(message.id)}
+            />
+          );
+        })}
       </div>
     </div>
   );

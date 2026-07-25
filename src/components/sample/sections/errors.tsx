@@ -20,6 +20,15 @@ import { defineSection } from "@/components/sample/showcase-types";
  * 잘못 안내하는 셈이라, `error.tsx` 쪽 기본값을 원인 불명을 정직하게 말하는 `unknown`으로
  * 분리했다. `network`는 `global-error.tsx`(루트 레이아웃 자체가 깨진, 실제로 인프라·연결
  * 실패일 가능성이 높은 훨씬 드문 상황) 전용으로 남는다.
+ *
+ * **20일차, I-069 근본 해결(부분) — `forbidden` 도달성 높은 4곳은 이제 throw가 아니라 값
+ * 반환이다.** `(app)/crews/[crewId]/layout.tsx`·`MeetupDetailContainer`·`CrewSettingsContainer`·
+ * `PostWriteContainer`(해산된 크루 분기)는 더 이상 `cause: { code: "forbidden" }`를 던지지
+ * 않고 `<RouteErrorBoundary kind="forbidden" />`를 컴포넌트 트리에 직접 반환한다 — `cause`
+ * 직렬화에 의존하지 않으므로 이 네 곳은 프로덕션에서도 정확히 `forbidden`으로 뜬다(아래
+ * `forbidden` 항목 note 참고). 나머지 throw 지점(`BoardListContainer`·`PostDetailContainer`·
+ * `PostWriteContainer`의 `post:create` 분기·`MessageListContainer` — 전부 현재 권한 매트릭스로
+ * 도달 불가능한 방어적 코드)은 그대로이므로 여전히 `unknown`으로 떨어진다.
  */
 const KIND_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = [
   {
@@ -30,7 +39,7 @@ const KIND_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = 
   {
     kind: "forbidden",
     name: "RouteErrorBoundary — 403 (권한 없음)",
-    note: "RLS 403류 도메인 오류(lib/data/contracts.ts의 DataErrorCode 'forbidden'). 비소속 크루 접근처럼 서버·RLS가 거부한 경우다(D-007·D-017, NFR-012). ⚠️ 프로덕션에서는 error.tsx가 이 kind로 정확히 분류하지 못하고 'unknown'으로 떨어진다(I-069) — 이 프리뷰는 분류가 성공했다고 가정한 이상적인 모습이다.",
+    note: "RLS 403류 도메인 오류(lib/data/contracts.ts의 DataErrorCode 'forbidden'). 비소속 크루 접근처럼 서버·RLS가 거부한 경우다(D-007·D-017, NFR-012). 20일차부터 도달성 높은 4곳(크루원 게이트·Meetup 상세·크루 설정·해산된 크루 글쓰기)은 값 반환으로 전환돼 이 kind가 프로덕션에서도 정확히 뜬다(I-069 부분 해결). 나머지(board:read·post:create 일부·chat:send_message 등, 현재 매트릭스로 도달 불가능한 방어적 코드)는 여전히 throw 패턴이라 프로덕션에서는 'unknown'으로 떨어진다 — 이 프리뷰는 두 경우 모두 분류가 성공했다고 가정한 이상적인 모습이다.",
   },
   {
     kind: "unknown",

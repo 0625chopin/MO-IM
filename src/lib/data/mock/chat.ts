@@ -17,6 +17,14 @@ export async function getChatRoomByCrewId(crewId: Id): Promise<ChatRoom | null> 
   return store.chatRooms.find((r) => r.crewId === crewId) ?? null;
 }
 
+/** 단건 조회(FR-054, Task 041) — 삭제 Server Action이 삭제를 실행하기 *전에* `senderId`로
+ *  권한을 판정하기 위해 필요하다(먼저 지우고 사후에 되돌리면 Mock에는 RLS가 없어 실제로
+ *  지워진 채 남는다). 이미 삭제된 메시지도 반환한다(재삭제 시도를 `not_found`로 표현할지는
+ *  호출자 책임). */
+export async function getMessageById(id: Id): Promise<ChatMessage | null> {
+  return store.chatMessages.find((m) => m.id === id) ?? null;
+}
+
 export interface ListMessagesQuery {
   /** 이 메시지보다 오래된 메시지부터 반환한다 — 위로 이어 로드(D-023). */
   beforeMessageId?: Id | null;

@@ -7,9 +7,14 @@
  * 참고) — 남는 33행을 이 판정 대상으로 삼는다. 그중 "자기 게시글 수정·삭제"
  * (FR-032) 1행은 "타인 게시글 삭제"가 이미 별행인 것과 대칭을 맞추려고
  * `post:update_own`·`post:delete_own` 두 액션으로 나눴다 — 그래서 `PermissionAction`
- * ·`PERMISSION_MATRIX`의 실제 항목 수는 33행이 아니라 **34개 액션**이다. 이 34개
+ * ·`PERMISSION_MATRIX`의 실제 항목 수는 33행이 아니라 **34개 액션**이었다. 이 34개
  * 액션 전부를 여기 표로 옮기고, 각주 ¹~⁵의 조건부 허용(○)만 `PermissionCheckContext`
  * 로 판정한다.
+ *
+ * **Task 041(FR-033, 21일차 BOARD) 추가** — "댓글 작성"(comment:create) 1행만 매트릭스에
+ * 있었고 댓글 수정·삭제 3행(post:update_own/delete_own/delete_any와 대칭)이 원 33행 집계에서
+ * 빠져 있었다. `comment:update_own`·`comment:delete_own`·`comment:delete_any`를 더해 실제
+ * 액션 수는 34개에서 **37개**가 됐다.
  *
  * React·Next·데이터 레이어를 import하지 않는다(zone 1, `eslint.config.mjs`).
  * 데이터(예: 크루 공개 범위, 강퇴 대상 role)는 전부 `context` 인자로 받는다 —
@@ -41,7 +46,8 @@ const ROLES = [
 
 /**
  * 3.3절 33행(회원가입·로그인 2행 제외) 중 FR-032 1행을 `post:update_own`·
- * `post:delete_own` 두 액션으로 나눈 34개 액션 전부. 열 순서는 표와 동일
+ * `post:delete_own` 두 액션으로 나누고, Task 041(FR-033)이 댓글 수정·삭제 3행을 더한
+ * 37개 액션 전부. 열 순서는 표와 동일
  * (비회원·일반회원·크루원·임원·오너·관리자). `Record<PermissionAction,
  * Record<UserRole, Allowance>>` 타입 자체가 "액션 하나라도 빠지면 컴파일
  * 에러"를 강제한다 — 매트릭스 누락을 컴파일 타임에 잡는다.
@@ -255,6 +261,34 @@ const PERMISSION_MATRIX: Record<PermissionAction, Record<UserRole, Allowance>> =
     crew_owner: "allow",
     system_admin: "deny",
   },
+  // 자기 댓글 수정 — FR-033. isSelf는 checkPermission에서 별도 확인. post:update_own과 대칭
+  // (Task 041, 21일차 BOARD).
+  "comment:update_own": {
+    guest: "deny",
+    member: "deny",
+    crew_member: "allow",
+    crew_staff: "allow",
+    crew_owner: "allow",
+    system_admin: "allow",
+  },
+  // 자기 댓글 삭제 — FR-033. isSelf는 checkPermission에서 별도 확인.
+  "comment:delete_own": {
+    guest: "deny",
+    member: "deny",
+    crew_member: "allow",
+    crew_staff: "allow",
+    crew_owner: "allow",
+    system_admin: "allow",
+  },
+  // 타인 댓글 삭제 — FR-033. post:delete_any와 대칭으로 임원 이상(운영 목적)·관리자만.
+  "comment:delete_any": {
+    guest: "deny",
+    member: "deny",
+    crew_member: "deny",
+    crew_staff: "allow",
+    crew_owner: "allow",
+    system_admin: "allow",
+  },
   // 모임 제안글 작성 — FR-034.
   "poll:create_proposal": {
     guest: "deny",
@@ -371,6 +405,9 @@ const OWN_SCOPED_ACTIONS: ReadonlySet<PermissionAction> = new Set([
   "post:update_own",
   "post:delete_own",
   "chat:delete_own_message",
+  // Task 041(FR-033, 21일차 BOARD) — post:update_own/delete_own과 같은 이유.
+  "comment:update_own",
+  "comment:delete_own",
 ]);
 
 /**

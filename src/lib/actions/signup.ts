@@ -2,11 +2,11 @@
 
 import { redirect } from "next/navigation";
 
+import { checkHandleAvailabilityAction } from "@/lib/actions/check-handle-availability";
 import { signUpWithPassword } from "@/lib/auth";
-import { createProfile, getProfileByHandle } from "@/lib/data";
+import { createProfile } from "@/lib/data";
 import { isValidEmailFormat, validatePasswordFormat } from "@/lib/rules/auth-credentials";
 import { validateDisplayName } from "@/lib/rules/display-name-validation";
-import { validateHandleFormat } from "@/lib/rules/handle-validation";
 import { strings } from "@/lib/strings";
 
 /**
@@ -30,6 +30,35 @@ import { strings } from "@/lib/strings";
  * profile.ts`)이 그 경우만 예외적으로 service-role 클라이언트를 쓴다. 이 액션은 세션 유무와
  * 무관하게 `signUpWithPassword` 성공 직후 곧바로 프로필을 만든다 — 사용자가 나중에 메일
  * 링크로 인증하고 로그인하면 `getAuthSession()`이 이미 존재하는 이 프로필 행을 찾는다.
+ *
+ * **I-065 major① 해소(20일차, BOARD 교차검증 → CORE 수정)** — 핸들 중복 확인은
+ * `getProfileByHandle`(service-role, RLS 완전 우회)을 **직접 부르지 않는다.** 예전엔 여기서
+ * 직접 불러 `checkHandleAvailabilityAction`(D-047, IP당 분당 10회)이 건 리밋을 완전히
+ * 우회하는 두 번째 진입문이었다 — I-058 major①과 같은 구조("다른 경로로 같은 오라클에
+ * 도달")로, `/signup`에 핸들만 바꿔가며 POST를 반복하면 리밋 없이 익명 열거가 가능했다
+ * (필드 오류가 하나라도 있으면 `signUpWithPassword` 호출 전에 조기 반환하는 구조라 Supabase
+ * Auth 내장 리밋에도 안 닿았다). 지금은 `checkHandleAvailabilityAction`을 그대로 재사용한다
+ * — **익명 컨텍스트에서 핸들 존재를 묻는 진입점은 이 함수 하나뿐이어야 한다**
+ * (`getProfileByHandle` docstring의 규약 참고).
+ *
+ * **리밋에 걸리면 가입 제출 자체를 차단한다 — 20일차 안에 한 번 뒤집힌 판단이다.** 최초
+ * 수정은 "리밋에 걸려도 제출은 막지 않는다"였다(`rateLimited`면 사전 중복 확인을 건너뛰고
+ * `signUpWithPassword`까지 그대로 진행, 실제 중복이면 `createProfile`의 UNIQUE 제약이 최종
+ * 판정하는 방향). **BOARD가 이 판단이 만든 새 결함을 찾았다** — `rateLimited`로 사전 확인을
+ * 건너뛰면 `signUpWithPassword`가 성공해 **실 `auth.users` 행이 먼저 생기고**, 그다음
+ * `createProfile`이 `23505`(handle 중복)로 실패하는데 **그 `auth.users` 행을 되돌리는 코드가
+ * 없다**(Admin API 삭제 호출 없음, grep 확인) — 사용자에겐 "핸들이 이미 사용 중"만 보이지만
+ * 실제로는 이메일이 소모된 고아 계정이 하나 남고, 그 계정으로 로그인하면 `getAuthSession()`
+ * 이 `forbidden`을 반환하는 복구 불가능한 막다른 골목이 된다. 기존에도 "동시에 같은 핸들로
+ * 제출하는 진짜 레이스"는 같은 실패 지점을 탈 수 있었지만 확률이 낮았다 — `rateLimited` 스킵은
+ * "리밋 소진 + 고른 핸들이 이미 존재"라는 훨씬 흔한 조합에서 **단일 요청으로 결정론적으로**
+ * 이 경로를 연다(예: 공유 IP에서 동료들이 blur로 리밋을 먼저 소진한 상태). **그래서
+ * 뒤집었다** — `rateLimited`면 `handleTaken`과 명확히 구분되는 전용 필드 오류로 제출을 막고,
+ * 사용자는 리밋 윈도(60초) 뒤 재시도한다. Admin API로 `auth.users`를 사후 정리하는 대안(BOARD
+ * 제안 (b))은 "정리 자체가 실패하면?"이라는 재귀적 문제를 새로 만들어 채택하지 않았다 — 이
+ * 결정은 D-047과 상충하지 않는다(D-047의 목표는 "무제한 → 로테이션 비용이 드는 상태"였지
+ * "리밋에 걸려도 통과시킨다"가 아니었다). 근거 전문:
+ * `docs/prioritization-and-risks.md` D-047, `docs/ISSUES.md` I-065.
  */
 export interface SignupFieldErrors {
   email?: string;
@@ -81,10 +110,17 @@ export async function signupAction(
       : strings.auth.signup.errors.displayNameTooLong;
   }
 
-  const handleFormatCheck = validateHandleFormat(handle);
-  if (!handleFormatCheck.valid) {
+  // I-065 major① 해소 — checkHandleAvailabilityAction 하나로 형식·중복·리밋을 한 번에
+  // 판정한다(위 docstring 참고). rateLimited는 이제 제출을 막는다 — 건너뛰면 signUpWithPassword
+  // 가 먼저 실 auth.users 행을 만들어 버려, 그 뒤 handle UNIQUE 위반으로 되돌릴 수 없는 고아
+  // 계정이 남는다(BOARD 20일차 발견, 팀장이 최초 판단을 뒤집었다). handleTaken과 다른 문구를
+  // 써서 "재시도하면 된다"는 걸 명확히 한다.
+  const handleAvailability = await checkHandleAvailabilityAction(handle);
+  if (!handleAvailability.format.valid) {
     fieldErrors.handle = strings.auth.signup.errors.handleInvalidFormat;
-  } else if (await getProfileByHandle(handle)) {
+  } else if (handleAvailability.rateLimited) {
+    fieldErrors.handle = strings.auth.signup.errors.handleCheckRateLimited;
+  } else if (handleAvailability.available === false) {
     fieldErrors.handle = strings.auth.signup.errors.handleTaken;
   }
 
@@ -108,7 +144,10 @@ export async function signupAction(
 
   // I-046 해소 — 세션 유무와 무관하게 auth.users 행이 생긴 직후 곧바로 프로필을 만든다
   // (createProfile이 이 경우 service-role로 RLS를 우회한다, 위 docstring 참고). 핸들 중복은
-  // 위에서 이미 검사했지만 그 사이 경쟁(같은 핸들 동시 가입)이 있으면 여기서 conflict로 잡힌다.
+  // 위에서 이미 검사했지만(rateLimited면 애초에 여기 도달하지 않는다 — 위에서 제출 자체를
+  // 막았다) 그 사이 진짜 경쟁(같은 핸들로 동시 가입)이 있으면 이 UNIQUE 제약이 마지막
+  // 방어선으로 잡는다 — 이 경우엔 auth.users 고아 행이 드물게 남을 수 있지만(동시성 자체의
+  // 근본 한계, 이번 회차 범위 밖), rateLimited로 인한 결정론적 발생은 위에서 이미 제거했다.
   const created = await createProfile({ id: signedUp.userId, handle, displayName });
   if (!created.ok) {
     return { fieldErrors: { handle: strings.auth.signup.errors.handleTaken } };

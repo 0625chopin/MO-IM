@@ -51,6 +51,56 @@ const noRealtimeLayer = {
     "표현 컴포넌트는 구독을 소유하지 않는다 — 구독은 컨테이너(*Container.tsx)의 책임이다 (D-030 ①·②).",
 };
 
+// I-074(21일차, CORE) — `getProfileByHandle`(service-role, RLS 완전 우회) 익명 오라클 재발
+// 방지. docstring 규약("익명 컨텍스트 호출은 checkHandleAvailabilityAction 하나만 거친다")만
+// 있던 걸 이번에 컴파일러가 강제하는 정적 검사로 승격한다 — 같은 구멍이 I-058 major①(19일차,
+// get_profile_public_by_handle RPC 경유)·I-065 major①(20일차, signup.ts 직접 호출) 두 번
+// 실제로 뚫렸다. 실 소비자는 `@/lib/data` 배럴에서 이 이름을 named import 하므로(파일 딥
+// 임포트가 아니다 — 딥 임포트는 zone 3·6의 noSupabaseDataImpl이 이미 전면 차단한다),
+// `no-restricted-imports`의 `paths[].importNames`로 "이 배럴의 이 이름만" 좁혀 막는다(파일
+// 단위 허용 목록이 아니라 특정 named export 사용처 제한 — 조사 결과 이 옵션이 지원한다).
+const noGetProfileByHandleFromBarrel = {
+  name: "@/lib/data",
+  importNames: ["getProfileByHandle"],
+  message:
+    "getProfileByHandle은 service-role로 RLS를 완전히 우회하는 무제한 조회다 — 익명 컨텍스트에서 " +
+    "직접 호출하지 않는다. 허용된 두 진입점(check-handle-availability.ts의 " +
+    "checkHandleAvailabilityAction · invite-crew-member.ts)만 예외다 (I-074, I-065, D-047).",
+};
+
+// I-074 major(21일차, DESIGN 프로브 실증) — 위 규칙은 "@/lib/data" 배럴 named import만
+// 매칭해 src/lib/data/supabase/** 내부의 상대경로 import(`./profile-handle-oracle`,
+// `../profile-handle-oracle` 등, 호출부 위치마다 표기가 다르다)는 막지 못했다. 함수를
+// `profile-handle-oracle.ts` 하나로 격리해(profile.ts→profile-handle-oracle.ts 이동)
+// 파일 이름 하나만 표적하는 group 패턴으로 위치·깊이 무관하게 막는다 — `paths`(정확한
+// 지정자 문자열)로 표기 변형을 전부 나열하는 대안보다 이쪽이 새 하위 폴더가 생겨도
+// 안정적이다(파일 분리 자체가 CORE의 판단 근거, `profile-handle-oracle.ts` 모듈
+// docstring 참고). zone 3(`src/lib/data/supabase/**`) 자기 자신에게만 적용한다 — 이
+// 계층 밖(zone 6 등)의 딥 임포트는 기존 `noSupabaseDataImpl`이 이미 전면 차단한다.
+// I-074 3차 보완(21일차, DESIGN 프로브 F 재검증) — 위 group 패턴 3종은 "profile-handle-oracle"
+// 로 문자열이 정확히 끝나야 매칭되는데(minimatch), `tsconfig.json`의 `moduleResolution:
+// "bundler"`는 `./profile-handle-oracle.ts`처럼 **확장자를 붙인 표기도 실제로 허용한다** —
+// 그 경우 문자열이 ".ts"로 끝나 매칭에 실패했다(전례는 0건이라 minor로 평가됐지만, "정적
+// 검사로 막았다"는 이 규칙의 존재 이유 자체에 남는 흠이라 보완한다). 브레이스 확장
+// (`{a,b}`)에 기대지 않고 확장자별로 명시적으로 나열한다 — 지원 여부를 가정하지 않고
+// 검증 가능한 형태를 우선한다.
+const PROFILE_HANDLE_ORACLE_SPECIFIER_STEMS = [
+  "**/profile-handle-oracle",
+  "./profile-handle-oracle",
+  "../profile-handle-oracle",
+];
+const PROFILE_HANDLE_ORACLE_EXTENSIONS = ["", ".ts", ".js"];
+const noProfileHandleOracleRelative = {
+  group: PROFILE_HANDLE_ORACLE_SPECIFIER_STEMS.flatMap((stem) =>
+    PROFILE_HANDLE_ORACLE_EXTENSIONS.map((ext) => `${stem}${ext}`),
+  ),
+  message:
+    "getProfileByHandle은 profile-handle-oracle.ts 밖에서 상대경로로 import하지 않는다 — " +
+    "이 계층 안의 새 형제 파일도, 확장자를 붙인 표기(.ts·.js)도 예외가 아니다. 필요하면 " +
+    "@/lib/data 배럴을 거치되, 그 경우도 허용된 두 진입점(check-handle-availability.ts· " +
+    "invite-crew-member.ts)만 예외다 (I-074).",
+};
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -124,7 +174,7 @@ const eslintConfig = defineConfig([
   {
     files: ["src/lib/data/supabase/**/*.{ts,tsx}"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noMockImpl] }],
+      "no-restricted-imports": ["error", { patterns: [noMockImpl, noProfileHandleOracleRelative] }],
     },
   },
 
@@ -251,7 +301,30 @@ const eslintConfig = defineConfig([
       "src/lib/auth/**",
       "src/lib/audit/**",
       "src/components/**/*.tsx",
+      // I-074 — zone 6b(아래)가 이 두 파일을 대신 맡는다. flat config는 같은 파일에 매치되는
+      // 여러 config의 같은 rule을 병합하지 않고 나중 객체가 통째로 덮어쓰므로(파일 상단
+      // 공통 주의사항), 이 zone과 6b의 `files`/`ignores`가 겹치면 안 된다 — 여기서 빼고
+      // 6b에서만 매칭시킨다.
+      "src/lib/actions/check-handle-availability.ts",
+      "src/lib/actions/invite-crew-member.ts",
     ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [...noSupabaseClient.paths, noGetProfileByHandleFromBarrel],
+          patterns: [noMockImpl, noSupabaseDataImpl, noDeepRealtimeImpl, ...noSupabaseClient.patterns],
+        },
+      ],
+    },
+  },
+
+  // zone 6b: I-074 허용 목록 — `getProfileByHandle`을 익명 컨텍스트에서 호출해도 되는 두 실
+  // 소비자(모듈 docstring, `src/lib/data/supabase/profile.ts` 참고)만 zone 6의 새 제한에서
+  // 뺀다. zone 6과 나머지 규칙(Supabase 클라이언트 직접 import·mock/realtime 딥 임포트 차단)은
+  // 동일하게 유지한다 — `getProfileByHandle` 제한 한 줄만 뺐다.
+  {
+    files: ["src/lib/actions/check-handle-availability.ts", "src/lib/actions/invite-crew-member.ts"],
     rules: {
       "no-restricted-imports": [
         "error",

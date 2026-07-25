@@ -62,6 +62,10 @@ export function generateProfiles(
       // 기본 상태만 표현한다 — 쿨다운 잠김 상태는 /sample 정적 데모로 별도 시연한다.
       handleChangedAt: null,
       onboardingCompletedAt: isWithdrawn ? null : "2026-06-01T00:00:00.000Z",
+      // FR-082(D-049) — 대량 시드는 관리자를 생성하지 않는다. system_admin은 크루 role과
+      // 달리 전역 1급 시민이 아니라 예외적 권한이라, 300개 무작위 시드에 섞어 넣으면 개발
+      // 중 우연히 관리자 세션을 시뮬레이션하게 될 위험이 이점보다 크다.
+      isSystemAdmin: false,
     });
   }
   return profiles;

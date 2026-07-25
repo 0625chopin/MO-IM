@@ -3,6 +3,9 @@ import { Loader2Icon } from "lucide-react";
 import type { BoardPostSummary, PostDetailViewModel } from "@/components/board/board-view-models";
 import { BoardList } from "@/components/board/BoardList";
 import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
+import type { CommentSectionViewModel } from "@/components/board/comment-view-models";
+import { CommentList } from "@/components/board/CommentList";
+import { CommentListSkeleton } from "@/components/board/CommentListSkeleton";
 import { PostDeletedNotice } from "@/components/board/PostDeletedNotice";
 import { PostDetail } from "@/components/board/PostDetail";
 import { PostDetailSkeleton } from "@/components/board/PostDetailSkeleton";
@@ -39,6 +42,7 @@ const SAMPLE_POSTS: BoardPostSummary[] = [
     authorAvatarUrl: null,
     createdAt: "2026-07-20T09:00:00.000Z",
     pollStatus: null,
+    isAuthorBlocked: false,
   },
   {
     id: "post-2",
@@ -48,6 +52,7 @@ const SAMPLE_POSTS: BoardPostSummary[] = [
     authorAvatarUrl: null,
     createdAt: "2026-07-22T10:00:00.000Z",
     pollStatus: "open",
+    isAuthorBlocked: false,
   },
   {
     id: "post-3",
@@ -57,6 +62,22 @@ const SAMPLE_POSTS: BoardPostSummary[] = [
     authorAvatarUrl: null,
     createdAt: "2026-07-10T09:00:00.000Z",
     pollStatus: "closed_passed",
+    isAuthorBlocked: false,
+  },
+];
+
+/** FR-081 AC1(Task 042A, 20일차) 데모용 — 차단한 사용자의 글(`BoardListItem`이 접힘 처리). */
+const SAMPLE_POSTS_WITH_BLOCKED: BoardPostSummary[] = [
+  ...SAMPLE_POSTS,
+  {
+    id: "post-blocked-1",
+    title: "차단된 사용자의 게시글 제목(펼치기 전까지 안 보임)",
+    type: "general",
+    authorDisplayName: "차단된사용자",
+    authorAvatarUrl: null,
+    createdAt: "2026-07-23T09:00:00.000Z",
+    pollStatus: null,
+    isAuthorBlocked: true,
   },
 ];
 
@@ -79,6 +100,101 @@ const SAMPLE_POST_DETAIL: PostDetailViewModel = {
   canEditTitleBody: true,
   canDelete: true,
   meetupDateLocked: true,
+  isAuthorBlocked: false,
+};
+
+/** FR-081 AC1(Task 042A, 20일차) 데모용 — 차단한 사용자의 게시글 상세(본문만 접힘, 제목·작성자는
+ *  그대로 — `PostDetail.tsx` docstring 참고). */
+const SAMPLE_POST_DETAIL_BLOCKED: PostDetailViewModel = {
+  ...SAMPLE_POST_DETAIL,
+  id: "sample-demo-post-blocked",
+  authorDisplayName: "차단된사용자",
+  isAuthorBlocked: true,
+};
+
+/** FR-033(Task 041) 데모용 — 최상위 댓글 2건(그중 하나는 답글 1건), 삭제된 댓글 아래 답글이
+ *  유지되는 AC3 사례를 함께 보여준다. */
+const SAMPLE_COMMENTS: CommentSectionViewModel = {
+  postId: "sample-demo-post",
+  crewId: "crew-1",
+  canComment: true,
+  comments: [
+    {
+      id: "sample-comment-1",
+      authorDisplayName: "박민준",
+      authorAvatarUrl: null,
+      body: "저도 갈게요! 몇 시까지 도착하면 될까요?",
+      isDeleted: false,
+      isAuthorBlocked: false,
+      canEdit: false,
+      canDelete: false,
+      canReply: true,
+      replies: [
+        {
+          id: "sample-comment-1-reply-1",
+          authorDisplayName: "김유나",
+          authorAvatarUrl: null,
+          body: "7시까지 오시면 돼요, 준비운동은 각자 해오세요!",
+          isDeleted: false,
+          isAuthorBlocked: false,
+          canEdit: true,
+          canDelete: true,
+          // 답글에는 다시 답글을 달 수 없다(depth 1, canReplyToComment).
+          canReply: false,
+          replies: [],
+        },
+      ],
+    },
+    {
+      // FR-033 AC3 — 삭제된 부모 댓글 아래 답글은 그대로 유지된다.
+      id: "sample-comment-2-deleted",
+      authorDisplayName: "탈퇴한사용자",
+      authorAvatarUrl: null,
+      body: "",
+      isDeleted: true,
+      isAuthorBlocked: false,
+      canEdit: false,
+      canDelete: false,
+      canReply: true,
+      replies: [
+        {
+          id: "sample-comment-2-reply-1",
+          authorDisplayName: "서지훈",
+          authorAvatarUrl: null,
+          body: "저도 궁금했는데 답변 감사합니다!",
+          isDeleted: false,
+          isAuthorBlocked: false,
+          canEdit: false,
+          canDelete: false,
+          canReply: false,
+          replies: [],
+        },
+      ],
+    },
+  ],
+};
+
+/** FR-081 AC1(Task 041) — 차단한 사용자의 댓글(I-072 "댓글은 화면 자체가 없어 남은 범위"
+ *  해소). 최상위 댓글 하나의 작성자를 차단한 경우만 접는다 — 본문만 BlockedContentNotice로
+ *  감싼다(작성자 이름은 그대로 보여야 신고·차단 판단이 가능하다, `CommentItem.tsx`와 같은
+ *  원칙). */
+const SAMPLE_COMMENTS_WITH_BLOCKED: CommentSectionViewModel = {
+  ...SAMPLE_COMMENTS,
+  comments: [
+    {
+      id: "sample-comment-blocked-1",
+      authorDisplayName: "차단된사용자",
+      authorAvatarUrl: null,
+      body: "차단된 사용자의 댓글 내용(펼치기 전까지 안 보임)",
+      isDeleted: false,
+      isAuthorBlocked: true,
+      canEdit: false,
+      canDelete: false,
+      canReply: true,
+      replies: [],
+    },
+    ...SAMPLE_COMMENTS.comments,
+  ],
 };
 
 const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = [
@@ -90,7 +206,12 @@ const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: stri
   {
     kind: "forbidden",
     name: "글쓰기 권한 없음 (post:create 거부)",
-    note: "PostWriteContainer가 던진다(Task 018B) — (app)/crews/[crewId]/layout.tsx(D-039)가 크루원 여부를 이미 걸렀지만, Server Component가 다른 경로로 렌더될 가능성에 대한 방어로 컨테이너가 다시 판정한다. 실제 화면 결과는 위 게시판 접근 항목과 같다(둘 다 kind='forbidden').",
+    note: "PostWriteContainer가 던진다(Task 018B) — (app)/crews/[crewId]/layout.tsx(D-039)가 크루원 여부를 이미 걸렀지만, Server Component가 다른 경로로 렌더될 가능성에 대한 방어로 컨테이너가 다시 판정한다. 실제 화면 결과는 위 게시판 접근 항목과 같다(둘 다 kind='forbidden'). 20일차 확인 — post:create는 현재 권한 매트릭스에서 crew_member 이상 전원 allow라 이 분기는 도달 불가능한 방어적 코드다(19일차 영향 범위 인벤토리 #7) — 그래서 이번 회차 전환(아래 항목) 대상에서 뺐고 여전히 throw다(I-069 근본 해결 범위 밖).",
+  },
+  {
+    kind: "forbidden",
+    name: "글쓰기 차단 — 해산된 크루 (crew_archived)",
+    note: "PostWriteContainer가 값으로 직접 반환한다(20일차, I-069 근본 해결) — 해산된 크루원이 /board/new에 직접 접근하는 경로다(19일차 영향 범위 인벤토리 #4, DESIGN이 이 지점에서 I-069를 최초 발견). 예전엔 cause:{code:'forbidden', message:'crew_archived'}를 던졌지만 프로덕션에서 Next.js가 서버 컴포넌트 예외의 cause를 클라이언트로 넘기지 않아 error.tsx가 항상 오분류했다 — 지금은 <RouteErrorBoundary kind=\"forbidden\"/>을 직접 반환해 이 문제를 구조적으로 피한다. HTTP 응답은 500 대신 200이다(정상 도달 화면 상태로 취급, docs/decisions/domain-error-channel-069.md).",
   },
 ];
 
@@ -146,6 +267,27 @@ export const boardSection = defineSection({
           <PreviewFrame height={160}>
             <div className="p-4">
               <BoardErrorStatePreview />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "게시판 목록 — 차단한 사용자의 글 (FR-081 AC1, Task 042A)",
+      note: "마지막 카드(post-blocked-1)의 작성자를 뷰어가 차단했다고 가정합니다. isAuthorBlocked=true인 글은 BlockedContentNotice로 감싸져 카드 전체(제목·작성자·날짜)가 접히고 '펼치기'를 눌러야 보입니다 — 이 카드는 목록 전체가 <Link>라(BoardListItem.tsx docstring) 접힌 동안은 클릭도 되지 않습니다. 게시판·채팅에는 이번 회차(20일차)에 배선했고, 크루원 목록(MemberList)에는 이미 배선돼 있습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={620}>
+            <div className="p-4">
+              <BoardList
+                crewId="crew-1"
+                posts={SAMPLE_POSTS_WITH_BLOCKED}
+                totalCount={SAMPLE_POSTS_WITH_BLOCKED.length}
+                page={1}
+                totalPages={1}
+                canWrite
+                writeHref="/crews/crew-1/board/new"
+              />
             </div>
           </PreviewFrame>
         ),
@@ -250,6 +392,19 @@ export const boardSection = defineSection({
       },
     },
     {
+      name: "게시글 상세 — 차단한 사용자의 글 (FR-081 AC1, Task 042A)",
+      note: "isAuthorBlocked=true면 본문(CardContent)만 BlockedContentNotice로 감싸 접힙니다 — 제목·작성자·날짜는 그대로 보입니다(PostDetail.tsx docstring: 이미 목록에서 본 정보이고 신고 대상을 특정하려면 계속 보여야 함). 이 컴포넌트는 <Link>로 감싸여 있지 않아 BoardListItem과 달리 카드 전체를 접을 필요가 없습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={420}>
+            <div className="p-4">
+              <PostDetail crewId="crew-1" post={SAMPLE_POST_DETAIL_BLOCKED} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
       name: "게시글 상세 — 삭제된 글 (FR-032 AC4)",
       note: "getPostById가 소프트 삭제(deletedAt)를 걸러 null을 반환하면 PostDetailContainer가 이 안내를 그린다 — 채팅 공유 링크로 들어와도 동일하다.",
       panels: {
@@ -270,6 +425,53 @@ export const boardSection = defineSection({
           <PreviewFrame height={460}>
             <div className="p-4">
               <PostDetail crewId="crew-1" post={SAMPLE_POST_DETAIL} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "댓글 (CommentList, FR-033)",
+      note: "최상위 댓글 2건 — 하나는 답글 1건이 달렸고, 다른 하나는 삭제된 부모 아래 답글이 그대로 유지되는 AC3 사례입니다(depth 1 제한 — 답글에는 '답글' 버튼이 없습니다). 작성 폼은 실제 CommentComposer/createCommentAction입니다 — postId가 실재하지 않는 값(sample-demo-post)이라 등록을 눌러도 'not_found' 오류만 안전하게 보여줍니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={520}>
+            <div className="p-4">
+              <CommentList section={SAMPLE_COMMENTS} />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={280}>
+            <div className="p-4">
+              <CommentListSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={220}>
+            <div className="p-4">
+              <CommentList section={{ ...SAMPLE_COMMENTS, comments: [] }} />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={160}>
+            <div className="p-4">
+              <BoardErrorStatePreview />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "댓글 — 차단한 사용자의 댓글 (FR-081 AC1, Task 041 — I-072 해소)",
+      note: "isAuthorBlocked=true인 댓글은 본문만 BlockedContentNotice로 감싸 접힙니다 — 작성자 이름은 그대로 보여야 신고·차단 판단이 가능합니다(PostDetail·MessageBubble과 같은 원칙). I-072가 '댓글은 화면 자체가 없어 남은 범위'로 남겨 뒀던 지점을 이 회차에서 닫았습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={520}>
+            <div className="p-4">
+              <CommentList section={SAMPLE_COMMENTS_WITH_BLOCKED} />
             </div>
           </PreviewFrame>
         ),

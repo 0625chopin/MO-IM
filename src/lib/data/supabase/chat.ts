@@ -25,6 +25,16 @@ export async function getChatRoomByCrewId(crewId: Id): Promise<ChatRoom | null> 
   return data ? toChatRoom(data) : null;
 }
 
+/** 단건 조회(FR-054, Task 041) — `deleteChatMessageAction`이 삭제 실행 전에 `senderId`로
+ *  본인 여부를 판정하기 위해 쓴다(Mock 구현과 같은 이유 — 순서가 중요하다). `chat_messages_
+ *  select_members` RLS가 그대로 적용된다(비소속자는 0행 → null). */
+export async function getMessageById(id: Id): Promise<ChatMessage | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.from("chat_messages").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? toChatMessage(data) : null;
+}
+
 export interface ListMessagesQuery {
   beforeMessageId?: Id | null;
   afterMessageId?: Id | null;

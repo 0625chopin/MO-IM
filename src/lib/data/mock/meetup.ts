@@ -6,6 +6,8 @@ import type {
   MeetupAttendance,
 } from "@/lib/types";
 
+import { type DataResult, err, ok } from "../contracts";
+
 import { generateId, store } from "./fixtures";
 
 /** Meetup·MeetupAttendance 데이터 접근 (FR-060~061·063~064·066~068). */
@@ -148,4 +150,20 @@ export async function respondAttendance(
 /** 참석자 목록 조회(FR-068). */
 export async function listAttendance(meetupId: Id): Promise<MeetupAttendance[]> {
   return store.meetupAttendances.filter((a) => a.meetupId === meetupId);
+}
+
+/**
+ * Meetup 취소(FR-065 AC1). 이미 취소된 Meetup을 다시 취소하면 `conflict`를 반환한다 — 과거
+ * Meetup 가드(AC3)는 이 함수의 책임이 아니라 호출자(Server Action)가 `isMeetupAttendanceOpen`
+ * (`lib/rules/meetup-attendance-eligibility.ts`, "확정 상태 + 예정일 미경과" 판정을 FR-066과
+ * 공유한다)로 먼저 판정한다.
+ */
+export async function cancelMeetup(id: Id): Promise<DataResult<Meetup>> {
+  const meetup = store.meetups.find((m) => m.id === id);
+  if (!meetup) return err("not_found", `meetup ${id} 를 찾을 수 없다.`);
+  if (meetup.status === "cancelled") {
+    return err("conflict", `meetup ${id} 는 이미 취소됐다.`);
+  }
+  meetup.status = "cancelled";
+  return ok(meetup);
 }

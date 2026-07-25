@@ -3,7 +3,7 @@
 요구사항의 **우선순위**, **리스크 등록부**, **확정된 결정**을 기록한다.
 
 - 이 파일의 6.3절 **결정 기록(D-\*)**이 확정 결정의 **단일 소스**다. **미결 이슈·개선사항은 여기가 아니라 [`ISSUES.md`](./ISSUES.md)**에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
-- **다음 결정 번호: D-047** / **다음 리스크 번호: R-021** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -nE "^### D-0" docs/prioritization-and-risks.md | tail`로 실제 최댓값을 확인한다 — 18일차에 D-043·D-044가 등재됐는데도 이 줄이 D-043으로 남아 있었고, **19일차에 D-045(BOARD)·D-046(CREW)이 등재됐는데도 이 줄이 D-046으로 남아 같은 어긋남이 재발했다**. 두 사람이 각자 자기 번호를 잡고 이 줄을 갱신하면 나중에 등재한 쪽이 이기므로 항상 하나 모자란다 — 그래서 이 줄은 **읽는 쪽이 grep으로 검증해야 하는 값**이고, 팀장이 회차 마감마다 대조한다)
+- **다음 결정 번호: D-048** / **다음 리스크 번호: R-021** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -nE "^### D-0" docs/prioritization-and-risks.md | tail`로 실제 최댓값을 확인한다 — 18일차에 D-043·D-044가 등재됐는데도 이 줄이 D-043으로 남아 있었고, **19일차에 D-045(BOARD)·D-046(CREW)이 등재됐는데도 이 줄이 D-046으로 남아 같은 어긋남이 재발했다**. 두 사람이 각자 자기 번호를 잡고 이 줄을 갱신하면 나중에 등재한 쪽이 이기므로 항상 하나 모자란다 — 그래서 이 줄은 **읽는 쪽이 grep으로 검증해야 하는 값**이고, 팀장이 회차 마감마다 대조한다)
 - 리스크는 **누구나 제보**한다. 미결이 확정되면 `ISSUES.md`의 I-\* 를 닫고 여기 6.3절에 D-\* 로 옮긴다.
 - 항목은 상태가 바뀌어도 **지우지 않는다**. 같은 판단이 다시 올라왔을 때 이전 근거를 찾을 수 있어야 한다.
 
@@ -298,6 +298,10 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
   동작하기 시작했는데, 여기에는 리밋이 없다 — 노출은 boolean 1개(핸들 존재 여부)뿐이라 원본
   I-058보다 훨씬 좁지만, D-005가 다루지 않은 **익명 흐름 전용 리밋 정책**이 없다는 이 리스크의
   잔여 위험을 그대로 보여준다. 상세·설계 검토·판단 근거는 **I-065**(열림, D-\* 결정 필요).
+- **[2026-07-25, 20일차 추가]** 사용자가 정책을 새 결정으로 확정하는 방향을 택해 **D-047**로
+  IP당 분당 10회 리밋을 등재하고 구현·실측까지 마쳤다 — I-065는 해결됨으로 닫는다. 이
+  잔여 위험 항목은 "구현이 정책을 지키는가" 축이었으므로 이 갈래는 닫히지만, R-012 자체는
+  `profile_search`(FR-006) 등 다른 구현 축이 남아 있어 상태를 "완화중"으로 유지한다.
 
 ### R-013 · 캘린더 자동 색상 배정이 접근성 대비 기준을 만족하지 못한다
 
@@ -859,6 +863,64 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
   20일차 팀장 판단이 나오기 전까지 바꾸지 않는다(이 각주는 재검토가 필요하다는 신호일
   뿐, 새 결정이 아니다).
 
+- **20일차 갱신 — 부분 전환 채택(DESIGN, 팀장 지시로 사용자 확인 완료).** 19일차가 정리한
+  세 갈래(ⓐ `forbidden()`/`authInterrupts` experimental 부분 도입 · ⓑ 8곳 전량 값 반환
+  전환 · ⓒ 도달성 높은 곳만 우선 값 반환 전환) 중 **ⓒ**가 채택됐다 — "이유 1"(experimental/
+  canary 리스크)은 여전히 유효해 ⓐ를 배제하고, ⓑ의 전면 재작업 비용 없이 실사용자 영향이
+  큰 지점부터 고친다는 절충이다.
+  - **바뀐 것**: 도달성 "높음/중간" 4곳(19일차 인벤토리 #1~#4)을 throw → **값 반환 +
+    `RouteErrorBoundary` 직접 렌더**로 전환했다 — `(app)/crews/[crewId]/layout.tsx`·
+    `MeetupDetailContainer`·`CrewSettingsContainer`·`PostWriteContainer`(`crew_archived`
+    분기). `cause` 직렬화에 의존하지 않으므로 프로덕션 정화 문제 자체가 발생하지 않는다 —
+    이 네 곳은 이제 프로덕션에서도 정확히 `forbidden` 문구가 뜬다(브라우저 실측 2건 확인,
+    아래 참고).
+  - **안 바뀐 것**: 도달성 "사실상 0"인 나머지 4곳(#5~#8, `board:read`·`post:create`
+    일부·`chat:send_message` — 현재 권한 매트릭스로 도달 불가능한 방어적 코드)은 여전히
+    throw + `error.tsx` 패턴이다. 즉 **"이유 2"(부분 도입이 두 메커니즘을 섞는다)가 다시
+    발생한다** — 다만 이번엔 Next 내장 경계 vs 우리 `error.tsx`가 아니라 "값 반환(4곳)"과
+    "throw(4곳)"라는 우리 자체 패턴 안의 분기다. 8곳이 전부 도달 가능했다면 이 분기가 사용자
+    경험을 실제로 가르지만, 안 바뀐 4곳은 애초에 아무도 도달하지 못하므로(방어적 코드) 이
+    분기가 관측되는 사용자 경험 차이로 이어지지는 않는다 — "이유 2"가 완전히 무효화된 것은
+    아니고, 이번 채택은 그 위험을 "도달 불가능한 코드에 한해" 받아들인 것이다.
+  - **트레이드오프(정직하게 기록)**: 전환한 4곳은 예외를 던지지 않으므로 HTTP 응답이 500이
+    아니라 **200**이 된다 — I-044가 우려한 "500이 오류율 지표를 오염시킨다"는 이 네 곳에서
+    해소되지만, 요구사항이 명시하는 403 자체는 여전히 아니다(200). `digest`·재시도 버튼·
+    `reportClientErrorAction` telemetry도 이 네 곳에는 더 이상 없다 — 예외가 아니라 정상
+    도달 화면 상태로 재분류했기 때문이다.
+    - **어떤 요구사항이 걸리는지(20일차, CORE 교차검증 지적 — 원래 빠져 있었다)**: **NFR-012**
+      ("권한 검사는 UI 숨김이 아니라 서버·RLS에서 이뤄진다 ... 권한 없는 API 직접 호출 시
+      403/404"), **FR-011 예외 흐름 E1**("권한 없음 → 403 화면"), **FR-012 AC4**("`public`
+      크루의 게시판 API, 비로그인 상태로 직접 호출, 401 또는 403이 반환된다") 셋이다. 이
+      셋은 200을 허용하지 않는다 — 전환한 4곳은 이 요구를 충족하지 못한 채로 남는다. **이건
+      무지가 아니라 프레임워크 제약 아래의 의식적 선택이다**: 문자 그대로 403을 내려면
+      `forbidden()`(대안 ⓐ)이 필요한데 여전히 experimental/canary라(위 "이유 1", 안 바뀜)
+      보류했다 — 문구 정확성(200이지만 올바른 안내)과 상태 코드 정확성(403이지만 실험적
+      API 리스크) 중 전자를 택했다는 뜻이다. 사용자가 승인한 방향이라 되돌리지 않는다.
+  - **프로덕션 브라우저 실측(포트 3211/3212, 계정은 `auth-integration-030.md` §6)**: 비소속
+    크루 board 접근(#1)·비소속 임원 미만 크루원의 설정 접근(#3) 2건에서 "접근 권한이 없어요"가
+    HTTP 200으로 정상 렌더됨을 확인했다. **archived 크루(#4)는 20일차 재검증에서 확인
+    완료** — 새로 만든 일회성 테스트 크루에서 오너 본인이 실제 "크루 해산" 버튼(`disband_crew`
+    RPC, 커밋)을 눌러 archived 전이를 일으킨 뒤 `/board/new`에서 "접근 권한이 없어요"가 HTTP
+    200으로 정상 렌더됨을 확인했다(기존 공유 시드 크루는 건드리지 않았다 — `crews_guard_
+    archived_immutable` 트리거가 archived를 종착 상태로 만들어 되돌릴 수 없으므로, 반드시
+    새 테스트 크루로만 검증했다). Meetup 상세(#2)는 예상과 다르게 **`meetups` RLS
+    (`meetups_select_members`)가 비소속자에게 행 자체를 감춰 `notFound()`가 먼저 실행돼 이
+    전환 분기에 도달하지 않는다**(`getCrewById`와 달리 `getMeetupById`에는 private-crew 404
+    수정 때 만든 것과 같은 RLS-폴백이 없다) — 이 전환이 만든 회귀는 아니고(전환 전에도 같은
+    이유로 도달 불가능했다), 다음에 이 인벤토리를 참고할 때는 #2의 실사용자 도달성을
+    "높음"이 아니라 "낮음/사실상 0"으로 읽어야 한다. **프레임 정정(20일차, CORE 교차검증이
+    반증)**: 이 404를 "R-012(사용자 열거 방지) 관점에서 의도된 것일 수 있다"고 적었던 최초
+    판단은 틀렸다 — **FR-064 AC2가 문자 그대로 "비소속 회원의 Meetup 상세 API 호출 → 403"을
+    요구**하므로 이 404는 승인된 대안이 아니라 미해소 위반이다(R-012는 검색·열거 시나리오를
+    다루지 이미 구체적 리소스 id를 아는 요청의 존재 노출과는 무관 — 카테고리 오류였다). 별도
+    이슈로 등재했다(`docs/ISSUES.md` **I-073**) — I-069 각주로만 남기면 I-069가 닫힐 때 함께
+    묻힌다. 상세 근거는 `docs/ISSUES.md` I-069 "20일차 — 근본 해결(부분)" 절과
+    `docs/decisions/domain-error-channel-069.md`.
+  - **다음에 다시 볼 시점**: Task 029A·031은 이미 지났으므로(v0.1 Mock 단계가 끝나고 실
+    데이터로 전환됨), "이유 3"은 이제 항상 무효다. 남은 4곳(#5~#8)을 언제 값 반환으로
+    옮길지는 role 세분화(예: `board:read`가 임원 이상으로 좁혀지는 시점)가 생기는 시점에
+    재판단한다 — 그 전까지는 도달 불가능한 코드를 미리 재작업할 근거가 약하다.
+
 ### D-041 · 통합 캘린더 월간 뷰를 오픈소스 Schedule-X로 교체한다
 
 - **일자**: 2026-07-24
@@ -1060,3 +1122,527 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
 - **영향**: `src/components/crews/MemberList.tsx`(오너로 임명 다이얼로그 추가)·
   `CrewSettingsContainer.tsx`(해산 섹션만 추가, 이양 UI 없음)·`crews_guard_owner_only_fields`
   트리거. 상세 실측·감사 로그 구조는 `docs/decisions/crew-lifecycle-040.md` 참고.
+
+### D-047 · 익명 흐름(회원가입 blur) 핸들 존재 확인은 IP당 분당 10회로 제한한다
+
+- **일자**: 2026-07-25
+- **결정자**: CORE (20일차 — 사용자가 19일차 마감에 "두 갈래 중 (1) 정책을 새 D-\*로 확정한
+  뒤 구현"을 확정, `docs/ISSUES.md` **I-065** 참고. "잔여 위험 수용·종결"은 기각됐다)
+- **맥락**: `checkHandleAvailabilityAction`(`src/lib/actions/check-handle-availability.ts`)은
+  `SignupForm`이 핸들 입력란 **blur마다**(로그인하지 않은 방문자 포함) 호출하는 Server
+  Action이다. 19일차 I-058 major① 수정으로 `getProfileByHandle`이 service-role 클라이언트
+  (RLS 완전 우회)로 조회하도록 바뀌면서 이 액션이 실제로 정상 동작하게 됐는데, 리밋이
+  전혀 없어 로그인하지 않은 누구나 임의 핸들 문자열을 무제한으로 넣어 존재 여부를 확인할
+  수 있었다(R-012 사용자 열거 방지 관점의 잔여 위험). `NFR-016`·**D-005**는 "계정당" 리밋
+  (핸들 검색 분당 20회)만 규정하고, 익명(미인증) 흐름의 리밋은 요구사항 문서 어디에도
+  정의돼 있지 않다.
+- **왜 D-005의 20회/60초를 그대로 재사용하지 않는가**: D-005는 **계정당·인증된 사용자**
+  위협 모델로 승인된 숫자다 — 호출자가 이미 로그인 세션을 통과했으므로 "리밋을 우회하려면
+  계정을 새로 여러 개 만들어야 한다"는 비용이 걸려 있다. 이 액션의 호출자는 **IP당·익명**
+  이라 그 비용이 없다 — 봇이 계정 없이, 세션 없이, IP만 있으면 바로 두드릴 수 있다. 반대
+  방향으로도 다르다: IP는 계정과 달리 **공유 자원**이다(사무실·카페 공용 회선, 통신사
+  NAT/CGNAT 뒤에 수십~수백 명이 몰릴 수 있다) — 계정 기준으로 승인된 숫자를 IP 기준에
+  그대로 옮기면 "다른 위협 모델에 근거 없는 숫자를 재사용하는 것"이 된다(선례:
+  `request-password-reset.ts` docstring "근거 없는 숫자를 지어내지 않는다" — 다만 그
+  액션은 Supabase Auth 내장 리밋이라는 하부 안전망이 있었고 이 액션에는 없다는 차이가
+  있어 "안전망이 없으니 아무 리밋도 두지 않는다"가 아니라 "안전망이 없으니 이 액션 스스로
+  근거 있는 리밋을 가져야 한다"로 판단했다).
+- **결정 — IP당 분당 10회(고정 윈도 60초)**:
+  - **정상 사용 근거**: `SignupForm.handleHandleBlur`(20일차 확인)는 로컬 형식 검사
+    (`validateHandleFormat`, 왕복 없음)를 통과한 값만 서버로 보낸다 — 즉 한 번의 blur가
+    항상 서버 호출로 이어지진 않는다. 실사용자가 회원가입 중 핸들을 정하며 blur를 반복하는
+    횟수는(오타 수정, 다른 후보 핸들 시도) 세션당 넉넉히 잡아도 5~8회 안팎으로 추정한다.
+    같은 IP에서 두세 명이 동시에 가입을 진행하는 상황(사무실·같은 공유기)까지 얹어도 10회는
+    단일 세션 기준으로 걸릴 일이 거의 없는 여유값이다.
+  - **열거 억제 근거**: 10회/60초는 시간당 600회로 상한이 걸린다 — 무제한 대비 유의미하게
+    느리고, 의미 있는 규모의 핸들 네임스페이스를 훑으려면 IP 로테이션이 강제된다(단일 IP로는
+    비현실적으로 오래 걸린다). **이 방어가 IP 로테이션으로 우회 가능하다는 것 자체는 이
+    숫자의 결함이 아니라 IP 기반 리밋 일반의 한계다** — "무제한"에서 "로테이션 비용이 드는
+    상태"로 옮기는 것이 이 결정의 목표이지, 로테이션까지 막는 것은 이 결정의 범위가 아니다
+    (그런 방어는 계정 인증·CAPTCHA 등 다른 계층의 몫이다).
+  - **윈도(60초)**: D-005·`handle_search_attempts`와 같은 단위를 써서 운영(정리 잡 주기·
+    관측)상 익숙함을 유지한다 — 값 자체(20)를 옮기는 것과 달리 시간 단위(60초)를 맞추는
+    것은 다른 위협 모델 간에도 문제되지 않는다.
+- **신뢰 경계**: `x-forwarded-for`(Next.js 16 `headers()`, await 필요 —
+  `request-password-reset.ts`에 이미 전례가 있다)의 첫 번째 값을 식별자로 쓴다. **NFR-039가
+  명시한 배포 대상(Vercel)을 전제로 신뢰 가능하다고 판단한다** — Vercel 엣지가 실제 클라이언트
+  IP로 이 헤더를 설정·재작성하므로 이 배포 환경에서는 클라이언트가 임의로 위조해 리밋을
+  우회할 수 없다. 이 저장소는 아직 실제 Vercel 프로젝트에 연결되지 않았다(`docs/decisions/
+  build-deploy-verification.md` §6) — 그 전까지(로컬 `next dev` 등, 프록시가 헤더를 붙이지
+  않는 환경)는 헤더가 없으므로 `"unknown"` 고정 식별자로 폴백해 모든 호출이 하나의 버킷을
+  공유한다(로컬 개발 편의 저하는 감수, 실 사용자에게 영향 없음).
+- **대안**: (1) **잔여 위험으로 수용하고 종결** — 사용자가 19일차 마감에 명시적으로 기각.
+  (2) **D-005의 20/60을 그대로 재사용** — 위 "왜 재사용하지 않는가" 참고, 근거 없는 숫자
+  전용에 해당해 기각. (3) **CAPTCHA·프루프오브워크 도입** — 이 액션 하나를 위해 새 외부
+  의존성을 들이는 비용이 과하다고 판단해 기각(v0.1 범위 밖).
+- **영향**: `src/lib/rules/rate-limit.ts`(`ANONYMOUS_HANDLE_AVAILABILITY_RATE_LIMIT` 상수)·
+  `src/lib/data/supabase/handle-availability-rate-limit.ts`(신규, zone 3)·
+  `src/lib/actions/check-handle-availability.ts`·마이그레이션
+  `handle_availability_ip_rate_limit_i065`. `change-account-handle.ts`(인증된 핸들 변경)도
+  같은 액션을 재사용하므로 부수적으로 같은 IP 리밋의 적용을 받는다 — 인증 여부를 액션
+  내부에서 분기하지 않는다(docstring이 이미 "인증 검사 자체를 둘 수 없다"고 명시). 실측
+  전문은 `docs/ISSUES.md` I-065를 단일 소스로 둔다(별도 결정 문서는 만들지 않았다).
+- **적용 지점(익명 컨텍스트에서 `getProfileByHandle`을 부르는 자리 — 이 리밋을 반드시
+  거쳐야 한다, 20일차 BOARD 교차검증 major① 후속)**: `checkHandleAvailabilityAction`이
+  `getProfileByHandle`(service-role, RLS 완전 우회)을 익명 컨텍스트에서 부르는 **유일한
+  진입점**이어야 한다는 규약을 세웠다(`src/lib/data/supabase/profile.ts`의
+  `getProfileByHandle` docstring에 명시). 이 규약이 나온 이유 — `SignupForm`의 blur 호출
+  뿐 아니라 **`signupAction`(`src/lib/actions/signup.ts`)의 제출 시점 최종 중복 검사도
+  한때 `getProfileByHandle`을 직접 호출해 이 리밋을 완전히 우회하는 두 번째 진입문이었다**
+  (`fieldErrors`가 있으면 `signUpWithPassword` 호출 전에 조기 반환해 Supabase Auth 내장
+  리밋에도 안 닿았다 — I-058 major①과 같은 "다른 경로로 같은 오라클 재도달" 구조). 수정:
+  `signupAction`도 `checkHandleAvailabilityAction`을 재사용한다.
+- **정정(같은 20일차 안 — "리밋에 걸려도 제출은 막지 않는다"는 원 판단을 뒤집었다)**: 위
+  적용 지점 수정의 최초 버전은 "리밋에 걸려도 가입 제출 자체는 막지 않는다"였다 —
+  `rateLimited`면 사전 중복 확인을 건너뛰고 `signUpWithPassword`까지 그대로 진행시켜
+  `createProfile`의 `profiles_handle_key` UNIQUE 제약이 최종 판정하게 하는 방향이었다.
+  **BOARD가 이 판단이 만드는 결함을 찾았다** — `rateLimited` 스킵은 `signUpWithPassword`가
+  먼저 실행돼 **실 `auth.users` 행을 만드는데**, 그 뒤 `createProfile`이 `23505`로 실패해도
+  **그 행을 되돌리는 코드가 없다**(Admin API 호출 없음, `auth.users` non-internal 트리거도
+  0건 — SQL로 확인). 결과는 이메일이 소모된 고아 계정과, 그 계정으로 로그인해도
+  `getAuthSession()`이 `forbidden`을 반환하는 복구 불가능한 막다른 골목이다. 기존에도
+  "두 사람이 동시에 같은 핸들로 제출"하는 진짜 레이스는 같은 실패 지점을 탈 수 있었지만
+  확률이 낮았다 — `rateLimited` 스킵은 "리밋 소진(예: 공유 IP에서 동료들이 blur로 먼저
+  소진) + 고른 핸들이 이미 존재"라는 훨씬 흔한 조합에서 **단일 요청·단일 사용자로
+  결정론적으로** 이 경로를 열어, 피해자가 공격자가 아니라 선의의 실사용자가 된다. **그래서
+  뒤집었다**: `rateLimited`면 이제 `handleTaken`과 구분되는 전용 문구로 가입 제출 자체를
+  차단한다 — 사용자는 리밋 윈도(60초) 경과 후 재시도한다. BOARD가 제시한 대안(`23505` 시
+  Admin API로 `auth.users` 사후 정리)은 "정리 자체가 실패하면?"이라는 재귀적 문제를 새로
+  만들어 채택하지 않았다. **이 정정은 D-047의 정책 숫자(10/60)나 신뢰 경계를 바꾸지
+  않는다** — 애초에 D-047의 목표가 "무제한 → 로테이션 비용이 드는 상태"였지 "리밋에 걸려도
+  제출은 통과시킨다"가 아니었으므로, 이번 정정은 D-047 자체의 재검토가 아니라 D-047을
+  적용하는 **애플리케이션 레이어 배선의 버그 수정**이다. 함께 넣은 완화:
+  `SignupForm.tsx`에 blur 중복 호출 방지(`lastCheckedHandleRef` — 같은 값이면 서버를 다시
+  안 부른다)를 추가해 정직한 사용자가 리밋에 우연히 걸릴 확률 자체를 낮췄다(DESIGN 최초
+  지적 → BOARD 재확인 → CORE 적용). `DESIGN`의 I-069 산출물이 세운 "리밋/오류에 걸려도
+  정상 흐름 제출은 막지 않는다" 원칙과 이번 사안이 겉으로는 반대되는 결론(제출을 막는다)
+  으로 보일 수 있는데, 실제로는 같은 원칙(D-030 ③, 이미 발생한 실패는 되돌릴 수 없는 부작용
+  없이 사용자에게 정확히 알려야 한다)의 다른 적용이다 — I-069는 "이미 성공한 접근을 사후에
+  거부로 잘못 표시하지 않는다"는 문제였고, 이번은 "아직 성공하지 않은 조작을 되돌릴 수 없는
+  부작용과 함께 진행시키지 않는다"는 문제라 결이 다르다. 상세 경위: `docs/ISSUES.md` I-065
+  "후속(같은 20일차 안에서 또 한 번 정정)". 재발 방지 논의(정적 검사로 `getProfileByHandle`
+  호출부를 강제 제한)는 이번 회차 범위를 넘어 **I-074**로 이월했다.
+- **알려진 한계(가용성, 보안 아님 — BOARD 20일차 참고 의견, 새 이슈 미등재)**:
+  `x-forwarded-for`가 없는 환경은 모든 호출이 `"unknown"` 버킷 하나를 공유한다(위 "신뢰
+  경계" 참고). 실 배포에서 이 헤더가 어떤 이유로든 비면 익명 방문자 전원이 리밋 버킷을
+  나눠 쓰게 돼 한 명이 소진하면 다른 사람도 막히는 **가용성 리스크**가 된다 — 정보 노출이나
+  방어 우회가 아니라 오히려 더 보수적으로 막히는 방향이라 보안 리스크로 보지 않는다. Vercel
+  배포에서는 엣지가 이 헤더를 항상 설정하므로(위 신뢰 경계 참고) 정상 운영 중에는 발생하지
+  않는 시나리오로 판단한다.
+
+### D-048 · 비소속자의 Meetup 상세 접근은 `getCrewById`와 같은 "0행 → private 최소정보 RPC 폴백" 패턴으로 403(forbidden)에 도달시킨다(RLS 부분 노출 조건 추가는 기각)
+
+- **일자**: 2026-07-25
+- **결정자**: CORE (21일차 — `docs/ISSUES.md` **I-073** 처리, DESIGN 제보·CORE 교차검증)
+- **맥락**: `requirements.md` **FR-064 AC2**는 "비소속 회원이 Meetup 상세 API를 호출하면
+  403이 반환된다"고 요구한다. 실제로는 **404**(`notFound()`, HTTP 200)가 떴다 — `meetups`
+  테이블 RLS `meetups_select_members`(`crew_id IN (내 활성 멤버십 crew_id 목록)`)가
+  비소속자에게 그 행 자체를 0건으로 숨겨, `MeetupDetailContainer`의 `getMeetupById` 조회가
+  먼저 `null`을 반환하고 컨테이너 자신의 크루원 재판정(`cause:{code:"forbidden"}` → 20일차
+  부터 `<RouteErrorBoundary kind="forbidden"/>` 값 반환, I-069)에 도달하기도 전에
+  `if (!meetup) notFound()`가 먼저 실행됐다. `getCrewById`(`src/lib/data/supabase/crew.ts`)
+  는 17일차 핫픽스로 "원본 select 0행 → `crew_directory_summary` RPC 폴백"을 갖춰 이 문제가
+  없다 — `meetups`에는 이 폴백이 없었던 것이 비대칭의 원인이다.
+- **틀렸던 최초 프레임(경위 보존)**: I-069 작업 중 이 gap을 처음 발견했을 때 "R-012(사용자
+  열거 방지) 관점에서 오히려 의도된 것일 수 있다"는 여지가 남았었다 — 이번 회차 판단으로
+  **반증한다**. R-012 원문은 "핸들 검색으로 회원 목록을 사전 대입해 열거"하는 시나리오를
+  다룬다 — 검색·나열을 통해 **모르는** 대상을 찾아내는 능력을 막는 것이 목적이다. 이 사안은
+  호출자가 **이미 구체적인 리소스 id(`meetupId`)를 안다는 전제**에서 그 리소스의 존재
+  여부·소속 크루를 확인하는 것으로, R-012가 막으려는 "열거"와는 범주가 다르다(카테고리
+  오류) — `meetupId`는 `gen_random_uuid()` 128비트 무작위값이라 URL을 이미 손에 넣은
+  경우(공유 링크·채팅의 `PostLinkCard`·알림 등 정당한 경로)에만 의미가 있는 조회다.
+- **후보 검토**:
+  - **① `getMeetupById`에 `getCrewById`와 같은 "0행 → private 최소정보 RPC 폴백" 추가
+    (채택)**. `meetup_directory_summary(p_meetup_id)`(`private` SECURITY DEFINER +
+    `public` 얇은 INVOKER 래퍼, 029B와 같은 2단 구조)를 신설해 `id`·`crew_id` **두 값만**
+    돌려준다. 컨테이너·Server Action은 이 `crewId`로 기존에 하던 크루원 재판정
+    (`getCrewMembership` + `isActiveMembership`)을 그대로 수행해 정확한 forbidden 분기에
+    도달한다 — **콘텐츠(제목·날짜·장소 등)는 이 경로로 전혀 노출되지 않는다**, 크루의
+    public 부분 노출(D-007, 크루명·설명까지 보여줌)과 의도적으로 다르다. Meetup에는 크루
+    같은 독자적 공개 범위 개념이 없고, 접근 게이트가 "크루원인가" 하나뿐이라 게스트에게
+    보여줄 것이 애초에 없기 때문이다 — 그래서 anon에는 EXECUTE를 주지 않는다
+    (authenticated만).
+  - **② `meetups_select_members` RLS에 D-007식 부분 노출 조건 추가 (기각)**. RLS의
+    `qual`은 행 단위 필터만 표현하고 컬럼 단위 마스킹을 지원하지 않는다(029B 설계 문서
+    §"기각된 대안 A"와 같은 제약) — "존재는 보이되 내용은 감춘다"를 RLS 정책 하나로
+    표현하려면 뷰 분리나 컬럼별 GRANT/REVOKE가 필요해지고, 이는 이미 있는 `postgres`
+    소유 SECURITY DEFINER 폴백 패턴(①)보다 새 구조를 하나 더 얹는 비용이 크다. 또한 RLS를
+    바꾸면 `listAttendance`·`respondAttendance`(RPC 내부에서 이 RLS를 참조) 등 기존
+    소비자 전체의 가시성 가정을 재검증해야 해 파급 범위가 넓다.
+- **결정**: **후보 ①을 채택**한다. `private.meetup_directory_summary`/
+  `public.meetup_directory_summary` RPC 신설, `getMeetupById`
+  (`src/lib/data/supabase/meetup.ts`)가 원본 select 0행일 때 이 RPC로 폴백해 `crewId`만
+  채운 최소 `Meetup`을 반환한다(`title`·`date`·`place` 등은 빈 값 플레이스홀더 — 이 값을
+  신뢰하거나 표시용으로 쓰지 않는다, `getCrewById`의 같은 경고와 동일). anon에는
+  EXECUTE를 주지 않는다(`revoke all ... from public, anon, authenticated` →
+  `grant execute ... to authenticated`만, `poll_vote_tally_for_decision`과 같은 패턴).
+- **주의(D-040과의 관계)**: 이 결정은 FR-064 AC2 "403"을 **문자 그대로의 HTTP 403 상태
+  코드**로 만들지 않는다 — D-040이 이미 라우트 레벨 권한 거부를 `<RouteErrorBoundary
+  kind="forbidden"/>` 값 반환(HTTP 200)으로 확정해 뒀고, 이 결정은 그 정책을 바꾸지
+  않는다. 이 결정이 고치는 것은 오직 "그 forbidden 분기에 정상적으로 **도달하는가**"이다
+  — 도달 자체가 막혀 404로 새는 것을 막는 것이 I-073의 실제 결함이었다.
+- **실측(21일차, `begin`…`rollback`, 단일 트랜잭션)**: 실제 meetup(크루 `ad540c05-…`)
+  기준 5개 시나리오 —
+  (A) 비소속자(해당 크루 멤버십 행 없음): 원본 select 0행 → RPC 폴백 1행(`crew_id` 정확히
+  일치) (B) 강퇴(`status='removed'`, 트랜잭션 내 임시 삽입 후 rollback): 원본 select 0행 →
+  RPC 폴백 1행(A와 동일하게 처리 — 강퇴도 "비소속"의 한 갈래로 다뤄야 하므로 의도된 동작)
+  (C) 실제 활성 크루원(owner): 원본 select가 즉시 1행 반환(폴백 미도달, 기존 경로 그대로)
+  (D) 존재하지 않는 meetupId: 원본 select·RPC 폴백 둘 다 0행(진짜 404 보존) (E) `anon`:
+  `permission denied for function meetup_directory_summary`(42501) — EXECUTE 거부 확인.
+  `get_advisors(security)` 재확인 결과 신규 WARN 0건(기존 `auth_leaked_password_protection`
+  1건 불변, 이 작업과 무관).
+- **영향**: `supabase/migrations/<ts>_meetup_directory_summary_i073.sql`(신규)·
+  `src/lib/data/supabase/meetup.ts`(`getMeetupById`)·`src/lib/data/supabase/
+  database.types.ts`(재생성)·`src/components/meetup/MeetupDetailContainer.tsx`(도달
+  가능성 docstring 갱신)·`src/components/sample/sections/meetup.tsx`(DOMAIN_ERROR_ITEMS
+  캐비엇 갱신). `respondMeetupAttendanceAction`(`src/lib/actions/respond-meetup-attendance.ts`)
+  도 같은 `getMeetupById`를 호출하므로 부수적으로 같은 수정의 혜택을 받는다(비소속자가
+  참석 응답을 시도하면 이제도 여전히 "크루원만" 문구로 거부되지만, 그 판정에 이르는
+  `crewId` 조회가 더 이상 예외적 경로에 의존하지 않는다). `docs/ISSUES.md` I-073을
+  해결됨으로 닫는다.
+
+### D-049 · `system_admin` 식별은 `profiles.is_system_admin` 컬럼 + 자가 승격 차단 트리거로 한다(셀프서비스 승격 경로 없음, 부트스트랩은 마이그레이션 직접 UPDATE)
+
+- **일자**: 2026-07-25
+- **결정자**: CREW (21일차, Task 042B — 팀장이 042A 구현·인계 문서 작성 실적을 근거로 원 배정
+  DESIGN에서 재배정)
+- **맥락**: 029A §7.5·029B §8이 "관리자 콘솔이 실제로 필요해지면 `profiles.is_system_admin`류
+  컬럼(또는 별도 role 테이블) 추가 + 관련 정책 갱신이 선행돼야 한다"고 명시 이월했다.
+  `docs/requirements/requirements.md` 3.1절은 역할 식별자 `system_admin`을 "전역" 스코프로
+  정의하지만 저장 위치는 정하지 않았다.
+- **후보 검토**:
+  - **① `profiles.is_system_admin boolean` 컬럼(채택)**. 크루 스코프 role(`crew_memberships.
+    role`)과 다른 테이블에 두는 이유는 3.1절이 명시하듯 이 역할이 **크루 단위가 아니라
+    전역**이기 때문이다 — `crew_memberships`에 넣으면 "어느 크루의 관리자인가"라는 잘못된
+    질문을 만든다.
+  - **② 별도 `system_admins` 테이블(행 존재 = 관리자)**. `profiles`를 건드리지 않아 스키마
+    변경이 더 작다는 장점은 있으나, 이 프로젝트에 이미 있는 유사 패턴(`crews.status`,
+    `profiles.status` 등 상태를 컬럼으로 표현)과 다른 방식을 하나 더 들이는 비용이 크고,
+    "관리자 목록"과 "프로필"을 조인 없이 한 번에 볼 수 없다는 불편만 남는다. 기각.
+  - **③ JWT 커스텀 클레임(Supabase Auth `app_metadata`)**. Admin API로만 설정 가능해 이
+    프로젝트의 service-role Admin REST 패턴(auth-integration-030.md §6)과 어울리지만, RLS/
+    SQL 함수에서 `auth.jwt()`를 파싱해야 해 이미 자리 잡은 "`profiles` 조인으로 판정"
+    패턴(`private.is_blocked` 등)과 다른 신뢰 경로를 하나 더 만든다. 세션 갱신 전까지 값이
+    stale할 수 있는 문제도 컬럼 방식과 동일하게 있다. 기각(스키마 안이 더 일관적).
+- **결정 — ① `profiles.is_system_admin boolean not null default false`**, `NOT NULL DEFAULT
+  false`라 기존 21개 프로필 행이 전부 안전하게 `false`로 채워진다(마이그레이션
+  `admin_console_042b_is_system_admin`).
+- **자가 승격 차단이 핵심이다** — 029B §8이 "'누가 이 값을 설정할 수 있는가'·'자기 자신을
+  관리자로 못 올리게 막는 방법'은 새 결정이 필요하다"고 정확히 지적한 지점이다.
+  `profiles_update_self` RLS(`id = auth.uid()`)는 **행** 단위만 제한하고 **컬럼**은 제한하지
+  않으므로, 컬럼만 추가하면 인증된 사용자 누구나 `update profiles set is_system_admin = true
+  where id = auth.uid()`를 스스로 성공시킬 수 있다 — 이것이 실제 취약점이 됐을 뻔한 지점이다.
+  `profiles_guard_self_status_transition` 트리거(029A, Task 039가 `status` 전이 제한으로 이미
+  한 번 확장한 함수)를 다시 확장해 `auth.uid() = old.id`이면서 `is_system_admin`이 바뀌는
+  UPDATE를 예외로 거부한다 — **셀프서비스 승격 UI·RPC를 의도적으로 만들지 않았다.**
+- **부트스트랩(최초 관리자 지정)**: 셀프서비스 경로가 없으므로 첫 관리자는 이 마이그레이션의
+  직접 `UPDATE`로 지정한다 — Admin REST + SQL 직접 삽입으로 테스트 계정을 만든 Task 030과
+  같은 "표준 앱 경로 밖의 최초 부트스트랩" 성격이다. 실 계정 2개(`docs/decisions/
+  auth-integration-030.md` §6) 중 **`0625chopin@gmail.com`**(이 세션 사용자 본인 계정,
+  `profiles.id = fb70ff1c-3736-44ee-a4a3-96993a3c62ed`)을 관리자로 지정했다 — 사용자가 실제
+  로그인으로 `/admin`을 검증할 수 있는 유일한 방법이라고 판단했다(다른 계정을 골라야 할
+  이유를 찾지 못했고, 두 실 계정 중 하나를 고르는 것 자체는 되돌리기 쉬운 SQL 한 줄이다).
+  **운영 관점의 한계**: 관리자 지정/해제 UI가 없다 — 두 번째 관리자가 필요해지면 이번에도
+  SQL 직접 UPDATE가 유일한 방법이다. `docs/ISSUES.md`에 후속으로 등재한다.
+- **최종 강제 경계는 이 컬럼이 아니라 RPC 내부 재확인이다** — `AuthSession.isSystemAdmin`
+  (세션 스냅샷)과 `(app)/admin/layout.tsx`의 404 게이트는 UI 편의일 뿐이고, 실제 방어는
+  `admin_list_reports`/`admin_resolve_report` SQL 함수가 `auth.uid()`로 `profiles.
+  is_system_admin`을 그때그때 다시 조회하는 것이다(D-050 참고) — 세션이 발급된 뒤 관리자
+  권한이 회수돼도 다음 RPC 호출에서 즉시 반영된다(세션 재발급을 기다리지 않는다).
+- **실측**: `docs/decisions/admin-console-042b.md` §4.
+
+### D-050 · 신고 처리는 SECURITY DEFINER RPC 단일 트랜잭션으로, `audit_logs.action`엔 `report.*` 5종을 쓰고 소프트삭제는 기존 `deleted_at`/`profiles.status`를 재사용한다(service_role 경로는 채택하지 않는다)
+
+- **일자**: 2026-07-25
+- **결정자**: CREW (21일차, Task 042B)
+- **맥락**: `report-block-042a.md` §6이 042B에 남긴 인계 계약은 두 가지를 전제했다 — (1)
+  `reports.status`는 `pending`→`resolved`|`dismissed`뿐이고 "service_role 경로로만" 바꿀 수
+  있다, (2) `audit_logs.action`에 `report.*` 값이 아직 없고 소프트삭제 연동 모델도 정해지지
+  않았다. 이번 회차가 두 미결을 확정한다.
+- **결정 A — 강제 경로: service_role 클라이언트가 아니라 SECURITY DEFINER RPC.** 042A 인계
+  문서의 "service_role 경로" 제안을 따르지 않았다 — 대신 `admin_resolve_report`/
+  `admin_list_reports`(둘 다 029B 2단 구조: `private.*` SECURITY DEFINER 실제 로직 + `public.*`
+  SECURITY INVOKER 얇은 래퍼)가 내부에서 `profiles.is_system_admin`을 직접 확인한다. 이유:
+  - **일관성**: 042A의 `private.is_blocked`가 이미 "RLS가 표현 못 하는 조건은 SECURITY
+    DEFINER 헬퍼로 판정한다"는 이 저장소의 표준 패턴을 세웠다. service_role은 이 저장소에서
+    지금까지 **읽는 화면이 없는 로그 전용 쓰기**(`audit-log.ts`·`lockout.ts`)에만 썼다 —
+    사용자가 클릭해서 트리거하는 일반 CRUD형 기능에 service_role을 쓴 전례가 없다.
+  - **배선 비용**: service_role 경로를 택했다면 `SUPABASE_SERVICE_ROLE_KEY`를 다루는 새
+    `import "server-only"` 모듈이 하나 더 필요했다(`audit-log.ts`와 같은 패턴). RPC 방식은
+    이미 있는 `createSupabaseServerClient()`(publishable key)로 충분하다.
+  - **실측으로 드러난 충돌과 해소**: 이 설계가 042A 인계 문서의 전제("`auth.uid()`가 없는
+    컨텍스트만 이 트리거의 제한을 받지 않는다")와 정확히 어긋나는 지점을 실측 중 발견했다 —
+    `reports_guard_self_update_reason_only` 트리거가 "`auth.uid()`가 NULL이 아니면(=
+    로그인 세션이면 누구든) `status`를 못 바꾼다"로 짜여 있어, 인증된 관리자 세션에서 실행되는
+    내 RPC의 UPDATE까지 막았다(`P0001` 실측). **트리거를 확장해 `is_system_admin` 세션도
+    통과시켰다**(마이그레이션 `admin_console_042b_reports_guard_admin_bypass`) — RPC가 이미
+    UPDATE 전에 같은 조건을 확인하므로 새 구멍이 아니라, 042A 트리거 주석이 예고한 "향후
+    관리자 콘솔(Task 042B)" 갈래를 실제로 채운 것이다.
+- **결정 B — `audit_logs.action`에 5개 `report.*` 값을 추가한다**: `report.dismissed`·
+  `report.post_removed`·`report.comment_removed`·`report.chat_message_removed`·
+  `report.account_suspended`. 단일 `report.resolved`로 뭉치지 않고 콘텐츠 종류별로 나눈
+  이유는 `audit_logs`에 `target_type` 컬럼이 없어서다(028부터 그렇다) — 행위 이름 자체가
+  무엇이 바뀌었는지 알려줘야 나중에 로그만 보고 대상 종류를 알 수 있다. 크루 임원·오너의
+  강제 삭제(`post.force_deleted`·`comment.force_deleted`, Task 038·041)와 별개 값을 쓴
+  이유는 행위 주체(관리자 vs 크루 임원)가 감사 관점에서 다른 신뢰 수준이라 로그에서 구분
+  가능해야 한다고 판단해서다. **`recordAuditLog()`(TS 헬퍼)는 호출하지 않는다** — RPC가
+  `reports.status` 전이·소프트삭제/계정 제재·`audit_logs` INSERT를 **단일 SQL 트랜잭션**으로
+  처리한다(I-054 회피 원칙의 연장, 042A가 `create_report`/`create_block`에서 이미 쓴 방식).
+  `AuditAction` 유니온에는 문서적 동기화 목적으로만 5개 값을 추가했다(`audit-log.ts` 참고).
+  `crewId`는 5종 모두 `null`이다 — `reports` 테이블 자체가 크루 스코프가 아니고(대상이
+  post/comment/chat_message/profile 어디든 신고 자체는 전역 개념), 콘텐츠 대상의 크루를
+  역추적하는 조인을 추가하는 비용 대비 지금 이 값을 소비하는 화면(크루별 감사 로그 뷰)이
+  없다.
+- **결정 C — 소프트삭제/계정 제재는 새 컬럼을 만들지 않고 기존 메커니즘을 재사용한다**:
+  `remove_content`는 대상 종류에 따라 `posts.deleted_at`/`comments.deleted_at`/
+  `chat_messages.deleted_at`(전부 이미 있음, 028)을 `now()`로 채운다 — 크루 임원의
+  "타인 게시글 삭제"(FR-032)와 정확히 같은 소프트삭제 계약이라 새 상태값이 필요 없다.
+  `suspend_account`는 `profiles.status`를 `'suspended'`로 바꾼다 — 이 값은 이미 028의
+  `profiles_status_check`에 있었다(`docs/decisions`가 "FR-082(계정 제재)에서 근거를 역산해
+  추론"했다고 남긴 그 값, `profile.types.ts` 원본 docstring). 즉 **스키마는 이미 이 결정을
+  기다리고 있었다** — 새 CHECK 값도 새 컬럼도 필요 없었다. `target_type==="profile"` 신고는
+  `remove_content`를 제공하지 않는다(콘텐츠가 아니라 사람이라 소프트삭제 대상이 없다,
+  `lib/rules/report-resolution.ts`).
+- **채택하지 않은 대안**: 하나의 신고 처리에서 콘텐츠 삭제와 계정 제재를 동시에 적용하는
+  것(예: "삭제 + 제재" 복합 액션)은 만들지 않았다 — FR-082 AC1 원문이 "삭제/기각/계정 제재"
+  3갈래를 병렬로 나열해 상호 배타적으로 읽었고, 복합 액션은 원자성·감사 로그 표현(하나의
+  액션에 두 대상이 바뀜)이 더 복잡해진다. 두 조치가 모두 필요하면 관리자가 처리를 두 번(예:
+  다른 신고 건으로 계정을 추가 제재) 수행해야 한다 — 알려진 한계로 `docs/ISSUES.md`에
+  남긴다.
+- **실측**: `docs/decisions/admin-console-042b.md` §4(전부 `begin`…`rollback`, 14개 시나리오).
+
+### D-051 · FR-065 AC2(Meetup 일정 변경)를 만족하는 설계는 있으나 예산상 이번 회차에 구현하지 않는다 — 현재 경로(취소+새 제안글)는 AC2 미충족 임시 조치다
+
+- **일자**: 2026-07-25(1차) / 2026-07-26(팀장 반론 반영, 정정)
+- **결정자**: BOARD (21일차, Task 041) — 1차 판단은 팀장 재검토 요청, 팀장 반론(같은 날)을
+  받아 **정정**했다. 원 서술의 오류를 아래 "정정 이력"에 남긴다.
+- **정정 이력(2026-07-26)**: 1차 판은 "AC2(보완 등급)와 D-003(고객 확정)이 정면으로 어긋나서
+  뒤에 나온 확정이 이겼다"고 서술했다 — **틀렸다.** 팀장이 원문을 대조해 지적한 대로, 둘은
+  서로 다른 축을 규정해 충돌하지 않는다: **AC2는 결과(outcome)**("바가 새 날짜로 이동하고
+  이력이 남는다")를, **D-003은 승인 경로(authorization)**("재투표를 요구한다")를 정한다.
+  "재투표로 승인 → 그 결과로 기존 Meetup의 날짜가 바뀌고 이력이 남는다"는 설계는 두 문장을
+  **동시에** 만족한다 — D-003이 금지하는 것은 "재투표 **없는** 직접 UPDATE"뿐이다. 1차 판은
+  이 "재투표를 거친 뒤의 UPDATE"라는 선택지를 대안 목록에서 아예 빠뜨리고, 대안①(무가드
+  직접 UPDATE, 이건 실제로 D-003 위반)이 기각되자 곧바로 "취소+새 제안글"로 건너뛰었다 —
+  중간 선택지를 검토하지 않은 것은 대안 나열이 불완전했던 것이지, 요구사항이 결정에 진 것이
+  아니었다. 그래서 **결론(이번 회차에 구현하지 않음)은 유지하되, 근거를 다시 쓴다** — "AC2가
+  D-003에 졌다"가 아니라 "AC2를 충족하는 설계가 있지만 이번 회차 예산으로 못 만들었다"이다.
+- **맥락**: `requirements.md` FR-065 AC2 원문 — "Given 날짜 변경, When 저장, Then 캘린더의
+  바가 새 날짜로 이동하고 변경 이력이 남는다." D-003 원문(관련 부분) — "가결된 Meetup의
+  날짜 변경은 재투표를 요구하며, 취소는 임원·오너·제안자가 할 수 있다." D-003 어디에도
+  "재투표 가결 후에는 새 행을 만들어야 한다"거나 "기존 행을 고치면 안 된다"는 서술은 없다 —
+  승인 경로만 규정한다.
+- **AC2를 실제로 만족하는 설계(이번 회차에 구현하지 않음)**: 기존 확정 Meetup에 **묶인**
+  "일정 변경 투표"를 새로 만들고(일반 FR-034 제안글과는 다른 종류 — 새 Meetup을 만드는 게
+  아니라 기존 Meetup을 가리킨다), 그 투표가 가결되면 `finalize_closed_poll`(Task 034)에
+  분기를 하나 추가해 **새 행을 INSERT하는 대신 기존 Meetup 행을 UPDATE**(날짜·시각·장소 등)
+  하고 별도 이력(테이블 또는 컬럼)에 이전 값을 남긴다. 이러면 캘린더 바는 정말로 "이동"하고
+  (같은 `meetups.id`가 유지된다), "변경 이력"도 사용자가 볼 수 있는 형태로 실재한다 — AC2를
+  문자 그대로 만족하는 유일한 설계다.
+- **왜 이번 회차에 안 만들었나 — 구체적 스키마 제약이 근거다(CREW 042B 독립 검증에서 확인,
+  이 결정에도 재사용)**: `polls.post_id`에 `polls_post_id_key UNIQUE (post_id)`,
+  `meetups.poll_id`에 `meetups_poll_id_key UNIQUE (poll_id)` 제약이 걸려 있다(직접
+  `pg_constraint` 조회로 재확인) — 즉 **제안글 1개 : 투표 1개 : Meetup 1개**가 스키마 수준의
+  불변식이다. "재투표 승인 → 기존 Meetup UPDATE" 설계는 **기존 Meetup을 겨냥하는 새 투표**를
+  요구하는데, 지금 스키마에는 그 투표를 기존 Meetup에 묶을 자리가 없다 — 새 투표는 정의상 새
+  `post`(모임 제안글)에서만 생기고, 그 새 `post`가 만드는 Meetup은 UNIQUE 제약상 항상 **새
+  행**이지 기존 행을 가리킬 수 없다. 이게 추상적 "예산 부족"이 아니라 **지금 스키마가 이
+  설계를 구조적으로 지원하지 않는다는 구체적 사실**이다. 마이그레이션(스키마 변경) 없이는
+  애초에 시도할 수조차 없다.
+  이 마이그레이션 자체의 비용도 작지 않다: ① 새 투표가 "기존 어느 Meetup을 겨냥하는가"를
+  담을 컬럼/테이블 + 변경 이력을 담을 컬럼/테이블 신설(위 UNIQUE 제약과 충돌하지 않게 재설계
+  필요), ② **`finalize_closed_poll`(Task 034가 만든, 트리거①②③이 공유하는 단일 funnel)
+  수정** — 새 INSERT 경로 옆에 UPDATE 분기를 추가하고 두 경로 모두 회귀 테스트, ③ UI —
+  "일정 변경 제안" 작성 진입점(일반 모임 제안과 구분되는 폼)과 Meetup 상세의 "일정 변경
+  이력" 표시, ④ **설계 질문 하나가 새로 생긴다**: 날짜가 바뀌면 기존 참석/불참 응답
+  (FR-066·067)은 어떻게 되는가 — 요구사항 어디에도 답이 없다(무효화? 유지? 재확인 요청?).
+  이건 구현 난이도가 아니라 **새로 결정해야 하는 제품 질문**이라 이번 회차에 임의로 정할 수
+  없었다. 스키마 제약(마이그레이션 필요) + 핵심 트리거 수정 + 미결 제품 질문을 합치면
+  Task 041에 이미 쓴 시간을 제외하고도 수 인일 규모라 9.5인일 예산 안에서 감당할 수
+  없었다 — **미구현 사유는 "스키마가 아직 지원하지 않고, 지원하게 만드는 비용이 이번 회차
+  예산을 넘는다"이지 "AC2가 D-003에 졌다"가 아니다.**
+- **결정**: 위 설계는 다음 회차 후보로 남기고, 이번 회차는 **`cancelMeetupAction`을 재사용한
+  "취소 + 새 제안글 작성" 흐름을 임시 경로로 구현**한다 — 취소된 Meetup은 명시적으로
+  `cancelled`로 남고, 새 제안이 재투표를 거쳐 가결되면 완전히 새로운 Meetup이 생긴다. **이
+  경로는 D-003(재투표 요구)은 만족하지만 AC2(바 이동·이력)는 만족하지 못한다** — 사용자
+  에게는 "취소된 모임 하나 + 새로 확정된 모임 하나"로 보이고, 동일 일정이 이동했다는 연속성이
+  없다. 이는 **AC2 미충족 상태로 남는 임시 조치**이지 AC2를 다른 방식으로 재해석해 완결한
+  것이 아니다.
+- **대안**: ① **무가드 직접 UPDATE**(재투표 없이 날짜만 바로 저장) — D-003을 그대로
+  위반하므로 **기각**(원칙적으로 배제, 이월 대상이 아니다). ② **낙관적 UI로 즉시 이동한
+  것처럼 보이게 꾸미기**(실제 재투표 결과와 무관하게 화면만 낙관 표시) — 실제 상태와
+  어긋나는 거짓 표시라 D-030 ③과 충돌해 **기각**. ③ **Meetup에 `superseded_by_meetup_id`
+  같은 연결 컬럼만 추가**(취소된 옛 Meetup과 새 Meetup을 링크) — UNIQUE 제약과는 충돌하지
+  않아 시도 가능하지만, 여전히 두 개의 별개 행으로 남아 AC2의 "바가 이동한다"(연속성)를
+  충족하지 못한다 — **부분 완화책일 뿐 AC2 충족이 아니라 기각**. **④ 재투표를 거친 뒤 기존
+  Meetup을 UPDATE**(위 "AC2를 실제로 만족하는 설계" 절) — **기각이 아니라 이월**이다. D-003을
+  위반하지 않고 AC2를 문자 그대로 만족하는 유일한 설계이지만, `polls.post_id`·`meetups.
+  poll_id` UNIQUE 제약 때문에 스키마 변경 없이는 시도 자체가 불가능해 이번 회차 예산으로
+  다루지 못했다 — 다음 회차가 **처음부터 검토해야 할 1순위 후보**로 남긴다(`docs/ISSUES.md`
+  I-079).
+- **영향**: FR-065 AC2(**미충족으로 정직하게 남는다** — "구현했다"로 부르지 않는다), D-003.
+  `docs/ISSUES.md` I-079(이 정정에 맞춰 갱신). `docs/decisions/community-expansion-041.md` §3.
+
+### D-052 · 테스트 러너(R-002 대응)는 Task 036에서 도입하지 않는다 — 최소 스펙만 다음 회차로 남긴다
+
+- **일자**: 2026-07-25
+- **결정자**: DESIGN (21일차, Task 036 — R-002가 "컴포넌트가 늘기 전에 도입 여부를 D-\*로
+  결정한다"고 위임한 그 결정)
+- **맥락**: R-002는 테스트 러너·포매터·CI 부재를 열린 리스크로 등록하며 "도입 여부를 D-\*로
+  결정한다"는 대응을 못박아 뒀다. Task 036(통합 테스트)이 이 결정을 내리기에 가장 자연스러운
+  시점이었고, I-071(투표 판정 공식의 TS·SQL 이중화)이 구체적인 도입 근거를 제공했다.
+- **결정**: **이번 회차에 도입하지 않는다.** 이유 셋(**21일차 CORE 교차검증 지적으로 원 근거②
+  삭제**, 아래 "근거② 정정" 참고): ① 이번 회차 자체가 `npm run build` 왕복 실패·크루 스코프
+  라우트 전체 dev 서버 오응답(I-083)을 겪을 만큼 세 팀원이 같은 파일 트리를 동시에 커밋 전
+  상태로 바꾸는 중이었다 — 새 도구를 얹기 가장 나쁜 시점이다. ③ 로드맵상 이번 이후 남은
+  Task는 045 하나뿐이라 도입해도 키울 다음 라운드가 사실상 없다. ④ 34×6 권한 매트릭스는
+  이번 회차의 수동 통합 테스트(`docs/decisions/integration-test-036.md` §2)로 이미 실측
+  검증됐다 — "회귀를 못 잡는다"는 R-002의 우려가 이번 한 번은 상쇄됐다(단, 그 실측 과정에서
+  "정적 대조만"으로 표시했던 8행 중 2행이 CORE 재검증에서 실제로 뚫려 있었음이 드러났다 —
+  I-085·I-086. 이는 "수동 통합 테스트도 검증 방법을 잘못 고르면 놓친다"는 신호이지 "테스트
+  러너가 있었으면 안 뚫렸다"는 뜻은 아니다 — I-085·I-086은 RLS·트리거 레벨 결함이라 vitest
+  단위 테스트가 아니라 §2.4가 남긴 "조건부 셀은 SQL로 재현한다"는 수동 규율로 잡히는
+  종류다).
+  - **근거② 정정(21일차, CORE 지적)**: 원래 "I-071의 위험은 이미 수동 규율로 완화돼 있고,
+    이번 회차에 그 지점이 바뀌지 않아 위험이 당장 현실화되지 않았다"고 적었으나, **이건
+    "안 터졌다"를 "안전하다"의 근거로 쓴 논리적 오류다** — 삭제한다. 위험이 이번 회차에
+    현실화되지 않은 것은 사실이지만, 그것이 위험을 완화시켰다는 뜻은 아니다. 대신
+    **CORE의 판단을 근거로 넣는다**: "I-071을 I-074식 정적 검사(ESLint import 구조 분석)로
+    막을 수 있는가"는 **불가능**하다 — I-074는 "이 이름을 이 파일들 밖에서 import하는가"라는
+    **구문(syntax) 문제**라 정적 분석으로 충분하지만, I-071은 "TS 함수와 SQL 함수가 같은
+    입력에 같은 출력을 내는가"라는 **의미(semantics) 문제**라 반드시 **실행하고 비교**해야
+    한다 — 종류가 다른 문제이므로 "정적 검사를 늘리면 된다"는 대안은 애초에 성립하지 않고,
+    테스트 러너(또는 그에 준하는 실행 기반 검증) 없이는 I-071을 자동으로 잡을 방법이 없다.
+    이 사실은 오히려 **도입을 늦출 근거가 아니라 도입이 필요해지는 시점을 앞당기는 근거**다
+    — 그래도 ①③④가 이번 회차엔 미도입 쪽으로 충분히 방어한다고 판단해 결정 자체는 유지한다.
+- **대신 남기는 것**: 도입 시 최소 스펙(범위 `lib/rules/quorum.ts`·`poll-decision.ts`·
+  `poll-eligibility.ts` 순수 함수만, `vitest`, CI 연동은 별개 결정으로 분리)을
+  `docs/ISSUES.md` I-071과 `integration-test-036.md` §6.3에 적어 뒀다.
+- **대안**: ① **지금 최소 규모로 도입** — I-071 위험 완화에는 유리하나 위 이유①③으로 기각.
+  ② **영구 보류(R-002를 "완화" 대신 "수용"으로 재분류)** — 프로젝트가 v1.0 이후로도 이어지면
+  이 위험이 반복 재발할 근거(이미 재발 이력 있음, R-002 "신호" 참고)가 있어 기각. **"다음
+  결정 시점을 다시 남긴다"는 절충(이번 결정)을 택했다.**
+- **영향**: R-002(대응 문구는 그대로 "완화"를 유지하되, "다음 판단 시점"을 이번 결정으로
+  갱신), I-071, `docs/decisions/integration-test-036.md` §6.
+
+### D-053 · 권한 매트릭스의 댓글 수정·삭제 3행은 원문에 없다 — `post:*` 대칭으로 보완했다
+
+- **일자**: 2026-07-26
+- **결정자**: BOARD (Task 041) — CREW의 042B 교차검증 지적을 받아 등재
+- **맥락**: `requirements.md` 3.3절 권한 매트릭스 원문에는 **"댓글 작성"(`comment:create`)
+  1행만** 있다. 게시글은 "자기 게시글 수정·삭제"·"타인 게시글 삭제" 2행이 원문에 명시된
+  것과 달리, 댓글 수정·삭제 행 자체가 원문에 없다. Task 041(FR-033)이 `lib/rules/
+  permission.ts`에 `comment:update_own`·`comment:delete_own`·`comment:delete_any` 3행을
+  추가했는데, **대조할 원문이 없다** — `post:update_own`·`post:delete_own`·`post:delete_any`
+  3분할과의 대칭, 그리고 FR-033 제목("작성·수정·삭제")을 근거로 삼은 보완이었다. 이 사실을
+  당시 기록하지 않아 다음 사람이 "요구사항에 있던 것"과 "보완한 것"을 구분할 수 없었다 —
+  권한 매트릭스는 34행(이제 37행) 전수 검증의 기준 문서라(Task 036이 그렇게 다뤘다) 원문
+  대조 없이 조용히 늘어나면 매트릭스가 요구사항과 갈라지는 시작점이 된다.
+- **결정**: 추가한 3행을 그대로 유지한다(방향 자체는 CREW·팀장 모두 타당하다고 판단, blocking
+  아님). 대신 이 결정 항목으로 **출처를 명시**한다 — 역할별 값:
+
+  | 액션 | guest | member | crew_member | crew_staff | crew_owner | system_admin |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | `comment:update_own` | deny | deny | allow(본인) | allow(본인) | allow(본인) | allow(본인) |
+  | `comment:delete_own` | deny | deny | allow(본인) | allow(본인) | allow(본인) | allow(본인) |
+  | `comment:delete_any` | deny | deny | deny | allow | allow | allow |
+
+  `post:update_own`·`post:delete_own`·`post:delete_any`와 값이 완전히 대칭이다. 실제
+  `PermissionAction`·`PERMISSION_MATRIX`의 액션 수는 이 3행을 더해 **34개에서 37개로**
+  늘었다(`lib/rules/permission.ts` 상단 docstring에 이미 반영, 여기서는 결정으로만 기록).
+- **영향**: `lib/rules/permission.ts`·`lib/types/permission.types.ts`(변경 없음, 이미 반영된
+  코드에 근거만 사후 기록), `docs/CONVENTIONS.md`(권한 매트릭스 34→37행 참조가 있다면 갱신
+  대상), Task 036의 권한 매트릭스 전수 검증 문서.
+
+### D-054 · `polls` 판정 결과 컬럼은 사람 세션에서 "덮어쓰기"로 보호한다(거부가 아니다) — I-089 긴급 수정
+
+- **일자**: 2026-07-26
+- **결정자**: BOARD (21일차 긴급 — I-089 CRITICAL 즉시 수정, 팀장 지시)
+- **맥락**: I-089(`docs/ISSUES.md`) — `polls_update_proposal_author_or_staff` RLS가 제안자
+  본인/staff/owner의 `polls` UPDATE를 허용하면서 `status`·`result`·`decided_at`·`closed_by`
+  값을 전혀 제한하지 않았고, `polls`엔 BEFORE UPDATE 가드가 없었다. 실측으로 확인: 일반
+  크루원이 실제 투표 0표인 채로 `closed_passed`/`passed`를 직접 써넣으면 성공하고 AFTER
+  UPDATE 트리거(`trg_polls_finalize_closed_poll`)가 그대로 발동해 진짜 `meetups` 행을
+  만든다 — D-003(정족수·과반) 전체가 우회된다.
+- **결정 A — 세 번째로 판정식을 베끼지 않는다**: `run_poll_auto_close_job`(Task 034)이
+  인라인하던 정족수·판정 계산을 `private.compute_poll_decision(poll_id)`로 뽑아내
+  **하나의 SQL 소스**로 만들고, 이번에 추가하는 신규 가드 트리거도 그 함수를 그대로 호출한다.
+  I-071(TS·SQL 이중화)이 이미 "물리적으로 못 피한다"고 인정한 이중화(TS 1벌 + SQL 1벌)를
+  **세 벌로 늘리지 않는** 선에서 멈췄다 — SQL 쪽 내부에서는 이제 한 벌이다.
+  - `run_poll_auto_close_job`은 계산 로직을 한 글자도 바꾸지 않고 호출 방식만 이 함수로
+    바꿨다 — cron 경로(가장 위험한 자리, 팀장 강조)의 회귀 위험을 최소화하는 선택이다.
+- **결정 B — "거부"가 아니라 "재계산해서 덮어쓴다"**: 신규 BEFORE UPDATE 트리거
+  (`polls_guard_decision_integrity`)는 사람 세션(`auth.uid()` not null)의 `open→closed_*`
+  전이에서 클라이언트가 보낸 `status`/`result`/`decided_at`을 검증해 **거부**하는 대신,
+  그 자리에서 `private.compute_poll_decision`으로 다시 계산해 **덮어쓴다**. 정상 경로
+  (`closePoll`/`decideAndClosePoll`, TS)가 이미 같은 공식으로 같은 값을 계산해 보내므로
+  재계산 결과와 항상 일치해 회귀가 없고, 혹시 TS·SQL 두 벌 사이에 미묘한 불일치(타이밍·
+  엣지케이스)가 있어도 **진실(SQL 재계산값)이 항상 이긴다** — 위조 시도가 있어도 예외로
+  전체 요청을 실패시키지 않고 조용히 올바른 값으로 대체된다.
+  - **대안(기각)**: 재계산값과 클라이언트 값이 다르면 예외로 거부 — 더 엄격하지만, 공식이
+    TS/SQL 사이에서 미묘하게 갈리는 버그가 생기면 **정당한 조기 종료 자체가 막혀버린다**
+    (팀장이 가장 우려한 회귀 지점). 덮어쓰기는 그 실패 모드를 원천적으로 없앤다 — 대신 TS·
+    SQL 공식이 갈리면 "화면에 표시되는 결과가 실제 값과 다르게 보일 수 있다"는 잔여 위험이
+    생기는데, 이는 두 공식이 지금 실제로 동일함을 4개 시나리오(0표 위조·정족수+과반 정상
+    가결·동수→부결·cron 자동 종료)로 실측 확인해 완화했다.
+  - **`closed_by`**: `NULL`(트리거①③, D-035 "자동 종료엔 human actor가 없다")이거나
+    `auth.uid()` 자기 자신만 허용한다 — 남의 프로필 id로 "내가 아니라 쟤가 닫았다"고 조작할
+    수 없다. 이미 종료된 poll의 재조작(사람 세션)은 예외로 거부한다(FR-044, `poll_votes`의
+    NFR-032 "표는 불변"과 같은 원칙 — "판정 결과도 한번 확정되면 불변"으로 확장했다).
+  - `auth.uid()`가 NULL인 세션(pg_cron, `run_poll_auto_close_job`의 실행 컨텍스트)은 이
+    가드를 완전히 건너뛴다 — 그 경로는 이미 같은 공유 함수로 스스로 계산한 값을 쓴다.
+- **실측(전부 `begin`…`rollback`, 실 crew-1 시드 계정)**: ① 0표 위조 시도 → 자동으로
+  `closed_invalid`/`invalid`로 정정, Meetup 0건 ② 제안자의 정당한 조기 종료(정족수+과반
+  충족) → `closed_passed`/`passed` 그대로 유지, Meetup 1건 정상 생성 ③ 동수 투표 →
+  `closed_rejected`/`rejected`로 정정(D-003) ④ **pg_cron 경로**(`auth.uid()` NULL 확인 후
+  호출) → 정상 종료·판정·Meetup 생성 전부 기존과 동일하게 동작(회귀 없음) ⑤ 이미 닫힌 poll
+  재조작 시도 → 예외로 차단 ⑥ `anon`의 트리거 함수 직접 RPC 호출 시도 → 차단(후속 grant
+  수정 후). 전부 기대와 일치.
+- **후속 수정 1건**: `get_advisors(security)`가 `polls_guard_decision_integrity`를 `anon`/
+  `authenticated`가 `/rest/v1/rpc/`로 직접 호출 가능한 `SECURITY DEFINER` 함수로 새로
+  경고했다(042A가 이미 겪은 "public 스키마 신규 함수 기본 권한" 패턴 재발) — 트리거 전용
+  함수라 클라이언트가 직접 부를 이유가 없어 `revoke`로 닫았다.
+- **영향**: FR-040~045(투표)·D-003·D-032·D-022. 마이그레이션 2건:
+  `major_fix_i089_polls_decision_integrity`·`major_fix_i089_revoke_trigger_function_execute`.
+  `docs/ISSUES.md` I-089 상태 갱신. TS 코드는 한 줄도 바꾸지 않았다(`closePoll`·
+  `decideAndClosePoll`·`cast-vote.ts`·`close-poll.ts` 전부 무변경) — 수정이 전부 DB 레이어에
+  있다.
+
+### D-055 · `poll_votes.invalidated`는 트리거 중첩 호출(`pg_trigger_depth()`)로만 식별하고, 가드는 다른 테이블 RLS 가시성에 기대지 않는다 — I-092 수정
+
+- **일자**: 2026-07-26
+- **결정자**: BOARD (21일차 — I-092, CREW의 I-089 재검증이 찾은 파생 결함 즉시 수정)
+- **맥락**: CREW가 I-089 재검증 중 `poll_votes.invalidated`가 self-service UPDATE로 무제한
+  변경 가능함을 실측으로 찾았다(I-092) — staff가 강퇴 없이 남의 표를 무효화, 강퇴자가 자기
+  표를 재유효화. `private.compute_poll_decision`(D-054가 신설)이 정확히 이 `invalidated`로
+  필터링하므로, I-089의 "진짜 투표로 재계산" 방어는 `poll_votes`가 정직하다는 전제 위에
+  서 있었는데 그 전제 자체가 흔들릴 수 있었다. CREW는 또한 "강퇴자가 자기 표의 `choice`를
+  바꾸려는 시도가 막히는 것이 의도된 방어가 아니라 우연"임을 밝혔다 — 옛 트리거가 SECURITY
+  INVOKER라 내부 `polls` 조회가 호출자의 `polls_select_members` RLS(활성 크루원 전용)를
+  타서, 강퇴된 사람에게는 그 조회가 우연히 0행이 되어 예외가 났을 뿐이다.
+- **결정 A — `invalidated`의 정당한 변경자는 `pg_trigger_depth() > 1`로 식별한다**: 유일한
+  정당한 변경 경로는 `crew_memberships_invalidate_votes_on_removal`(강퇴 트리거, AFTER
+  UPDATE ON `crew_memberships`, SECURITY DEFINER)이 그 안에서 `poll_votes`를 UPDATE하는
+  중첩 호출뿐이다. 이 프로젝트가 `crew_memberships_guard_self_transition`(029A)에서 이미
+  쓰던 "신뢰된 중첩 호출은 `pg_trigger_depth() > 1`로 식별한다" 패턴을 그대로 재사용했다 —
+  새 메커니즘(세션 GUC 플래그 등)을 만들지 않았다. 사람이 `poll_votes`를 직접 UPDATE하는
+  경로는 항상 depth 1이라 이 조건으로 명확히 구분된다.
+- **결정 B — "우연한 방어"를 SECURITY DEFINER + 명시적 판정으로 교체한다**: `poll_votes_
+  guard_immutability`를 SECURITY INVOKER에서 DEFINER로 바꿔 내부 `polls` 조회가 호출자 RLS
+  가시성과 무관하게 항상 진실을 보게 했다. 그리고 두 규칙을 명시적으로 추가했다 — ① 이미
+  `invalidated`된 표는 `choice`/`voted_at`도 못 바꾼다(재유효화든 뭐든) ② `poll_eligible_
+  voters`+`crew_memberships`를 직접 조회해 "투표자가 지금도 이 크루의 활성 멤버인가"를
+  판정한다. 결과적으로 실질 차단 범위는 옛 우연한 방어와 동일하다(강퇴·자진탈퇴 불문 비활성
+  투표자는 못 바꿈) — **의도적으로 동일하게 유지했다**, `polls_select_members`가 나중에
+  넓어져도(예: 열람 범위 확장) 이 방어는 흔들리지 않는다.
+- **결정 C(minor, 같은 마이그레이션)**: CREW가 `polls_guard_decision_integrity`(D-054)의
+  완전성 gap도 실측했다 — `new.status`가 `closed_*`가 아니면 조기 반환해, `status`를 유지한
+  채 `closed_by`만 바꾸는 UPDATE는 가드를 안 탔다. `open` 유지 전이에서는 `result`/
+  `decided_at`/`closed_by`를 `old` 값으로 되돌리는 무해화 분기를 추가해 닫았다.
+- **실측**: 8개 시나리오(무관한 표 직접 무효화 차단·강퇴자 자기 표 재유효화 차단·강퇴자
+  `choice` 변경 시도가 이제 "invalidated된 표는 변경할 수 없습니다" 명시적 사유로 차단·정상
+  강퇴 시 자동 무효화 회귀·활성 투표자의 정당한 투표 변경 회귀(FR-041 AC2)·`compute_poll_
+  decision`이 무효화된 표를 정확히 제외·**cron 경로 재확인(회귀 없음)**·staff의 정당한
+  조기 종료 회귀) 전부 `begin`…`rollback`으로 확인, 전부 기대 일치.
+- **영향**: FR-041·D-003. 마이그레이션 1건: `major_fix_i092_poll_votes_invalidated_guard`.
+  `docs/ISSUES.md` I-092 상태 갱신, I-091 표의 `poll_votes` 행 갱신. TS 코드 무변경.

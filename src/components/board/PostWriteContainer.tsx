@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PostWriteForm } from "@/components/board/PostWriteForm";
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
+import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import { getBoardByCrewId, getCrewById } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import type { Id } from "@/lib/types";
@@ -22,6 +23,21 @@ import type { Id } from "@/lib/types";
  * 크루면 아예 막는다(팀장 지시: "쓰기 전용 라우트는 아예 막아도 된다"). 이 UI 차단은 UX
  * 안내일 뿐이고, 실제 강제 경계는 CORE가 posts INSERT RLS 정책에 추가하는
  * `crews.status='active'` 조건이다(I-066 해소 방향 1, SQL이 최종 경계 — 18일차 교훈).
+ *
+ * **20일차(I-069 근본 해결, DESIGN) — 이 파일에는 `forbidden` throw 지점이 둘 있었고, 도달성이
+ * 갈려 처리를 다르게 했다(19일차 영향 범위 인벤토리 참고).**
+ * - **`crew_archived`(해산된 크루) — 값 반환으로 전환.** 해산된 크루는 항상 이 조건에 걸려
+ *   도달성이 "중간"이다(DESIGN이 19일차 이 정확한 지점에서 I-069를 최초 발견했다). 프로덕션
+ *   빌드는 서버 컴포넌트 예외의 `cause`를 클라이언트로 넘기지 않아(Next.js 공식 보안 동작)
+ *   `error.tsx`의 `classifyError`가 이 throw를 항상 분류 실패로 떨어뜨렸다 — 지금은
+ *   `<RouteErrorBoundary kind="forbidden" />`를 값으로 직접 반환한다.
+ * - **`post:create` 거부 — throw를 그대로 둔다.** `post:create`는 현재 권한 매트릭스에서
+ *   `crew_member` 이상 전원 `allow`이고(`lib/rules/permission.ts`), 이 지점에 오기 전에
+ *   이미 `(app)/crews/[crewId]/layout.tsx`(D-039)가 "크루원인가"를 걸렀다 — 즉 이 분기가
+ *   실제로 타는 경로가 현재 매트릭스에 없다(방어적 코드, 도달성 "사실상 0", 19일차 인벤토리
+ *   #7). 도달 불가능한 코드를 전환해도 프로덕션 실측으로 검증할 방법이 없어 이번 회차
+ *   범위(도달성 높은 4곳)에서 제외했다 — 향후 role 세분화로 `post:create`가 `crew_member`
+ *   전원 허용이 아니게 되면 이 throw도 재검토 대상이다.
  */
 export async function PostWriteContainer({ crewId }: { crewId: Id }) {
   const board = await getBoardByCrewId(crewId);
@@ -39,9 +55,7 @@ export async function PostWriteContainer({ crewId }: { crewId: Id }) {
 
   const crew = await getCrewById(crewId);
   if (crew?.status !== "active") {
-    throw new Error("해산된 크루에는 글을 쓸 수 없다.", {
-      cause: { code: "forbidden", message: "crew_archived" },
-    });
+    return <RouteErrorBoundary kind="forbidden" />;
   }
 
   return <PostWriteForm crewId={crewId} />;

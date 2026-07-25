@@ -12,3 +12,9 @@ export function getBoardListHref(crewId: Id): string {
 export function getPostDetailHref(crewId: Id, postId: Id): string {
   return `/crews/${crewId}/board/${postId}`;
 }
+
+/** 글쓰기 경로(FR-030, FR-065 "일정 변경"이 여기로 유도한다 — `community-expansion-041.md`
+ *  §3 참고). */
+export function getBoardWriteHref(crewId: Id): string {
+  return `/crews/${crewId}/board/new`;
+}

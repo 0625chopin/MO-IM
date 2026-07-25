@@ -3,6 +3,8 @@
 import { Loader2Icon } from "lucide-react";
 import { useActionState } from "react";
 
+import { BlockButton } from "@/components/moderation/BlockButton";
+import { ReportDialog } from "@/components/moderation/ReportDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +62,12 @@ export interface MemberListProps {
  *
  * **오너 이양(FR-025)·강퇴(FR-027)는 Task 040이 추가했다** — 둘 다 되돌리기 어렵거나(이양)
  * 대상에게 직접적인 영향을 주는(강퇴) 조작이라 다이얼로그로 한 번 더 확인한다.
+ *
+ * **신고(FR-080)·차단(FR-081)은 Task 042A가 추가했다** — 크루원 목록이 "차단이 조회 경로에
+ * 영향을 준다면 최소 침습으로 적용하라"는 팀장 지시가 명시한 지점 중 이 컴포넌트(CREW 소유
+ * 도메인)에 해당한다. 게시판·채팅 쪽 접힘 처리는 이번 회차 범위 밖이다(`docs/decisions/
+ * report-block-042a.md`). 두 버튼 다 오너·임원 여부와 무관하게 본인이 아닌 모든 행에 뜬다
+ * (매트릭스상 `report:create`·`block:create`는 role 분기가 없다).
  */
 export function MemberList({ crewId, crewName, members }: MemberListProps) {
   return (
@@ -104,6 +112,15 @@ export function MemberList({ crewId, crewName, members }: MemberListProps) {
                     profileId={member.profileId}
                     displayName={member.displayName}
                   />
+                )}
+                {member.canReportOrBlock && (
+                  <>
+                    <ReportDialog targetType="profile" targetId={member.profileId} />
+                    <BlockButton
+                      blockedId={member.profileId}
+                      initialBlocked={member.isBlockedByViewer}
+                    />
+                  </>
                 )}
                 {member.isSelf &&
                   (member.canLeave ? (

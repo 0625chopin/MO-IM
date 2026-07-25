@@ -1,9 +1,21 @@
-import { AlertTriangleIcon, Loader2Icon } from "lucide-react";
+import { AlertTriangleIcon, Loader2Icon, Trash2Icon } from "lucide-react";
 
 import { formatMessageTime } from "@/components/chat/format-message-time";
 import type { ChatTimelineItem } from "@/components/chat/message-view-models";
 import { PostLinkCard } from "@/components/chat/PostLinkCard";
+import { BlockedContentNotice } from "@/components/moderation/BlockedContentNotice";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { strings } from "@/lib/strings";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +26,15 @@ export interface MessageBubbleProps {
   isOwn: boolean;
   /** `message.deliveryStatus === "failed"`일 때만 쓰인다(FR-051 E1 "실패 표시 + 재전송 버튼"). */
   onRetry?: () => void;
+  /** FR-081 AC1(Task 042A) — 뷰어가 이 메시지의 발신자를 차단했는가. `isOwn`이면 항상 false로
+   *  넘어온다(자기 자신을 차단할 수 없다 — `blocks_check` CHECK, `create_block` RPC). */
+  isSenderBlocked?: boolean;
+  /** FR-054(Task 041) — 본인 메시지이거나 임원·오너·관리자면 true(`MessageList`가 이미
+   *  `isOwn || canDeleteAnyMessage`로 계산해 내려준다). `deliveryStatus !== "sent"`(낙관적
+   *  렌더 중이거나 실패한 메시지)에는 이 값과 무관하게 삭제 버튼을 그리지 않는다 — 서버에
+   *  아직 확정되지 않은 메시지는 지울 대상 자체가 없다. */
+  canDelete?: boolean;
+  onDelete?: () => void;
 }
 
 /**
@@ -34,8 +55,20 @@ export interface MessageBubbleProps {
  * 스크롤 위치·읽음 지점을 복원할 때 이 속성으로 앵커 메시지를 찾는다(`chat-scroll-storage.ts`
  * 참고). 새 조건 분기를 추가할 때(예: 다른 삭제 표시 방식) 이 속성을 빠뜨리면 그 메시지 종류로
  * 스크롤이 복원되지 않는다.
+ *
+ * **FR-081 AC1(Task 042A, 20일차)**: `isSenderBlocked`면 말풍선 내용(`MessageContent`)만
+ * `BlockedContentNotice`로 감싼다 — 아바타·이름·시각은 그대로 둔다(`PostDetail`과 같은 원칙:
+ * 누구 메시지인지는 계속 보여야 신고·차단 판단이 가능하다). 말풍선이 `<Link>`로 감싸여 있지
+ * 않으므로(`BoardListItem`과 달리) 상호작용 요소 중첩 문제가 없다.
  */
-export function MessageBubble({ message, isOwn, onRetry }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isOwn,
+  onRetry,
+  isSenderBlocked = false,
+  canDelete = false,
+  onDelete,
+}: MessageBubbleProps) {
   if (message.deletedAt) {
     return (
       <div data-message-id={message.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
@@ -46,6 +79,7 @@ export function MessageBubble({ message, isOwn, onRetry }: MessageBubbleProps) {
 
   const isPending = message.deliveryStatus === "pending";
   const isFailed = message.deliveryStatus === "failed";
+  const showDelete = canDelete && !isPending && !isFailed && onDelete;
 
   return (
     <div
@@ -67,7 +101,13 @@ export function MessageBubble({ message, isOwn, onRetry }: MessageBubbleProps) {
             <span className="px-0.5 text-xs text-muted-foreground">{message.senderDisplayName}</span>
           )}
           <div className={cn("flex items-end gap-1.5", isOwn && "flex-row-reverse")}>
-            <MessageContent message={message} isOwn={isOwn} pending={isPending} />
+            {isSenderBlocked && !isOwn ? (
+              <BlockedContentNotice>
+                <MessageContent message={message} isOwn={isOwn} pending={isPending} />
+              </BlockedContentNotice>
+            ) : (
+              <MessageContent message={message} isOwn={isOwn} pending={isPending} />
+            )}
             {isPending ? (
               <span
                 className="mb-0.5 flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground"
@@ -83,6 +123,35 @@ export function MessageBubble({ message, isOwn, onRetry }: MessageBubbleProps) {
               >
                 {formatMessageTime(message.createdAt)}
               </time>
+            )}
+            {showDelete && (
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={strings.chat.message.delete.triggerLabel}
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                    />
+                  }
+                >
+                  <Trash2Icon aria-hidden="true" className="size-3.5" />
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{strings.chat.message.delete.confirmTitle}</DialogTitle>
+                    <DialogDescription>{strings.chat.message.delete.confirmDescription}</DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose render={<Button variant="outline" />}>
+                      {strings.chat.message.delete.cancelAction}
+                    </DialogClose>
+                    <Button variant="destructive" onClick={onDelete}>
+                      {strings.chat.message.delete.confirmAction}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>

@@ -4,7 +4,14 @@ import { getBoardListHref } from "@/components/board/board-links";
 import type { BoardPostSummary } from "@/components/board/board-view-models";
 import { BoardList } from "@/components/board/BoardList";
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
-import { getBoardByCrewId, getCrewById, getPollByPostId, getProfileById, listPostsByPage } from "@/lib/data";
+import {
+  getBoardByCrewId,
+  getCrewById,
+  getPollByPostId,
+  getProfileById,
+  listMyBlockedProfileIds,
+  listPostsByPage,
+} from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
 import type { Id } from "@/lib/types";
@@ -21,6 +28,10 @@ import type { Id } from "@/lib/types";
  * `crews.status==='active'`를 추가로 요구한다. 해산된 크루는 열람(이 컨테이너의 나머지 전부)은
  * 그대로 되지만 "새 글쓰기" 버튼은 숨는다(FR-013 AC2 "과거 항목은 열람 전용으로 남는다") —
  * `(app)/crews/[crewId]/layout.tsx`의 `ArchivedCrewBanner`가 이유를 안내한다.
+ *
+ * **20일차(Task 042A, FR-081 AC1) — 차단한 사용자의 글은 접힘 처리한다.** `listMyBlockedProfileIds`
+ * 를 한 번만 조회해 이 페이지의 모든 글 작성자와 대조한다 — 글마다 다시 조회하지 않는다
+ * (N+1 방지, `getProfileById`를 글마다 부르는 것과 같은 이유로 이미 있던 패턴을 그대로 따름).
  */
 export async function BoardListContainer({ crewId, page }: { crewId: Id; page: number }) {
   const board = await getBoardByCrewId(crewId);
@@ -39,6 +50,8 @@ export async function BoardListContainer({ crewId, page }: { crewId: Id; page: n
   const crew = await getCrewById(crewId);
   const canWrite = checkPermission({ role, action: "post:create" }).allowed && crew?.status === "active";
 
+  const blockedProfileIds = new Set(await listMyBlockedProfileIds());
+
   const postsPage = await listPostsByPage(board.id, { page });
   const posts: BoardPostSummary[] = await Promise.all(
     postsPage.items.map(async (post) => {
@@ -54,6 +67,7 @@ export async function BoardListContainer({ crewId, page }: { crewId: Id; page: n
         authorAvatarUrl: author?.avatarUrl ?? null,
         createdAt: post.createdAt,
         pollStatus: poll?.status ?? null,
+        isAuthorBlocked: blockedProfileIds.has(post.authorId),
       };
     }),
   );

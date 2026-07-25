@@ -128,6 +128,31 @@ export async function listCrewMembers(crewId: Id): Promise<CrewMembership[]> {
   return (data ?? []).map(toCrewMembership);
 }
 
+/**
+ * **I-081 해소(21일차, DESIGN 진단·CORE 수정) — public 크루 비소속 방문자용 활성 멤버 수.**
+ * `listCrewMembers`는 `crew_memberships_select_self_or_fellow_member` RLS(본인이거나 이미
+ * 그 크루의 활성 크루원이어야 함)에 걸려 **비소속 방문자(anon 포함)에게 항상 0행**을 준다 —
+ * `CrewHomeContainer`의 "public 크루·비소속" 분기가 `listCrewMembers`로 멤버 수를 세면 실제
+ * 인원과 무관하게 항상 "0명"으로 보인다(FR-012 AC3 위반). 이건 `getCrewById`의 private-크루
+ * 404 폴백(17일차)·`getMeetupById`의 forbidden 폴백(21일차, I-073)과 **같은 패턴의 세 번째
+ * 사례**다 — "RLS로 숨긴 값을 SECURITY DEFINER RPC로 최소 노출".
+ *
+ * `crew_directory_summary`(029B, D-007)가 `member_count`를 이미 RLS 우회로 정확히 계산해
+ * 반환하므로 그 값을 그대로 쓴다. **이 함수는 `getCrewById`처럼 "0행→폴백"이 아니라 처음부터
+ * RPC를 쓴다** — 존재 확인이 목적이 아니라(호출자가 이미 크루 존재·`public` 여부를 안다는
+ * 전제) "공개 소개용 멤버 수" 하나만 목적이고, D-007이 이 값을 `public` 크루에 한해 누구나
+ * (게스트 포함) 볼 수 있다고 이미 확정했다. 대상 크루가 없거나 `private`면 RPC가 0행을 주므로
+ * `0`을 반환한다 — 호출자가 이미 접근 가능 여부를 판정한 뒤에만 불러야 한다(private 크루의
+ * "초대 전용" 분기에서 이 값을 표시용으로 쓰면 안 된다, 소개조차 안 보이는 게 D-007 원문).
+ * 실측(anon·postgres 대조): `docs/ISSUES.md` I-081.
+ */
+export async function getPublicCrewMemberCount(id: Id): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("crew_directory_summary", { p_crew_id: id });
+  if (error) throw error;
+  return data?.[0]?.member_count ?? 0;
+}
+
 export interface ListCrewsByProfileOptions {
   /**
    * FR-013 AC2(Task 040 후속, I-067) — 해산된(`archived`) 크루도 포함할지. 기본값 `false`로
@@ -233,7 +258,19 @@ export async function createCrew(input: CreateCrewInput): Promise<Crew> {
 
 export type UpdateCrewInfoInput = Partial<Pick<Crew, "name" | "description" | "category" | "colorKey">>;
 
-/** 크루 정보 수정(FR-011). `crews_update_staff_or_owner` RLS가 임원 이상만 허용한다. */
+/**
+ * 크루 정보 수정(FR-011). `crews_update_staff_or_owner` RLS가 임원 이상만 허용한다.
+ *
+ * **I-070 해소(20일차, CORE)** — 예전엔 `if (error) throw error`라 SQL 거부(RLS·트리거)가
+ * 처리되지 않은 예외로 `updateCrewInfoAction`(Server Action)까지 그대로 올라갔다. 20일차
+ * `crews_guard_archived_immutable` 트리거(I-066 잔여분, archived 크루는 UPDATE 전체 거부)가
+ * 새로 생기면서 이 gap이 실제로 도달 가능해졌다 — `CrewSettingsContainer`는 `crew.status`를
+ * 보지 않으므로(별도 이슈 아님, 범위 밖) archived 크루의 설정 화면도 오너에게 정상 렌더되고,
+ * 제출 시점에야 이 UPDATE가 거부된다. `transferCrewOwnership`이 이미 쓰던 것과 같은 패턴
+ * (`err("forbidden", ...)`)으로 맞춘다 — 호출자 `updateCrewInfoAction`은 이미 `!result.ok`를
+ * 범용으로 처리하므로(`strings.crew.settings.info.errors.failed`) 이 파일 밖은 손대지
+ * 않아도 된다.
+ */
 export async function updateCrewInfo(
   id: Id,
   patch: UpdateCrewInfoInput,
@@ -250,7 +287,11 @@ export async function updateCrewInfo(
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // crews_update_staff_or_owner RLS·crews_guard_archived_immutable(I-066) 트리거가 여기서
+    // 거부될 수 있다 — D-030 ③에 따라 예외를 던지지 않고 도메인 오류로 표현한다(I-070).
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
   return ok(toCrew(data));
 }
@@ -260,6 +301,10 @@ export async function updateCrewInfo(
  * `crews_guard_owner_only_fields` 트리거가 `visibility`·`status`·`owner_id` 변경을 오너로
  * 다시 좁힌다 — 호출자(Server Action)가 이미 `crew:update_visibility`(오너 전용) 권한을
  * 확인했다는 전제이며, 이 트리거는 그 판정이 이미 실패했어야 할 상황의 2차 방어선이다.
+ *
+ * **I-070 해소(20일차, CORE)** — `updateCrewInfo`와 같은 이유로 `throw` 대신 `err("forbidden")`
+ * 을 반환한다(`crews_guard_archived_immutable` 트리거 포함). 호출자 `updateCrewVisibilityAction`
+ * 도 이미 `!result.ok`를 범용으로 처리하므로 변경이 필요 없다.
  */
 export async function updateCrewVisibility(
   id: Id,
@@ -272,7 +317,9 @@ export async function updateCrewVisibility(
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
   return ok(toCrew(data));
 }

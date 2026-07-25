@@ -19,6 +19,7 @@ const AUTHED: AuthSession = {
   displayName: "테스터",
   hasCompletedOnboarding: true,
   unreadNotificationCount: 3,
+  isSystemAdmin: false,
 };
 const AUTHED_EMPTY: AuthSession = { ...AUTHED, unreadNotificationCount: 0 };
 // RLS 403류 도메인 오류(D-030 ③) — 네트워크 실패가 아니라 "접근 권한 없음"으로 세션 조회가

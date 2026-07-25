@@ -8,6 +8,7 @@ import type {
   MeetupParticipantView,
 } from "@/components/meetup/meetup-view-models";
 import { MeetupAttendanceActions } from "@/components/meetup/MeetupAttendanceActions";
+import { MeetupLifecycleActions } from "@/components/meetup/MeetupLifecycleActions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,8 +124,17 @@ export function MeetupDetail({ meetup, participants, attendanceState }: MeetupDe
         </div>
       </CardContent>
 
-      <CardFooter className="border-t">
+      <CardFooter className="flex-col items-stretch gap-3 border-t">
         <MeetupAttendanceActions meetupId={meetup.id} state={attendanceState} />
+        {/* FR-065(Task 041) — 취소·일정 변경은 컨테이너가 이미 판정한 `canCancelOrUpdate`
+         *  (임원·오너 또는 제안자 본인, AC3로 과거 Meetup은 이미 false)로만 노출한다. */}
+        {meetup.canCancelOrUpdate && (
+          <MeetupLifecycleActions
+            crewId={meetup.crewId}
+            meetupId={meetup.id}
+            boardWriteHref={meetup.boardWriteHref}
+          />
+        )}
       </CardFooter>
     </Card>
   );
