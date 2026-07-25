@@ -25,6 +25,19 @@ Mock 단계(Task 007)에서는 비어 있는 것이 정상이다. 자세한 내�
   값만 채워 두었고, 이를 쓰는 관리자/스케줄 전용 클라이언트는 필요해지는 시점(Task 027 pg_cron
   또는 029 RLS)에 만든다 — 지금 만들면 쓰는 곳 없는 죽은 코드가 된다.
 
+## RLS 정책 (Task 029A, 15일차)
+
+- 21개 테이블 전부에 정책이 채워졌다(정책 58건, `get_advisors(security)` INFO/WARN 0건). 설계 근거·
+  발견한 재귀 버그·앱 규칙 대조 결과·029B 인계 목록은 `docs/decisions/rls-policies-029a.md` 참고.
+- **`server.ts`(anon key + 사용자 세션)로 쓰는 모든 조회·쓰기는 이제 RLS의 영향을 받는다** — 이
+  디렉터리에 도메인별 실데이터 구현을 추가할 때 `.from("...")` 호출이 정책상 허용된 범위(예:
+  `crew_memberships`는 자기 행만 SELECT/INSERT/UPDATE 가능, 임원의 강퇴·임명 등 FR-024·027은
+  029B 전까지 DB 레벨에서 막혀 있음)를 벗어나면 조용히 실패하는 게 아니라 빈 결과·403류 오류로
+  나타난다. 화면 구현 전 위 문서의 §4·§5를 확인할 것.
+- `SUPABASE_SERVICE_ROLE_KEY` 클라이언트는 **여전히 만들지 않았다** — `auth_attempts`·`audit_logs`·
+  `notifications` INSERT처럼 "서버 전용" 테이블은 029A가 client 정책을 아예 열지 않았다(의도적
+  전체 거부). 이 경로들을 실제로 구현할 때 service_role 클라이언트가 필요해진다.
+
 ## 스키마 타입 연결 (Task 028, 14일차)
 
 - **`database.types.ts`**: `generate_typescript_types`로 생성한 자동 생성 파일. PRD §7 22종 엔티티 중
