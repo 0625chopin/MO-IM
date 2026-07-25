@@ -128,6 +128,31 @@ export async function listCrewMembers(crewId: Id): Promise<CrewMembership[]> {
   return (data ?? []).map(toCrewMembership);
 }
 
+/**
+ * **I-081 해소(21일차, DESIGN 진단·CORE 수정) — public 크루 비소속 방문자용 활성 멤버 수.**
+ * `listCrewMembers`는 `crew_memberships_select_self_or_fellow_member` RLS(본인이거나 이미
+ * 그 크루의 활성 크루원이어야 함)에 걸려 **비소속 방문자(anon 포함)에게 항상 0행**을 준다 —
+ * `CrewHomeContainer`의 "public 크루·비소속" 분기가 `listCrewMembers`로 멤버 수를 세면 실제
+ * 인원과 무관하게 항상 "0명"으로 보인다(FR-012 AC3 위반). 이건 `getCrewById`의 private-크루
+ * 404 폴백(17일차)·`getMeetupById`의 forbidden 폴백(21일차, I-073)과 **같은 패턴의 세 번째
+ * 사례**다 — "RLS로 숨긴 값을 SECURITY DEFINER RPC로 최소 노출".
+ *
+ * `crew_directory_summary`(029B, D-007)가 `member_count`를 이미 RLS 우회로 정확히 계산해
+ * 반환하므로 그 값을 그대로 쓴다. **이 함수는 `getCrewById`처럼 "0행→폴백"이 아니라 처음부터
+ * RPC를 쓴다** — 존재 확인이 목적이 아니라(호출자가 이미 크루 존재·`public` 여부를 안다는
+ * 전제) "공개 소개용 멤버 수" 하나만 목적이고, D-007이 이 값을 `public` 크루에 한해 누구나
+ * (게스트 포함) 볼 수 있다고 이미 확정했다. 대상 크루가 없거나 `private`면 RPC가 0행을 주므로
+ * `0`을 반환한다 — 호출자가 이미 접근 가능 여부를 판정한 뒤에만 불러야 한다(private 크루의
+ * "초대 전용" 분기에서 이 값을 표시용으로 쓰면 안 된다, 소개조차 안 보이는 게 D-007 원문).
+ * 실측(anon·postgres 대조): `docs/ISSUES.md` I-081.
+ */
+export async function getPublicCrewMemberCount(id: Id): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("crew_directory_summary", { p_crew_id: id });
+  if (error) throw error;
+  return data?.[0]?.member_count ?? 0;
+}
+
 export interface ListCrewsByProfileOptions {
   /**
    * FR-013 AC2(Task 040 후속, I-067) — 해산된(`archived`) 크루도 포함할지. 기본값 `false`로

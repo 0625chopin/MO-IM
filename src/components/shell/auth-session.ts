@@ -36,6 +36,9 @@ export type AuthSession =
       /** 최초 1회 온보딩 재방문 리다이렉트(PRD §2.2 각주2)에 쓴다. */
       hasCompletedOnboarding: boolean;
       unreadNotificationCount: number;
+      /** FR-082(Task 042B, D-049) — `/admin` 게이트 UI 판단용. 최종 강제는
+       *  `admin_resolve_report`/`admin_list_reports` RPC 내부의 is_system_admin 재확인이다. */
+      isSystemAdmin: boolean;
     }
   | { status: "error"; reason: "network" | "forbidden" }
   | { status: "error"; reason: "deactivated"; graceEndsAt: ISODateTimeString };

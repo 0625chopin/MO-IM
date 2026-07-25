@@ -49,6 +49,13 @@ export type PermissionAction =
   | "post:delete_own"
   | "post:delete_any"
   | "comment:create"
+  // Task 041(FR-033, 21일차 BOARD) 추가 — "댓글 작성"(comment:create) 1행만 있고 수정·삭제는
+  // 매트릭스에 없었다(원 33행 자체가 회원가입·로그인 제외 후 33행이라 댓글 CRUD 세부는 처음부터
+  // 빠져 있었다 — `post:update_own`·`post:delete_own`·`post:delete_any`와 대칭이 되도록 같은
+  // 3분할로 추가한다). 이 세 값을 더해 실제 액션 수는 34개에서 37개가 된다.
+  | "comment:update_own"
+  | "comment:delete_own"
+  | "comment:delete_any"
   | "poll:create_proposal"
   | "poll:vote"
   | "poll:close_early"

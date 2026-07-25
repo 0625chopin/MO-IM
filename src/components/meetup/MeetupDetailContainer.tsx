@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getPostDetailHref } from "@/components/board/board-links";
+import { getBoardWriteHref, getPostDetailHref } from "@/components/board/board-links";
 import { formatDayLabelKo, todayIsoUtc } from "@/components/calendar/date-grid";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import { MeetupDetail } from "@/components/meetup/MeetupDetail";
@@ -12,13 +12,16 @@ import {
   getMeetupById,
   getPollById,
   getPollTally,
+  getPostById,
   getProfileById,
   listAttendance,
   listCrewMembers,
 } from "@/lib/data";
-import { isActiveMembership } from "@/lib/rules/crew-membership-transition";
+import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { resolveMeetupAttendanceButtonState } from "@/lib/rules/meetup-attendance-button-state";
+import { isMeetupAttendanceOpen } from "@/lib/rules/meetup-attendance-eligibility";
 import { groupMeetupParticipantIds } from "@/lib/rules/meetup-participant-grouping";
+import { checkPermission } from "@/lib/rules/permission";
 import type { Id, MeetupAttendance, Profile } from "@/lib/types";
 
 /**
@@ -42,16 +45,15 @@ import type { Id, MeetupAttendance, Profile } from "@/lib/types";
  * 응답은 500 대신 200이 된다(정상 도달 화면 상태로 취급 — 트레이드오프는
  * `docs/decisions/domain-error-channel-069.md` 참고).
  *
- * **프로덕션 브라우저 실측(20일차)에서 이 분기가 실제로는 도달 불가능함을 발견했다.**
- * 비소속 크루의 Meetup에 접근하면 이 `forbidden` 반환이 아니라 위 `getMeetupById`의
- * `notFound()`가 먼저 실행된다 — `meetups` 테이블의 RLS(`meetups_select_members`, `crew_id
- * IN (내 활성 멤버십 crew_id 목록)`)가 비소속자에게 그 행 자체를 0건으로 숨기기 때문이다.
- * `getCrewById`(`lib/data/supabase/crew.ts`)와 달리 `getMeetupById`에는 private-crew 404
- * 수정(17일차) 때 만든 것과 같은 "원본 select 0행 → RPC 폴백" 장치가 없다. 이 전환이 만든
- * 회귀는 아니다 — 전환 전에도 같은 이유로 이 지점의 원래 throw가 이미 도달 불가능했다. 코드는
- * 그대로 두는 것이 맞다(`getMeetupById` 구현이 나중에 바뀌거나 RLS가 완화되면 도달한다) —
- * 다만 다음에 이 코드의 실사용자 도달성을 참고할 때는 "높음"(19일차 인벤토리 원 평가)이
- * 아니라 "낮음/사실상 0"으로 읽어야 한다. 상세: `docs/decisions/domain-error-channel-069.md` §6.
+ * **20일차 프로덕션 브라우저 실측에서 이 분기가 당시엔 도달 불가능함을 발견했었다** — 비소속
+ * 크루의 Meetup에 접근하면 이 `forbidden` 반환보다 위 `getMeetupById`의 `notFound()`가 먼저
+ * 실행됐다(`meetups` 테이블 RLS `meetups_select_members`가 비소속자에게 행 자체를 0건으로
+ * 숨겨서). `docs/ISSUES.md` I-073으로 등재됐던 이 gap은 **21일차(D-048)에 해소됐다** —
+ * `getMeetupById`(`lib/data/supabase/meetup.ts`)가 이제 `getCrewById`와 같은 "원본 select
+ * 0행 → private 최소정보 RPC(`meetup_directory_summary`) 폴백" 패턴으로 실제 `crewId`를
+ * 돌려주므로, 이 컨테이너는 그 값으로 아래 크루원 재판정을 정상적으로 수행해 이 `forbidden`
+ * 분기에 도달한다. 상세: `docs/prioritization-and-risks.md` D-048, `docs/decisions/
+ * domain-error-channel-069.md` §6(이전 판정의 경위 보존).
  */
 export interface MeetupDetailContainerProps {
   meetupId: Id;
@@ -113,10 +115,24 @@ export async function MeetupDetailContainer({ meetupId }: MeetupDetailContainerP
 
   const tally = poll ? await getPollTally(poll.id) : null;
 
+  // FR-065(Task 041) — 취소·일정 변경 버튼 노출 여부. 제안 작성자 판정은 `PollPanelContainer`
+  // 와 같은 방식(poll → post.authorId)이다. `isMeetupAttendanceOpen`으로 AC3(과거 Meetup)까지
+  // 함께 걸러 둔다 — 서버(`cancelMeetupAction`)가 최종 판정을 다시 하므로 여기서는 버튼 노출
+  // 여부만 결정한다.
+  const post = poll ? await getPostById(poll.postId) : null;
+  const isProposalAuthor = post?.authorId === session.profileId;
+  const canCancelOrUpdate =
+    checkPermission({
+      role: deriveUserRoleForPermissionCheck(membership),
+      action: "meetup:cancel_or_update",
+      context: { isProposalAuthor },
+    }).allowed && isMeetupAttendanceOpen(meetup, todayIso);
+
   return (
     <MeetupDetail
       meetup={{
         id: meetup.id,
+        crewId: meetup.crewId,
         title: meetup.title,
         description: meetup.description,
         crewName: crew.name,
@@ -130,6 +146,8 @@ export async function MeetupDetailContainer({ meetupId }: MeetupDetailContainerP
         isCancelled: meetup.status === "cancelled",
         postHref: poll ? getPostDetailHref(meetup.crewId, poll.postId) : null,
         pollTally: tally,
+        canCancelOrUpdate,
+        boardWriteHref: getBoardWriteHref(meetup.crewId),
       }}
       participants={{
         attending: groups.attending.map(toParticipantView),

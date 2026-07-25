@@ -4,7 +4,7 @@ import { CrewHome } from "@/components/crews/CrewHome";
 import { CrewIntroPreview } from "@/components/crews/CrewIntroPreview";
 import { PrivateCrewNotice } from "@/components/crews/PrivateCrewNotice";
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { getCrewById, getCrewMembership, listCrewMembers } from "@/lib/data";
+import { getCrewById, getCrewMembership, getPublicCrewMemberCount, listCrewMembers } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { resolveJoinRequestButtonState } from "@/lib/rules/join-request-button-state";
 import { checkPermission } from "@/lib/rules/permission";
@@ -65,8 +65,12 @@ export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
     return <PrivateCrewNotice crewName={crew.name} />;
   }
 
-  const members = await listCrewMembers(crewId);
-  const memberCount = members.filter((m) => isActiveMembership(m.status)).length;
+  // I-081 해소 — 이 분기는 비소속 방문자(anon 포함)용이라 listCrewMembers(직접 select)를
+  // 쓰면 crew_memberships RLS가 항상 0행을 줘서 멤버 수가 "0명"으로 고정된다. D-007·FR-012
+  // AC3가 public 크루의 멤버 수는 게스트도 볼 수 있어야 한다고 요구하므로, RLS를 우회하는
+  // crew_directory_summary RPC(getPublicCrewMemberCount)를 쓴다 — 위 활성 멤버십 분기의
+  // listCrewMembers는 원래 정확하므로 그대로 둔다.
+  const memberCount = await getPublicCrewMemberCount(crewId);
   const joinState = resolveJoinRequestButtonState({
     isAuthenticated,
     crewVisibility: crew.visibility,

@@ -1,10 +1,21 @@
-import { AlertTriangleIcon, Loader2Icon } from "lucide-react";
+import { AlertTriangleIcon, Loader2Icon, Trash2Icon } from "lucide-react";
 
 import { formatMessageTime } from "@/components/chat/format-message-time";
 import type { ChatTimelineItem } from "@/components/chat/message-view-models";
 import { PostLinkCard } from "@/components/chat/PostLinkCard";
 import { BlockedContentNotice } from "@/components/moderation/BlockedContentNotice";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { strings } from "@/lib/strings";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +29,12 @@ export interface MessageBubbleProps {
   /** FR-081 AC1(Task 042A) — 뷰어가 이 메시지의 발신자를 차단했는가. `isOwn`이면 항상 false로
    *  넘어온다(자기 자신을 차단할 수 없다 — `blocks_check` CHECK, `create_block` RPC). */
   isSenderBlocked?: boolean;
+  /** FR-054(Task 041) — 본인 메시지이거나 임원·오너·관리자면 true(`MessageList`가 이미
+   *  `isOwn || canDeleteAnyMessage`로 계산해 내려준다). `deliveryStatus !== "sent"`(낙관적
+   *  렌더 중이거나 실패한 메시지)에는 이 값과 무관하게 삭제 버튼을 그리지 않는다 — 서버에
+   *  아직 확정되지 않은 메시지는 지울 대상 자체가 없다. */
+  canDelete?: boolean;
+  onDelete?: () => void;
 }
 
 /**
@@ -44,7 +61,14 @@ export interface MessageBubbleProps {
  * 누구 메시지인지는 계속 보여야 신고·차단 판단이 가능하다). 말풍선이 `<Link>`로 감싸여 있지
  * 않으므로(`BoardListItem`과 달리) 상호작용 요소 중첩 문제가 없다.
  */
-export function MessageBubble({ message, isOwn, onRetry, isSenderBlocked = false }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  isOwn,
+  onRetry,
+  isSenderBlocked = false,
+  canDelete = false,
+  onDelete,
+}: MessageBubbleProps) {
   if (message.deletedAt) {
     return (
       <div data-message-id={message.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
@@ -55,6 +79,7 @@ export function MessageBubble({ message, isOwn, onRetry, isSenderBlocked = false
 
   const isPending = message.deliveryStatus === "pending";
   const isFailed = message.deliveryStatus === "failed";
+  const showDelete = canDelete && !isPending && !isFailed && onDelete;
 
   return (
     <div
@@ -98,6 +123,35 @@ export function MessageBubble({ message, isOwn, onRetry, isSenderBlocked = false
               >
                 {formatMessageTime(message.createdAt)}
               </time>
+            )}
+            {showDelete && (
+              <Dialog>
+                <DialogTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={strings.chat.message.delete.triggerLabel}
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                    />
+                  }
+                >
+                  <Trash2Icon aria-hidden="true" className="size-3.5" />
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{strings.chat.message.delete.confirmTitle}</DialogTitle>
+                    <DialogDescription>{strings.chat.message.delete.confirmDescription}</DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <DialogClose render={<Button variant="outline" />}>
+                      {strings.chat.message.delete.cancelAction}
+                    </DialogClose>
+                    <Button variant="destructive" onClick={onDelete}>
+                      {strings.chat.message.delete.confirmAction}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </div>

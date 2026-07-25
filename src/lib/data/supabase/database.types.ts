@@ -888,6 +888,7 @@ export type Database = {
           handle: string
           handle_changed_at: string | null
           id: string
+          is_system_admin: boolean
           onboarding_completed_at: string | null
           search_opt_out: boolean
           status: string
@@ -902,6 +903,7 @@ export type Database = {
           handle: string
           handle_changed_at?: string | null
           id: string
+          is_system_admin?: boolean
           onboarding_completed_at?: string | null
           search_opt_out?: boolean
           status?: string
@@ -916,6 +918,7 @@ export type Database = {
           handle?: string
           handle_changed_at?: string | null
           id?: string
+          is_system_admin?: boolean
           onboarding_completed_at?: string | null
           search_opt_out?: boolean
           status?: string
@@ -965,6 +968,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_list_reports: {
+        Args: { p_status?: string }
+        Returns: {
+          created_at: string
+          reason: string
+          report_id: string
+          reporter_display_name: string
+          reporter_handle: string
+          reporter_id: string
+          status: string
+          target_author_handle: string
+          target_author_id: string
+          target_exists: boolean
+          target_id: string
+          target_preview: string
+          target_removed: boolean
+          target_type: string
+        }[]
+      }
+      admin_resolve_report: {
+        Args: { p_action: string; p_report_id: string }
+        Returns: {
+          ok: boolean
+          reason_code: string
+          status: string
+        }[]
+      }
       anonymize_expired_deactivated_profiles: {
         Args: { batch_size?: number; max_duration?: string }
         Returns: number
@@ -1007,6 +1037,7 @@ export type Database = {
           reason: string
         }[]
       }
+      finalize_closed_poll: { Args: { p_poll_id: string }; Returns: undefined }
       get_profile_public_by_id: {
         Args: { p_id: string }
         Returns: {
@@ -1015,6 +1046,13 @@ export type Database = {
           handle: string
           id: string
           status: string
+        }[]
+      }
+      meetup_directory_summary: {
+        Args: { p_meetup_id: string }
+        Returns: {
+          crew_id: string
+          id: string
         }[]
       }
       poll_vote_tally: {
@@ -1083,6 +1121,10 @@ export type Database = {
           ok: boolean
           reason: string
         }[]
+      }
+      run_poll_auto_close_job: {
+        Args: { batch_size?: number; max_duration?: string }
+        Returns: number
       }
     }
     Enums: {

@@ -25,6 +25,12 @@ export interface ChatMessageListPreviewProps {
  * 일어나지 않는다. **Task 020B에서 `connectionError` prop을 제거했다** — 그 자리는 이제
  * `ConnectionBanner`가 맡는다(`sections/chat.tsx`의 별도 항목 참고, `MessageList` 모듈
  * docstring과 같은 이유).
+ *
+ * **`onDelete`·`canDeleteAnyMessage`(Task 041, FR-054)도 같은 이유로 no-op이다** — 21일차
+ * Task 036 빌드 검증 중 `MessageList`가 이 두 필수 prop을 새로 요구하는 것을 발견해 추가했다
+ * (`npm run build` 타입 오류로 드러남). `onLoadMore`·`onRetry`와 동일하게 서버→클라이언트
+ * 경계를 넘지 않는 데모 전용 no-op이며, 삭제 UI 자체(권한 판정·실제 삭제)는 Task 041 소관이라
+ * 손대지 않았다.
  */
 export function ChatMessageListPreview({
   roomId,
@@ -42,6 +48,8 @@ export function ChatMessageListPreview({
       isLoadingMore={false}
       onLoadMore={() => {}}
       onRetry={() => {}}
+      onDelete={() => {}}
+      canDeleteAnyMessage={false}
       blockedProfileIds={blockedProfileIds}
     />
   );

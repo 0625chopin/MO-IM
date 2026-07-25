@@ -44,6 +44,16 @@ export interface Profile {
    * 없어 보조 httpOnly 쿠키(`onboarding-flag-cookie.ts`, 이제 미사용)로 근사했다.
    */
   onboardingCompletedAt: ISODateTimeString | null;
+  /**
+   * FR-082 시스템 관리자 식별(D-049, Task 042B). self-service로 바꿀 수 없다 — `profiles`
+   * 테이블의 `profiles_guard_self_status_transition` 트리거가 `auth.uid() = old.id`
+   * 컨텍스트에서 이 컬럼 변경 자체를 거부한다(RLS는 행 단위만 제한하므로 컬럼 단위 방어는
+   * 트리거 몫). 최초 지정은 서비스 경로(마이그레이션 직접 UPDATE)로만 한다 — 셀프서비스
+   * 승격 UI/RPC를 의도적으로 두지 않았다. 이 필드가 `false`인 것이 절대다수(3.1절 역할표
+   * "시스템 관리자"는 전역 role이지 크루 role이 아니다)라 목록 조회(`searchProfilesByHandle`
+   * 등)에는 노출하지 않는다 — `checkPermission`의 `role: "system_admin"` 판정에만 쓰인다.
+   */
+  isSystemAdmin: boolean;
 }
 
 /**

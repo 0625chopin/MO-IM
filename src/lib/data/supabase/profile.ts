@@ -73,6 +73,17 @@ import type { Database } from "./database.types";
  *   (설계 문서 §8). RPC가 `id`를 반환하지 않아 `Profile` 형태로 되돌리려면 없는 필드를 채워야
  *   하는데, **`id`는 절대 신뢰 가능한 값이 아니다**(빈 문자열 — 후속 동작에 쓰면 안 된다.
  *   필요하면 `getProfileByHandle`로 재조회).
+ *
+ * **21일차(I-074 major, 팀장·DESIGN 교차검증) — `getProfileByHandle`을 `profile-handle-
+ * oracle.ts`로 옮겼다.** 이 파일에 있던 시절엔 `eslint.config.mjs`의 I-074 규칙
+ * (`@/lib/data` 배럴 named import 제한)이 `src/lib/data/supabase/**` **내부**의 상대경로
+ * import(`./profile`)까지는 막지 못한다는 것이 프로브로 실증됐다(새 형제 파일이 `import {
+ * getProfileByHandle } from "./profile"`을 쓰면 tsc·lint 둘 다 통과했다) — 파일 위치에 묶인
+ * import-name 제한의 구조적 한계다. 함수를 전용 파일로 격리해 zone 3 규칙이 "이 파일을
+ * (자기 자신 제외) 어디서도 상대경로로 import하지 않는다"를 위치·깊이 무관하게 강제하게
+ * 했다 — 상세 근거는 그 파일 docstring, 실측은 `docs/ISSUES.md` I-074 참고. 이 문단 위의
+ * 설계 근거(service-role 조회 이유, 상태 필터 없는 이유 등)는 함수가 옮겨져도 유효하며 그
+ * 파일이 그대로 승계한다 — 여기 남겨 역사적 맥락(왜 이런 모양이 됐는지)을 보존한다.
  */
 
 /** `get_profile_public_by_id` RPC가 채우지 못하는 필드의 공통 null 스텁 — `searchProfilesByHandle`
@@ -83,6 +94,13 @@ const UNKNOWN_PROFILE_FIELDS = {
   deactivatedAt: null,
   handleChangedAt: null,
   onboardingCompletedAt: null,
+  // FR-082(D-048, Task 042B) — `get_profile_public_by_id`는 공개 3필드 RPC라 관리자 여부를
+  // 반환하지 않는다(그리고 반환해서도 안 된다, NFR-013 최소화). 타인 프로필 조회에서 이 값을
+  // 실제로 쓰는 곳이 없으므로(判정은 항상 `AuthSession.isSystemAdmin`, 본인 세션 기준) false
+  // 고정이 안전하다 — "고정값으로 속이지 않는다"는 위 주석 원칙과 달리 이 필드만은 예외인
+  // 이유: 다른 필드(bio 등)는 실제 값이 있을 수 있어 null이 "모른다"를 뜻하지만, 이 필드는
+  // 타인 조회 결과를 관리자 권한 판정에 쓸 일이 애초에 없다(권한 판정은 항상 자기 세션).
+  isSystemAdmin: false,
 } as const;
 
 export async function getProfileById(id: Id): Promise<Profile | null> {
@@ -110,29 +128,9 @@ export async function getProfileById(id: Id): Promise<Profile | null> {
   };
 }
 
-/**
- * handle→id 내부 재해석 전용(모듈 docstring 참고) — FR-006 검색에 쓰지 않는다.
- * service-role 클라이언트로 조회한다: (1) `check-handle-availability.ts`·`invite-crew-
- * member.ts`는 로그인 상태에서 부르지만 대상 행이 대부분 타인 행이라 self-row로 좁힌 RLS로는
- * 애초에 조회가 안 되고, (2) `signup.ts`는 세션 생성 **전**(`anon` 컨텍스트)에 부르므로 RLS
- * 기반 어떤 경로도 통과할 수 없다 — 그래서 `service_role`(`rolbypassrls=true`)로 RLS 자체를
- * 우회한다. 이 함수를 호출할 수 있는 client-invokable RPC/PostgREST 엔드포인트가 없으므로
- * publishable key로는 이 조회에 도달할 방법이 없다(19일차 major① 수정, 아래 참고).
- *
- * 상태 필터가 없는 이유: 핸들 유일성 확인(가입·초대)은 탈퇴·정지 계정이 쓰던 핸들도 "이미
- * 사용 중"으로 봐야 한다(계정이 사라진 게 아니라 30일 유예/익명화 상태일 뿐이고, handle
- * UNIQUE 제약은 상태와 무관하게 걸려 있다).
- */
-export async function getProfileByHandle(handle: string): Promise<Profile | null> {
-  const supabase = createSupabaseServiceRoleClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("handle", handle)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? toProfile(data) : null;
-}
+// `getProfileByHandle`은 21일차(I-074 major)에 `./profile-handle-oracle`로 옮겼다 — 위 모듈
+// docstring 끝 문단 참고. 배럴(`@/lib/data`)이 그 파일에서 재노출하므로 호출부(`check-handle-
+// availability.ts`·`invite-crew-member.ts`)는 아무것도 바뀌지 않는다.
 
 /**
  * 핸들 검색(FR-006) — `profile_search` RPC 경유(모듈 docstring 참고). RPC는 정확 일치 0~1건만
@@ -168,6 +166,9 @@ export async function searchProfilesByHandle(
     deactivatedAt: null,
     handleChangedAt: null,
     onboardingCompletedAt: null,
+    // FR-082(D-048) — profile_search는 검색 응답 3필드 계약(NFR-013)이라 관리자 여부를
+    // 반환하지 않는다. UNKNOWN_PROFILE_FIELDS의 같은 값과 같은 이유로 false 고정.
+    isSystemAdmin: false,
   }));
 }
 

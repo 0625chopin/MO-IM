@@ -2,6 +2,7 @@ import type {
   Board,
   ChatMessage,
   ChatRoom,
+  Comment,
   Crew,
   CrewMembership,
   Id,
@@ -58,6 +59,7 @@ function createSeed() {
       deactivatedAt: null,
       handleChangedAt: null,
       onboardingCompletedAt: null,
+      isSystemAdmin: false,
     },
     {
       id: "profile-2",
@@ -71,6 +73,7 @@ function createSeed() {
       deactivatedAt: null,
       handleChangedAt: null,
       onboardingCompletedAt: null,
+      isSystemAdmin: false,
     },
     {
       id: "profile-3",
@@ -84,6 +87,7 @@ function createSeed() {
       deactivatedAt: null,
       handleChangedAt: null,
       onboardingCompletedAt: null,
+      isSystemAdmin: false,
     },
     {
       // FR-005 30일 유예(Task 039, 18일차 교차검증 minor 2) — 탈퇴 요청 후 파기 전 상태를
@@ -103,6 +107,7 @@ function createSeed() {
       deactivatedAt: "2026-07-15T00:00:00.000Z",
       handleChangedAt: null,
       onboardingCompletedAt: "2026-06-01T00:00:00.000Z",
+      isSystemAdmin: false,
     },
   ];
 
@@ -459,6 +464,11 @@ function createSeed() {
     boards: [...boards, ...bulk.boards],
     chatRooms: [...chatRooms, ...bulk.chatRooms],
     posts: [...posts, ...crew2Posts, ...bulk.posts],
+    // Comment(FR-033, Task 041) — 실 DB도 0행으로 시작한다(`comments` 테이블 코멘트 "스키마만
+    // 선반영"). 대량 시드(`buildBulkSeed`)에 댓글을 추가하지 않는다 — 댓글 CRUD는 이 회차에
+    // 처음 만들어져 시나리오별 손댄 데이터가 필요 없고, 빈 배열 자체가 FR-033 AC2(빈 상태)를
+    // `/sample` 밖에서도 그대로 재현한다.
+    comments: [] as Comment[],
     polls: [...polls, ...bulk.polls],
     pollEligibleVoters: [...pollEligibleVoters, ...bulk.pollEligibleVoters],
     pollVotes: [...pollVotes, ...bulk.pollVotes],
@@ -501,6 +511,7 @@ export function resetFixtures(): void {
   replaceArrayContents(store.boards, seed.boards);
   replaceArrayContents(store.chatRooms, seed.chatRooms);
   replaceArrayContents(store.posts, seed.posts);
+  replaceArrayContents(store.comments, seed.comments);
   replaceArrayContents(store.polls, seed.polls);
   replaceArrayContents(store.pollEligibleVoters, seed.pollEligibleVoters);
   replaceArrayContents(store.pollVotes, seed.pollVotes);

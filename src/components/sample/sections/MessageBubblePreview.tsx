@@ -8,6 +8,8 @@ export interface MessageBubblePreviewItem {
   isOwn: boolean;
   /** FR-081 AC1(Task 042A, 20일차) 데모용. */
   isSenderBlocked?: boolean;
+  /** FR-054(Task 041) 데모용 — true면 삭제 버튼 + 확인 다이얼로그가 뜬다(no-op, 아래 참고). */
+  canDelete?: boolean;
 }
 
 export interface MessageBubblePreviewProps {
@@ -24,17 +26,22 @@ export interface MessageBubblePreviewProps {
  * `deliveryStatus === "failed"`인 항목에만 이 파일 안에서 만든 no-op `onRetry`를 붙인다 — 다른
  * 상태(sent·pending)는 애초에 재전송 버튼이 없으므로 `onRetry`를 넘기지 않는다(`MessageBubble`
  * 이 `undefined`면 버튼 자체를 그리지 않는다). 클릭해도 이 프리뷰 밖으로는 아무 효과가 없다.
+ * 같은 이유로 `canDelete`가 `true`인 항목에도 no-op `onDelete`를 붙인다(FR-054, Task 041) —
+ * 삭제 확인 다이얼로그를 열고 "삭제"를 눌러도 이 프리뷰 밖으로는 아무 효과가 없다(실제 삭제는
+ * `/crews/[crewId]/chat`에서 확인한다).
  */
 export function MessageBubblePreview({ items }: MessageBubblePreviewProps) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      {items.map(({ message, isOwn, isSenderBlocked }) => (
+      {items.map(({ message, isOwn, isSenderBlocked, canDelete }) => (
         <MessageBubble
           key={message.id}
           message={message}
           isOwn={isOwn}
           onRetry={message.deliveryStatus === "failed" ? () => {} : undefined}
           isSenderBlocked={isSenderBlocked}
+          canDelete={canDelete}
+          onDelete={canDelete ? () => {} : undefined}
         />
       ))}
     </div>

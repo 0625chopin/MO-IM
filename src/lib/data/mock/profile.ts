@@ -66,6 +66,7 @@ export async function createProfile(input: CreateProfileInput): Promise<DataResu
     // 시작해 첫 실제 변경 전까지는 쿨다운이 걸리지 않는다.
     handleChangedAt: null,
     onboardingCompletedAt: null,
+    isSystemAdmin: false,
   };
   store.profiles.push(profile);
   return ok(profile);

@@ -8,11 +8,13 @@
  * 호출하는 컨테이너가 뷰어의 차단 목록(`listMyBlockedProfileIds`)과 콘텐츠 작성자 id를
  * 넘기면 된다.
  *
- * **적용 범위(Task 042A 결정, `docs/decisions/report-block-042a.md` 참고)**: 이 순수 함수와
- * `BlockedContentNotice`(표현 컴포넌트)는 이번 회차에 만들었지만, 게시판(`BoardListContainer`·
- * `PostDetailContainer`)·채팅(`MessageListContainer`)에는 아직 배선하지 않았다 — 그 파일들은
- * 다른 팀원 소유 도메인이고 같은 회차에 동시 작업 중이라 충돌 위험이 있어 최소 침습 원칙에
- * 따라 범위 밖으로 뒀다. 크루원 목록(`MemberList`)에는 이번에 직접 배선했다(CREW 소유 도메인).
+ * **적용 범위(Task 042A 결정, `docs/decisions/report-block-042a.md` 참고, I-072 경위 포함)**:
+ * 20일차에는 크루원 목록(`MemberList`)에만 배선하고 게시판·채팅은 다른 팀원 소유 도메인과의
+ * 동시 작업 충돌을 피해 범위 밖으로 뒀지만, 같은 회차 안에 팀장 판정으로 게시판
+ * (`BoardListContainer`·`PostDetailContainer`)·채팅(`MessageListContainer`)까지 배선됐다
+ * (I-072 해소). **21일차(Task 041, FR-033)가 댓글(`CommentListContainer`)에도 같은 패턴으로
+ * 배선해 I-072의 "댓글은 화면 자체가 없어 남은 범위" 서술을 닫았다** — 이제 네 곳(크루원 목록·
+ * 게시판·채팅·댓글) 모두 이 함수를 재사용한다.
  */
 import type { Id } from "@/lib/types";
 

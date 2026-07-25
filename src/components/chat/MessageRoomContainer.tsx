@@ -11,6 +11,7 @@ import {
   type MessageViewModel,
 } from "@/components/chat/message-view-models";
 import { MessageList } from "@/components/chat/MessageList";
+import { deleteChatMessageAction } from "@/lib/actions/delete-chat-message";
 import { loadEarlierMessagesAction } from "@/lib/actions/load-earlier-messages";
 import { resyncChatMessagesAction } from "@/lib/actions/resync-chat-messages";
 import type { SendChatMessageState } from "@/lib/actions/send-chat-message";
@@ -30,6 +31,9 @@ export interface MessageRoomContainerProps {
   initialCursor: Id | null;
   /** `chat:send_message` 판정 결과 — `Composer`에 그대로 내려준다. */
   canSend: boolean;
+  /** FR-054(Task 041) — `chat:delete_any_message` 판정 결과(임원·오너·관리자). 본인 메시지
+   *  삭제 가능 여부는 별도 플래그 없이 `MessageList`가 항목별 `isOwn`으로 판정한다. */
+  canDeleteAnyMessage: boolean;
   /** FR-081 AC1(Task 042A) — 뷰어의 차단 목록(배열, 서버→클라이언트 직렬화 가능한 형태).
    *  `MessageList`에 `Set`으로 변환해 내려준다(모듈 docstring 참고). */
   blockedProfileIds: Id[];
@@ -156,6 +160,7 @@ export function MessageRoomContainer({
   initialMessages,
   initialCursor,
   canSend,
+  canDeleteAnyMessage,
   blockedProfileIds,
 }: MessageRoomContainerProps) {
   const blockedProfileIdSet = new Set(blockedProfileIds);
@@ -210,9 +215,22 @@ export function MessageRoomContainer({
     const unsubscribe = subscribeToRoom(
       topic,
       (event) => {
-        if (event.type !== "chat_message_created" || event.roomId !== topic) return;
+        if (event.roomId !== topic) return;
         if (!isMessageViewModel(event.payload)) return;
         const payload = event.payload;
+
+        // FR-054(Task 041) — 다른 접속자가 삭제한 메시지를 이 화면에도 반영한다. 삭제 이벤트는
+        // "새 메시지"가 아니라 "기존 메시지 갱신"이라 `seenIds` 중복 검사(아래 생성 분기)를
+        // 타지 않는다 — 이미 목록에 없는 메시지(예: 이 세션이 아직 로드하지 않은 오래된 메시지)
+        // 라면 조용히 무시한다(교체할 대상이 없다).
+        if (event.type === "chat_message_deleted") {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === payload.id ? { ...m, deletedAt: payload.deletedAt } : m)),
+          );
+          return;
+        }
+
+        if (event.type !== "chat_message_created") return;
         if (seenIds.current.has(payload.id)) return;
         seenIds.current.add(payload.id);
         setMessages((prev) => [...prev, payload]);
@@ -344,6 +362,28 @@ export function MessageRoomContainer({
     submitMessage(item.body, clientKey);
   };
 
+  /**
+   * 메시지 삭제(FR-054, Task 041). 자기 확정 메시지를 반영할 때(위 `submitMessage`)와 같은
+   * 원칙 — 실패해도 화면 상태가 어긋나지 않도록, 서버가 실제로 성공을 반환했을 때만 로컬
+   * `messages`를 갱신한다(낙관적으로 먼저 지우지 않는다 — 삭제는 되돌릴 수 없는 행위라
+   * "일단 지운 것처럼 보여주고 실패하면 복구"보다 "성공을 확인하고 지운다"가 더 안전하다).
+   * 성공하면 이 세션도 다른 접속자와 똑같이 "삭제된 메시지" 플레이스홀더를 본다 — 뒤이어
+   * 도착하는 자기 자신의 `chat_message_deleted` 브로드캐스트 에코는 이미 같은 값이라
+   * 중복 갱신이어도 무해하다.
+   */
+  const handleDeleteMessage = (messageId: string) => {
+    void (async () => {
+      const result = await deleteChatMessageAction({ crewId, roomId, messageId });
+      if (!result.ok) {
+        console.error("[chat] delete failed", result.error);
+        return;
+      }
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, deletedAt: result.data.deletedAt } : m)),
+      );
+    })();
+  };
+
   const handleManualReconnect = () => {
     // 실제로 오프라인이면 "재연결됨"으로 잘못 넘어가지 않는다 — 사용자가 배너의 버튼을 눌러도
     // 네트워크 자체가 없으면 아무 일도 일어나지 않는다(다시 온라인이 되면 `online` 이벤트가
@@ -373,6 +413,8 @@ export function MessageRoomContainer({
         isLoadingMore={isLoadingMore}
         onLoadMore={handleLoadMore}
         onRetry={handleRetry}
+        onDelete={handleDeleteMessage}
+        canDeleteAnyMessage={canDeleteAnyMessage}
         blockedProfileIds={blockedProfileIdSet}
       />
       <Composer canSend={canSend} onSubmit={handleComposerSubmit} />

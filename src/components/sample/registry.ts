@@ -1,5 +1,6 @@
 import { a11ySection } from "@/components/sample/sections/a11y";
 import { accountSection } from "@/components/sample/sections/account";
+import { adminSection } from "@/components/sample/sections/admin";
 import { authSection } from "@/components/sample/sections/auth";
 import { boardSection } from "@/components/sample/sections/board";
 import { calendarSection } from "@/components/sample/sections/calendar";
@@ -52,5 +53,6 @@ export const SHOWCASE_SECTIONS: ShowcaseSection[] = [
   notificationsSection,
   invitationsSection,
   moderationSection,
+  adminSection,
   a11ySection,
 ];

@@ -8,8 +8,11 @@ import type {
 import { MeetupAttendanceActions } from "@/components/meetup/MeetupAttendanceActions";
 import { MeetupDetail } from "@/components/meetup/MeetupDetail";
 import { MeetupDetailSkeleton } from "@/components/meetup/MeetupDetailSkeleton";
+import { MeetupLifecycleActions } from "@/components/meetup/MeetupLifecycleActions";
 import { PreviewFrame } from "@/components/sample/PreviewFrame";
 import { defineSection } from "@/components/sample/showcase-types";
+import { ErrorState } from "@/components/ui/error-state";
+import { strings } from "@/lib/strings";
 
 import type { ReactNode } from "react";
 
@@ -33,6 +36,7 @@ function participant(id: string, displayName: string): MeetupParticipantView {
 
 const DEMO_MEETUP: MeetupDetailViewModel = {
   id: "sample-meetup-detail",
+  crewId: "sample-crew",
   title: "한강 5km 정기런",
   description:
     "다음 주 토요일 아침 7시, 한강공원 반포지구에서 만나요. 준비운동은 각자 해오시고 현장에서 스트레칭만 같이 합니다.",
@@ -47,6 +51,10 @@ const DEMO_MEETUP: MeetupDetailViewModel = {
   isCancelled: false,
   postHref: "#",
   pollTally: { forCount: 9, againstCount: 2, abstainCount: 1 },
+  // FR-065(Task 041) — 제안자·임원·오너 시점 데모. `MeetupDetail`이 `canCancelOrUpdate`일
+  // 때만 `MeetupLifecycleActions`를 붙인다.
+  canCancelOrUpdate: true,
+  boardWriteHref: "#",
 };
 
 const DEMO_PARTICIPANTS: MeetupParticipantGroupsView = {
@@ -73,8 +81,8 @@ const EMPTY_PARTICIPANTS: MeetupParticipantGroupsView = {
 const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = [
   {
     kind: "forbidden",
-    name: "Meetup 상세 — 크루원 아님 (요구사항상 403, 실제로는 도달 불가)",
-    note: "FR-064 AC2 — 비소속 회원의 Meetup 상세 접근은 403이 반환돼야 한다. MeetupDetailContainer가 (app)/crews/[crewId]/layout.tsx(D-039)와 같은 방식(getCrewMembership + isActiveMembership)으로 다시 판정해 20일차부터 cause:{code:'forbidden'}을 던지지 않고 <RouteErrorBoundary kind=\"forbidden\"/>을 값으로 직접 반환한다(I-069 근본 해결). ⚠️ 20일차 프로덕션 실측 결과 이 분기는 실제로 도달하지 않는다 — meetups 테이블 RLS(meetups_select_members)가 비소속자에게 행 자체를 0건으로 숨겨 getMeetupById가 먼저 notFound()를 던지고, 이 forbidden 분기보다 그쪽이 항상 먼저 실행된다. 그 결과 실사용자는 \"페이지를 찾을 수 없어요\"(404, HTTP 200)를 본다 — FR-064 AC2 미해소, 별도 이슈 I-073으로 등재(board.tsx의 post:create 항목과 같은 '도달 불가능' 성격의 caveat). 상세: docs/decisions/domain-error-channel-069.md §6.",
+    name: "Meetup 상세 — 크루원 아님 (FR-064 AC2, I-073 해소·D-048)",
+    note: "FR-064 AC2 — 비소속 회원의 Meetup 상세 접근은 403이 반환돼야 한다. MeetupDetailContainer가 (app)/crews/[crewId]/layout.tsx(D-039)와 같은 방식(getCrewMembership + isActiveMembership)으로 다시 판정해 20일차부터 cause:{code:'forbidden'}을 던지지 않고 <RouteErrorBoundary kind=\"forbidden\"/>을 값으로 직접 반환한다(I-069 근본 해결). 20일차엔 meetups 테이블 RLS(meetups_select_members)가 비소속자에게 행 자체를 0건으로 숨겨 getMeetupById가 먼저 notFound()를 던지는 바람에 이 분기가 실제로는 도달하지 않았다(I-073) — 21일차에 getMeetupById가 getCrewById와 같은 '원본 0행 → private 최소정보 RPC(meetup_directory_summary) 폴백' 패턴을 갖추면서 해소됐다(D-048). 이제 비소속자는 이 forbidden 분기에 정상 도달한다. 상세: docs/prioritization-and-risks.md D-048, docs/decisions/domain-error-channel-069.md §6(경위 보존).",
   },
 ];
 
@@ -179,6 +187,35 @@ export const meetupSection = defineSection({
             meetupId="sample-meetup-attendance-full"
             state={{ kind: "full" }}
           />
+        ),
+      },
+    },
+    {
+      // FR-065(Task 041) — 취소·일정 변경. 컨테이너가 `canCancelOrUpdate`로 노출 여부를 이미
+      // 정했으므로(제안자·임원·오너만) 이 항목은 항상 노출된 상태로 보여준다. "일정 변경"은
+      // D-003(가결된 Meetup의 날짜 변경은 재투표를 요구한다)에 따라 취소 + 새 제안글 작성
+      // 안내이지 즉시 날짜 저장이 아니다 — `docs/decisions/community-expansion-041.md` §3.
+      name: "MeetupLifecycleActions",
+      note: "실제 컴포넌트를 그대로 등록했습니다 — meetupId가 실재하지 않는 값이라 버튼을 눌러 확인 다이얼로그를 열고 실행해도 Mock 데이터는 바뀌지 않고 '모임을 찾을 수 없어요' 오류만 안전하게 보여줍니다. '오류' 상태는 실제 실패 시(권한 없음·이미 취소됨·과거 Meetup) ErrorState가 어떻게 보이는지 정적으로 보여줍니다(컴포넌트 내부 상태를 강제로 만들 수 없어 board.tsx의 도메인 오류 패턴처럼 별도 정적 렌더로 재현).",
+      panels: {
+        default: (
+          <MeetupLifecycleActions
+            crewId="sample-crew"
+            meetupId="sample-meetup-lifecycle"
+            boardWriteHref="#"
+          />
+        ),
+        error: (
+          <div className="flex flex-col gap-3">
+            <ErrorState
+              title={strings.meetup.lifecycle.errors.submitFailed}
+              description={strings.meetup.lifecycle.errors.forbidden}
+            />
+            <ErrorState
+              title={strings.meetup.lifecycle.errors.submitFailed}
+              description={strings.meetup.lifecycle.errors.conflict}
+            />
+          </div>
         ),
       },
     },

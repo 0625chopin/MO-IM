@@ -367,6 +367,20 @@ export const chatSection = defineSection({
       ),
     },
     {
+      name: "말풍선 — 삭제 가능 (FR-054, Task 041)",
+      note: "canDelete=true면 타임스탬프 옆에 삭제 아이콘 버튼이 붙는다 — 본인 메시지는 항상, 타인 메시지는 임원·오너·관리자(chat:delete_any_message)일 때만 MessageList가 이 값을 계산해 내려준다. 클릭하면 확인 다이얼로그(PostActions·CommentItem과 같은 패턴)가 뜬다. 전송 중(pending)·실패(failed) 메시지에는 애초에 삭제 버튼이 뜨지 않는다(MessageBubble.tsx의 showDelete 판정) — 아래 예시엔 그래서 포함하지 않았다.",
+      content: (
+        <PreviewFrame height={200}>
+          <MessageBubblePreview
+            items={[
+              { message: SAMPLE_MESSAGES[1], isOwn: true, canDelete: true },
+              { message: SAMPLE_MESSAGES[0], isOwn: false, canDelete: true },
+            ]}
+          />
+        </PreviewFrame>
+      ),
+    },
+    {
       name: "입력창 (Composer)",
       note: "실제 컴포넌트는 onSubmit을 통해 MessageRoomContainer.submitMessage(Server Action 호출 + 낙관적 렌더)로 이어져(auth.tsx의 SignupForm과 같은 이유) 여기서는 같은 UI 원자로 만든 정적 프리뷰만 둡니다 — 실제 전송은 /crews/[crewId]/chat에서 확인하세요. Task 020B부터 전송 자체는 낙관적이라(결과를 기다리지 않고 입력을 비운다) 이 컴포넌트 자체에는 더 이상 '전송 중' 상태가 없습니다 — 그 피드백은 위 MessageBubble의 '전송 중'/'전송 실패' 변형이 대신합니다.",
       panels: {

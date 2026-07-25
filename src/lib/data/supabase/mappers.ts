@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   ChatMessageType,
   ChatRoom,
+  Comment,
   Crew,
   CrewMembership,
   CrewMembershipRole,
@@ -59,6 +60,20 @@ export function toPost(row: Tables<"posts">): Post {
     capacity: row.capacity,
     createdAt: row.created_at,
     editedAt: row.edited_at,
+    deletedAt: row.deleted_at,
+  };
+}
+
+/** `created_at`은 도메인 타입(Comment)에 없는 운영 부기 컬럼이다(`comments` 테이블 코멘트,
+ *  `posts`·`invitations`와 같은 취급) — 매핑하지 않는다. 정렬은 호출부가 쿼리에서
+ *  `order("created_at")`로 한다. */
+export function toComment(row: Tables<"comments">): Comment {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    authorId: row.author_id,
+    parentId: row.parent_id,
+    body: row.body,
     deletedAt: row.deleted_at,
   };
 }
@@ -210,6 +225,7 @@ export function toProfile(row: Tables<"profiles">): Profile {
     deactivatedAt: row.deactivated_at,
     handleChangedAt: row.handle_changed_at,
     onboardingCompletedAt: row.onboarding_completed_at,
+    isSystemAdmin: row.is_system_admin,
   };
 }
 

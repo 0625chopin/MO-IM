@@ -37,9 +37,14 @@
  * 거치지 않으면 `check-handle-availability.ts`가 호출할 방법이 없기 때문이다(팀장 지시로
  * `src/lib/audit/**`가 아니라 zone 3에 둔 이유는 해당 모듈 docstring 참고).
  */
+export * from "./supabase/admin";
 export * from "./supabase/block";
 export * from "./supabase/board";
 export * from "./supabase/chat";
+// Task 041(21일차 BOARD, FR-033) 추가 — 9개 도메인 목록에 Comment를 더한다. 댓글은 스키마만
+// Task 006·028에서 선반영됐을 뿐 읽기·쓰기 둘 다 이번 회차가 처음이라 다른 도메인처럼
+// "Task 031 읽기 / Task 032 쓰기"로 나뉘지 않고 한 파일이 전부 담당한다.
+export * from "./supabase/comment";
 export * from "./supabase/crew";
 export * from "./supabase/handle-availability-rate-limit";
 export * from "./supabase/invitation";
@@ -48,6 +53,9 @@ export * from "./supabase/meetup";
 export * from "./supabase/notification";
 export * from "./supabase/poll";
 export * from "./supabase/profile";
+// 21일차(I-074 major) — `getProfileByHandle`만 격리된 파일로 옮겼다(profile.ts 모듈
+// docstring·profile-handle-oracle.ts 참고). 배럴 재노출 이름은 그대로라 호출부는 안 바뀐다.
+export * from "./supabase/profile-handle-oracle";
 export * from "./supabase/report";
 
 export * from "./contracts";

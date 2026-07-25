@@ -74,6 +74,12 @@ export async function MessageListContainer({ crewId }: { crewId: Id }) {
   // 와 같은 N+1 방지 패턴).
   const blockedProfileIds = await listMyBlockedProfileIds();
 
+  // FR-054(Task 041) — "타인 메시지 삭제" 버튼 노출 여부. 본인 메시지 삭제는 `MessageBubble`이
+  // 항목별로 `isOwn`을 이미 알고 있어 별도 플래그가 필요 없지만, "임원·오너는 남의 메시지도
+  // 지울 수 있다"는 role 하나로 정해지므로 여기서 한 번만 판정해 내려준다(`canSend`와 같은
+  // 자리 — 최종 판정은 `deleteChatMessageAction`이 다시 한다, Server Function 직접 호출 방어).
+  const canDeleteAnyMessage = checkPermission({ role, action: "chat:delete_any_message" }).allowed;
+
   return (
     <MessageRoomContainer
       crewId={crewId}
@@ -82,6 +88,7 @@ export async function MessageListContainer({ crewId }: { crewId: Id }) {
       initialMessages={initialMessages}
       initialCursor={page.nextCursor}
       canSend={canSend}
+      canDeleteAnyMessage={canDeleteAnyMessage}
       blockedProfileIds={blockedProfileIds}
     />
   );

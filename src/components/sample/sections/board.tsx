@@ -3,6 +3,9 @@ import { Loader2Icon } from "lucide-react";
 import type { BoardPostSummary, PostDetailViewModel } from "@/components/board/board-view-models";
 import { BoardList } from "@/components/board/BoardList";
 import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
+import type { CommentSectionViewModel } from "@/components/board/comment-view-models";
+import { CommentList } from "@/components/board/CommentList";
+import { CommentListSkeleton } from "@/components/board/CommentListSkeleton";
 import { PostDeletedNotice } from "@/components/board/PostDeletedNotice";
 import { PostDetail } from "@/components/board/PostDetail";
 import { PostDetailSkeleton } from "@/components/board/PostDetailSkeleton";
@@ -107,6 +110,91 @@ const SAMPLE_POST_DETAIL_BLOCKED: PostDetailViewModel = {
   id: "sample-demo-post-blocked",
   authorDisplayName: "차단된사용자",
   isAuthorBlocked: true,
+};
+
+/** FR-033(Task 041) 데모용 — 최상위 댓글 2건(그중 하나는 답글 1건), 삭제된 댓글 아래 답글이
+ *  유지되는 AC3 사례를 함께 보여준다. */
+const SAMPLE_COMMENTS: CommentSectionViewModel = {
+  postId: "sample-demo-post",
+  crewId: "crew-1",
+  canComment: true,
+  comments: [
+    {
+      id: "sample-comment-1",
+      authorDisplayName: "박민준",
+      authorAvatarUrl: null,
+      body: "저도 갈게요! 몇 시까지 도착하면 될까요?",
+      isDeleted: false,
+      isAuthorBlocked: false,
+      canEdit: false,
+      canDelete: false,
+      canReply: true,
+      replies: [
+        {
+          id: "sample-comment-1-reply-1",
+          authorDisplayName: "김유나",
+          authorAvatarUrl: null,
+          body: "7시까지 오시면 돼요, 준비운동은 각자 해오세요!",
+          isDeleted: false,
+          isAuthorBlocked: false,
+          canEdit: true,
+          canDelete: true,
+          // 답글에는 다시 답글을 달 수 없다(depth 1, canReplyToComment).
+          canReply: false,
+          replies: [],
+        },
+      ],
+    },
+    {
+      // FR-033 AC3 — 삭제된 부모 댓글 아래 답글은 그대로 유지된다.
+      id: "sample-comment-2-deleted",
+      authorDisplayName: "탈퇴한사용자",
+      authorAvatarUrl: null,
+      body: "",
+      isDeleted: true,
+      isAuthorBlocked: false,
+      canEdit: false,
+      canDelete: false,
+      canReply: true,
+      replies: [
+        {
+          id: "sample-comment-2-reply-1",
+          authorDisplayName: "서지훈",
+          authorAvatarUrl: null,
+          body: "저도 궁금했는데 답변 감사합니다!",
+          isDeleted: false,
+          isAuthorBlocked: false,
+          canEdit: false,
+          canDelete: false,
+          canReply: false,
+          replies: [],
+        },
+      ],
+    },
+  ],
+};
+
+/** FR-081 AC1(Task 041) — 차단한 사용자의 댓글(I-072 "댓글은 화면 자체가 없어 남은 범위"
+ *  해소). 최상위 댓글 하나의 작성자를 차단한 경우만 접는다 — 본문만 BlockedContentNotice로
+ *  감싼다(작성자 이름은 그대로 보여야 신고·차단 판단이 가능하다, `CommentItem.tsx`와 같은
+ *  원칙). */
+const SAMPLE_COMMENTS_WITH_BLOCKED: CommentSectionViewModel = {
+  ...SAMPLE_COMMENTS,
+  comments: [
+    {
+      id: "sample-comment-blocked-1",
+      authorDisplayName: "차단된사용자",
+      authorAvatarUrl: null,
+      body: "차단된 사용자의 댓글 내용(펼치기 전까지 안 보임)",
+      isDeleted: false,
+      isAuthorBlocked: true,
+      canEdit: false,
+      canDelete: false,
+      canReply: true,
+      replies: [],
+    },
+    ...SAMPLE_COMMENTS.comments,
+  ],
 };
 
 const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = [
@@ -337,6 +425,53 @@ export const boardSection = defineSection({
           <PreviewFrame height={460}>
             <div className="p-4">
               <PostDetail crewId="crew-1" post={SAMPLE_POST_DETAIL} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "댓글 (CommentList, FR-033)",
+      note: "최상위 댓글 2건 — 하나는 답글 1건이 달렸고, 다른 하나는 삭제된 부모 아래 답글이 그대로 유지되는 AC3 사례입니다(depth 1 제한 — 답글에는 '답글' 버튼이 없습니다). 작성 폼은 실제 CommentComposer/createCommentAction입니다 — postId가 실재하지 않는 값(sample-demo-post)이라 등록을 눌러도 'not_found' 오류만 안전하게 보여줍니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={520}>
+            <div className="p-4">
+              <CommentList section={SAMPLE_COMMENTS} />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={280}>
+            <div className="p-4">
+              <CommentListSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={220}>
+            <div className="p-4">
+              <CommentList section={{ ...SAMPLE_COMMENTS, comments: [] }} />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={160}>
+            <div className="p-4">
+              <BoardErrorStatePreview />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "댓글 — 차단한 사용자의 댓글 (FR-081 AC1, Task 041 — I-072 해소)",
+      note: "isAuthorBlocked=true인 댓글은 본문만 BlockedContentNotice로 감싸 접힙니다 — 작성자 이름은 그대로 보여야 신고·차단 판단이 가능합니다(PostDetail·MessageBubble과 같은 원칙). I-072가 '댓글은 화면 자체가 없어 남은 범위'로 남겨 뒀던 지점을 이 회차에서 닫았습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={520}>
+            <div className="p-4">
+              <CommentList section={SAMPLE_COMMENTS_WITH_BLOCKED} />
             </div>
           </PreviewFrame>
         ),
