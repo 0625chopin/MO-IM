@@ -50,6 +50,7 @@ grant select on cron.job, cron.job_run_details to service_role;
 - **동시 잡 8개 이내, 잡당 10분 이내.** pg_cron 자체에는 이를 강제하는 설정이 없다 — Supabase Cron 공식 문서가 권고치로만 명시한다. 따라서 이번 Task에서 마이그레이션으로 강제할 수단은 없고, **잡을 등록하는 쪽(Task 034·035)이 지켜야 하는 규약**으로 남긴다.
 - 각 잡을 등록할 때는 `cron.schedule` 안의 SQL에 `set local statement_timeout = '10min'`(또는 그 이하)을 거는 것을 권장한다 — pg_cron은 잡이 무한정 도는 것을 자체적으로 끊지 않는다.
 - 동시 잡 수는 이 문서(또는 후속 문서)에 등록된 잡 목록을 세는 방식으로 추적한다. 이번 회차에는 등록된 잡이 없다(0개).
+- **15일차 부기(Task 035, DESIGN)**: 채팅 12개월 파기 잡 `purge_expired_chat_messages`(`0 18 * * *`, `jobid=1`)를 등록해 **동시 잡 1/8개**가 됐다. 배치 크기 제한 루프 + `statement_timeout` 이중 방어로 CON-10 잡당 10분을 지켰다. 상세는 `docs/decisions/chat-retention-035.md` 참고.
 
 ## 4. 실패 감지 패턴 (NFR-029)
 
