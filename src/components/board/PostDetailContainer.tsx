@@ -4,7 +4,7 @@ import type { PostDetailViewModel } from "@/components/board/board-view-models";
 import { PostDeletedNotice } from "@/components/board/PostDeletedNotice";
 import { PostDetail } from "@/components/board/PostDetail";
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
-import { getBoardByCrewId, getPollByPostId, getPostById, getProfileById } from "@/lib/data";
+import { getBoardByCrewId, getPollByPostId, getPostById, getProfileById, listMyBlockedProfileIds } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import { hasLockedFields } from "@/lib/rules/post-edit-lock";
 import { strings } from "@/lib/strings";
@@ -38,9 +38,11 @@ export async function PostDetailContainer({ crewId, postId }: { crewId: Id; post
     return <PostDeletedNotice crewId={crewId} />;
   }
 
-  const [author, poll] = await Promise.all([
+  const [author, poll, blockedProfileIds] = await Promise.all([
     getProfileById(post.authorId),
     post.type === "meetup_proposal" ? getPollByPostId(post.id) : Promise.resolve(null),
+    // FR-081 AC1(Task 042A, 20일차) — BoardListContainer와 같은 패턴.
+    listMyBlockedProfileIds(),
   ]);
 
   const isSelf = session.status === "authenticated" && session.profileId === post.authorId;
@@ -66,6 +68,7 @@ export async function PostDetailContainer({ crewId, postId }: { crewId: Id; post
     canEditTitleBody,
     canDelete: canDeleteOwn || canDeleteAny,
     meetupDateLocked: hasLockedFields(post.type),
+    isAuthorBlocked: blockedProfileIds.includes(post.authorId),
   };
 
   return <PostDetail crewId={crewId} post={viewModel} />;

@@ -28,6 +28,14 @@ export interface MemberRowViewModel {
    *  (각주⁴) — 최종 판정은 Server Action이 `checkPermission`으로 다시 하므로 여기서는 버튼
    *  노출 여부만 결정한다(R-015, 오너 행은 항상 false). Task 040. */
   canRemove: boolean;
+  /** 뷰어가 이미 이 행(대상자)을 차단했는가(FR-081, Task 042A). 본인 행은 항상 false —
+   *  자기 차단은 `create_block` RPC·`blocks_check` CHECK 양쪽에서 거부되므로 버튼 자체를
+   *  숨긴다(`canReportOrBlock` 참고). */
+  isBlockedByViewer: boolean;
+  /** 뷰어가 이 행에 신고·차단 버튼을 볼 수 있는가 — 본인 행이 아니면 항상 true(매트릭스상
+   *  `report:create`·`block:create`는 로그인한 회원 전체에게 동일하게 허용되므로 role 분기가
+   *  필요 없다, `permission.ts` 참고). */
+  canReportOrBlock: boolean;
 }
 
 /**

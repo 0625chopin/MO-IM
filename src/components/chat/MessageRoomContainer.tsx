@@ -30,6 +30,9 @@ export interface MessageRoomContainerProps {
   initialCursor: Id | null;
   /** `chat:send_message` 판정 결과 — `Composer`에 그대로 내려준다. */
   canSend: boolean;
+  /** FR-081 AC1(Task 042A) — 뷰어의 차단 목록(배열, 서버→클라이언트 직렬화 가능한 형태).
+   *  `MessageList`에 `Set`으로 변환해 내려준다(모듈 docstring 참고). */
+  blockedProfileIds: Id[];
 }
 
 function isMessageViewModel(payload: unknown): payload is MessageViewModel {
@@ -135,6 +138,16 @@ function getMountedFalseOnServer(): boolean {
  * `messages`에 append하고 `seenIds`에 등록한다 — 뒤이어 도착하는 자기 자신의 브로드캐스트
  * 에코는 `seenIds` 중복 검사에 걸려 조용히 무시된다(중복 렌더 없음). 다른 크루원의 메시지는
  * 여전히 브로드캐스트 수신 경로 하나로만 들어온다.
+ *
+ * **20일차(Task 042A, FR-081 AC1) — 차단 접힘이 Realtime 경로에도 구조적으로 적용된다.**
+ * `blockedProfileIds`(배열)를 `Set`으로 한 번 바꿔 `MessageList`에 그대로 내려준다. 이
+ * `Set`은 `messages` 상태와 무관하게 고정 props이고, `MessageList`는 `messages` 배열(초기
+ * 메시지 + 이 컴포넌트의 `setMessages`로 append된 실시간 메시지 전부)을 **매 렌더마다 통째로
+ * map**하며 항목별로 `blockedProfileIds.has(senderId)`를 판정한다 — "초기 메시지냐 실시간
+ * 메시지냐"로 갈리는 별도 코드 경로가 없으므로, 실시간으로 도착한 메시지도 구조적으로 같은
+ * 판정을 받는다. **다만 실제 브라우저로 소켓을 열어 확인하지는 못했다** — 이번 회차도
+ * `npm run dev`는 팀장 전용 운영 규칙이라, 이 결론은 코드 경로 분석(정적)이지 실측이 아니다.
+ * 정직하게 남긴다.
  */
 export function MessageRoomContainer({
   crewId,
@@ -143,7 +156,9 @@ export function MessageRoomContainer({
   initialMessages,
   initialCursor,
   canSend,
+  blockedProfileIds,
 }: MessageRoomContainerProps) {
+  const blockedProfileIdSet = new Set(blockedProfileIds);
   const [messages, setMessages] = useState(initialMessages);
   const [cursor, setCursor] = useState(initialCursor);
   const [pending, setPending] = useState<Map<string, ChatTimelineItem>>(new Map());
@@ -358,6 +373,7 @@ export function MessageRoomContainer({
         isLoadingMore={isLoadingMore}
         onLoadMore={handleLoadMore}
         onRetry={handleRetry}
+        blockedProfileIds={blockedProfileIdSet}
       />
       <Composer canSend={canSend} onSubmit={handleComposerSubmit} />
     </div>

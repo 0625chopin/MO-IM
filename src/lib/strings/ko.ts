@@ -378,6 +378,11 @@ export const ko = {
           /** Task 032 교차검증 major 2 — 이미 가입 신청을 넣은 사용자는 초대가 아니라
            *  승인으로 처리해야 한다(FR-023). */
           already_requested: "이미 가입 신청을 넣은 사용자예요 — 신청 탭에서 승인해 주세요",
+          /** FR-020 E3(대상자가 나를 차단, FR-081) — Task 042A. 판정 데이터를 클라이언트가
+           *  가질 수 없어(차단 여부는 상대만 볼 수 있는 정보) DB RLS가 최종 거부하고, 이
+           *  문구는 그 거부를 일반 오류로 감싼다 — "차단됐다"는 사실 자체를 노출하지
+           *  않는다(requirements.md FR-020 정상 흐름 E3 "사유는 노출하지 않음"). */
+          blocked: "이 사용자를 초대할 수 없어요",
         },
       },
       /** FR-023 가입 신청 승인·반려 탭. `requests.status.*`는 `JoinRequestStatus` 값과 문구를
@@ -1128,6 +1133,13 @@ export const ko = {
       handleStatus: {
         checking: "확인하는 중…",
         available: "사용할 수 있는 핸들이에요",
+        /** D-047(20일차) — IP당 분당 10회 리밋 초과(blur 시점 미리보기). **20일차 안에 정정**
+         *  — 최초 문구는 "이대로 가입을 진행해도 괜찮아요"였으나, BOARD가 그 판단이 되돌릴
+         *  수 없는 고아 `auth.users` 계정을 만드는 결함으로 이어짐을 발견해 팀장이 뒤집었다
+         *  (`signup.ts` docstring 참고) — 제출 시점에는 이제 실제로 막힌다(아래
+         *  `errors.handleCheckRateLimited`). 이 blur 미리보기 문구도 그에 맞춰 "잠시 기다려
+         *  달라"로만 말하고 "진행해도 된다"는 약속은 더 이상 하지 않는다. */
+        rateLimited: "확인 요청이 많아요. 1분 뒤 다시 확인해 주세요.",
       },
       submit: "가입하기",
       submitPending: "가입하는 중…",
@@ -1144,6 +1156,11 @@ export const ko = {
         handleInvalidFormat: common.handle.invalidFormat,
         /** FR-001 E2 — 핸들 실시간 중복 검사 결과. `common.handle.taken`과 공유(W-2). */
         handleTaken: common.handle.taken,
+        /** D-047·I-065 major①(20일차) — 제출 시점에 IP 리밋(분당 10회)에 걸리면 제출 자체를
+         *  막는다(`signup.ts` docstring 참고, "리밋에 걸려도 통과시킨다"였던 최초 판단을
+         *  뒤집은 결과). `handleTaken`과 문구를 명확히 구분한다 — 이건 "이 핸들은 못 쓴다"가
+         *  아니라 "지금은 확인할 수 없으니 곧 다시 시도하라"는 뜻이다. */
+        handleCheckRateLimited: "핸들 확인 요청이 많아요. 1분 뒤 다시 시도해 주세요.",
         displayNameRequired: "표시 이름을 입력해 주세요",
         displayNameTooLong: "표시 이름은 30자 이하로 입력해 주세요",
         termsRequired: "계속하려면 약관에 동의해야 해요",
@@ -1304,5 +1321,75 @@ export const ko = {
     /** 프로덕션에서는 원본 오류 메시지 대신 이 코드만 노출한다(NFR-014) — 서버 내부 정보를
      *  사용자에게 드러내지 않으면서도 문의 시 로그와 대조할 수 있게 한다. */
     digest: "오류 코드: {digest}",
+  },
+
+  /**
+   * FR-080 신고(Task 042A). `ReportDialog`(범용 — post/comment/chat_message/profile 4종
+   * 어디에서든 `targetType`·`targetId`만 넘기면 재사용된다)가 쓴다. `errors`의 snake_case
+   * 키는 `lib/rules/report-eligibility.ts`의 `ReportIneligibleReason`·`create_report` SQL
+   * RPC의 `reason_code`와 그대로 맞췄다(`invite-eligibility.ts` 관례와 동일).
+   */
+  report: {
+    trigger: "신고",
+    dialogTitle: "신고하기",
+    dialogDescription: "신고 사유를 입력해 주세요. 같은 대상을 다시 신고하면 기존 신고에 합쳐져요.",
+    reasonLabel: "신고 사유",
+    reasonPlaceholder: "무엇이 문제인지 알려주세요",
+    submit: "신고 접수",
+    submitPending: "접수하는 중…",
+    cancel: "취소",
+    sentNotice: "신고가 접수됐어요",
+    mergedNotice: "이미 신고한 대상이에요. 사유를 갱신했어요.",
+    errors: {
+      notAllowed: "신고 권한이 없어요",
+      reason_required: "신고 사유를 입력해 주세요",
+      cannot_report_self: "자기 자신은 신고할 수 없어요",
+      validation_failed: "신고를 접수하지 못했어요. 다시 시도해 주세요.",
+      failed: "신고를 접수하지 못했어요. 다시 시도해 주세요.",
+    },
+  },
+
+  /**
+   * FR-081 사용자 차단(Task 042A). `BlockButton`(트리거)·`BlockedUsersList`(설정 페이지
+   * 차단 관리 목록) 둘 다 이 사전을 쓴다.
+   */
+  block: {
+    trigger: "차단",
+    dialogTitle: "차단하기",
+    dialogDescription: "차단하면 이 사용자는 나를 크루에 초대할 수 없고, 이 사용자의 콘텐츠는 접혀서 보여요.",
+    submit: "차단",
+    submitPending: "차단하는 중…",
+    cancel: "취소",
+    blockedNotice: "차단했어요",
+    alreadyBlockedNotice: "이미 차단한 사용자예요",
+    errors: {
+      notAllowed: "차단 권한이 없어요",
+      cannot_block_self: "자기 자신은 차단할 수 없어요",
+      validation_failed: "차단하지 못했어요. 다시 시도해 주세요.",
+      failed: "차단하지 못했어요. 다시 시도해 주세요.",
+    },
+    /** 계정 설정 "차단 관리" 섹션(`BlockedUsersListContainer`). FR-081 AC에 명시된 항목은
+     *  아니지만 해제 경로 없이 차단만 있으면 실수를 되돌릴 수 없어 함께 만들었다. */
+    manage: {
+      title: "차단한 사용자",
+      description: "차단한 사용자는 나를 크루에 초대할 수 없어요",
+      empty: "차단한 사용자가 없어요",
+      unblockButton: "차단 해제",
+      unblockPending: "해제하는 중…",
+      errors: {
+        removeFailed: "차단을 해제하지 못했어요. 다시 시도해 주세요.",
+      },
+    },
+  },
+
+  /** FR-081 AC1 — 차단한 사용자의 콘텐츠 접힘 표시(`BlockedContentNotice`). `docs/decisions/
+   *  report-block-042a.md`가 정한 대로 이번 회차는 `MemberList`에만 배선했고, 게시판·채팅은
+   *  범위 밖이다(`lib/rules/block-content-visibility.ts` docstring 참고). */
+  moderation: {
+    blockedContent: {
+      notice: "차단한 사용자의 콘텐츠예요",
+      expandButton: "펼치기",
+      collapseButton: "접기",
+    },
   },
 } as const;

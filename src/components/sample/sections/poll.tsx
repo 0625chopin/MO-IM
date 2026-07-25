@@ -331,8 +331,8 @@ export const pollSection = defineSection({
       },
     },
     {
-      name: "투표 종료 트리거 시뮬레이션(Mock)",
-      note: "D-003의 종료 트리거 3종 — ① 마감 시각 도래(자동), ② 조기 종료(사람이 버튼), ③ 미투표자 0명(자동, D-022) — 중 v0.1엔 pg_cron(Task 034)이 없어 ①만 사람이 대신 발화하는 자리가 필요합니다. 아래 버튼이 그 자리(`simulateScheduledPollClosureAction`, close-poll.ts)이고, ②는 위 `PollEarlyCloseControl`이 실제 화면에서 쓰는 버튼과 완전히 같은 것입니다. ③은 `castVoteAction`이 마지막 투표 제출 직후 동기 체크로 판정하므로 — 버튼이 아니라 위 `PollBallot`에서 마지막 한 표를 던지는 순간 발화합니다(실재 crewId·pollId가 있어야 관찰할 수 있어 이 화면에서 눈으로 보이진 않지만, 판정 코드(`decideAndClosePoll`)는 세 트리거가 전부 동일하게 호출합니다). Mock인 것은 세 트리거의 **발화 방식**뿐이고, 판정 자체는 100% 프로덕션 코드(`lib/rules`)입니다.",
+      name: "투표 종료 트리거 시뮬레이션",
+      note: "D-003의 종료 트리거 3종 — ① 마감 시각 도래(자동), ② 조기 종료(사람이 버튼), ③ 미투표자 0명(자동, D-022). **Task 034(20일차)부터 ①은 pg_cron 잡(`poll_auto_close_and_finalize`, 5분 주기)이 실제로 처리합니다** — 이 버튼은 5분을 기다리지 않고 즉시 확인하려는 QA용 수동 발화(`simulateScheduledPollClosureAction`, close-poll.ts)로 남겨 뒀습니다. ②는 위 `PollEarlyCloseControl`이 실제 화면에서 쓰는 버튼과 완전히 같은 것입니다. ③은 `castVoteAction`이 마지막 투표 제출 직후 동기 체크로 우선 판정하고(버튼이 아니라 위 `PollBallot`에서 마지막 한 표를 던지는 순간 발화), 그 동기 체크가 RLS로 조용히 막히는 드문 경우엔 같은 pg_cron 잡이 D-022 조건(스냅샷 ∩ 현재 active 미투표자 0명)으로 다시 잡아 백스톱합니다(write-path-realdata-032.md §8 인계 해소). 판정 자체(정족수·가결)는 세 트리거 전부 100% 동일 공식이고, 가결 시 Meetup 생성(FR-060)·종료 알림 적재(FR-045)도 이제 실제로 일어납니다 — DB 트리거(`finalize_closed_poll`) 하나가 트리거①②③ 전부를 공유합니다.",
       content: <PollAutoCloseSimulatorPreview />,
     },
   ],

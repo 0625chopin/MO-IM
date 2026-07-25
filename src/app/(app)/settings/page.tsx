@@ -1,3 +1,4 @@
+import { BlockedUsersListContainer } from "@/components/moderation/BlockedUsersListContainer";
 import { AccountSettingsContainer } from "@/components/profile/AccountSettingsContainer";
 import { assertAuthenticatedSession } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
@@ -13,6 +14,10 @@ import { strings } from "@/lib/strings";
  * 화면의 범위는 프로필 조회·수정(FR-004: 표시 이름·핸들·소개·검색 노출)과 핸들 검색 필드
  * (FR-006)다 — 알림 설정·탈퇴(FR-072·FR-005)는 각각 다른 Task(CREW의 Task 039 등) 몫이라
  * 이번 회차에 채우지 않는다.
+ *
+ * **20일차(Task 042A) 추가 — 차단 관리(FR-081)**. `BlockedUsersListContainer`를 이 페이지에
+ * 직접 조립했다. 새 라우트를 만들지 않은 이유는 이 화면이 이미 "계정" 스코프 설정의 자연스러운
+ * 연장이라서다(핸들 검색·프로필 수정과 같은 층위) — 새 세그먼트는 그만큼 배선을 늘린다.
  *
  * **인증 가드는 더 이상 여기 없다** — 6일차부터 `(app)/layout.tsx`가 이 라우트 그룹 전체의
  * 가드를 한 곳에서 맡는다(D-030 ④, I-025 해소). 이 페이지가 렌더된다는 것 자체가 그 레이아웃을
@@ -32,6 +37,9 @@ export default async function AccountSettingsPage() {
         description={strings.account.settings.description}
       />
       <AccountSettingsContainer session={session} />
+      <div className="mx-auto w-full max-w-2xl px-4 pb-6 sm:px-6">
+        <BlockedUsersListContainer />
+      </div>
     </main>
   );
 }

@@ -66,19 +66,23 @@ export interface SimulateScheduledPollClosureInput {
 }
 
 /**
- * **Mock 전용** — D-003 종료 트리거①(기한 도래 자동 종료)의 발화 시뮬레이터.
+ * D-003 종료 트리거①(기한 도래 자동 종료)의 **수동 발화 시뮬레이터** — QA 전용.
  *
- * 실제로는 Supabase Cron(pg_cron, D-027)이 스케줄로 `decideAndClosePoll`(또는 그 자리를
- * 대신하는 Task 034의 서버 함수)을 호출한다 — v0.1엔 스케줄러 자체가 없으므로(pg_cron은
- * 설치돼 있지만 미가동, `prioritization-and-risks.md` D-027 참고) "마감 시각이 지났는지"를
- * 사람이 대신 트리거하는 자리를 여기 남겨 둔다. 실제 사용자 화면(`PollPanel`) 어디에서도
- * 이 함수를 호출하지 않는다 — 사용자는 트리거①을 버튼으로 발화시킬 수 없고(트리거②만
- * 사람이 누르는 버튼이다), `isPollAwaitingClosure`(D-024)가 그 사이 창을 "결과 집계 중"으로
- * 표시만 할 뿐이다. 이 함수는 QA·개발 도구용 진입점으로만 존재한다.
+ * **Task 034(20일차)부터 실제 트리거①은 이 함수가 아니라 pg_cron 잡
+ * `poll_auto_close_and_finalize`(5분 주기, SQL 네이티브 — `docs/decisions/poll-pipeline-034.md`)
+ * 가 처리한다.** 그 잡은 이 함수와 달리 TS `decideAndClosePoll`을 호출하지 않는다 —
+ * pg_cron은 순수 SQL만 실행할 수 있어(PRD-validation.md) 판정 공식을 SQL로 미러링한
+ * `public.run_poll_auto_close_job`이 자체적으로 종료·판정하고, Meetup 생성(FR-060)·알림
+ * 적재(FR-045)는 `polls` AFTER UPDATE 트리거(`finalize_closed_poll`)가 담당한다 — 이 트리거는
+ * 트리거②③(아래·`cast-vote.ts`, 여전히 `decideAndClosePoll` 경유)의 UPDATE에도 똑같이
+ * 걸린다.
  *
- * **걷어낼 대상은 이 함수의 "호출 방식"(사람이 부르는 액션)이지 판정 로직이 아니다** —
- * Task 034가 pg_cron 잡을 붙이면 `decideAndClosePoll` 호출부만 cron 핸들러로 옮기면 되고,
- * 이 파일의 이 함수(그리고 이 함수만 쓰는 QA 도구)를 걷어내면 된다.
+ * 이 함수는 **걷어내지 않고 QA 단축 경로로 남겼다** — 5분 주기를 기다리지 않고 개발 중
+ * 즉시 트리거①의 배선(판정→종료→Meetup→알림)을 확인하려는 목적이다. 실제 사용자 화면
+ * (`PollPanel`) 어디에서도 이 함수를 호출하지 않는다 — 사용자는 트리거①을 버튼으로
+ * 발화시킬 수 없고(트리거②만 사람이 누르는 버튼이다), `isPollAwaitingClosure`(D-024)가 그
+ * 사이 창을 "결과 집계 중"으로 표시만 할 뿐이다. `/sample`의 `PollAutoCloseSimulatorPreview`가
+ * 유일한 호출부다.
  */
 export async function simulateScheduledPollClosureAction(
   input: SimulateScheduledPollClosureInput,

@@ -233,7 +233,19 @@ export async function createCrew(input: CreateCrewInput): Promise<Crew> {
 
 export type UpdateCrewInfoInput = Partial<Pick<Crew, "name" | "description" | "category" | "colorKey">>;
 
-/** 크루 정보 수정(FR-011). `crews_update_staff_or_owner` RLS가 임원 이상만 허용한다. */
+/**
+ * 크루 정보 수정(FR-011). `crews_update_staff_or_owner` RLS가 임원 이상만 허용한다.
+ *
+ * **I-070 해소(20일차, CORE)** — 예전엔 `if (error) throw error`라 SQL 거부(RLS·트리거)가
+ * 처리되지 않은 예외로 `updateCrewInfoAction`(Server Action)까지 그대로 올라갔다. 20일차
+ * `crews_guard_archived_immutable` 트리거(I-066 잔여분, archived 크루는 UPDATE 전체 거부)가
+ * 새로 생기면서 이 gap이 실제로 도달 가능해졌다 — `CrewSettingsContainer`는 `crew.status`를
+ * 보지 않으므로(별도 이슈 아님, 범위 밖) archived 크루의 설정 화면도 오너에게 정상 렌더되고,
+ * 제출 시점에야 이 UPDATE가 거부된다. `transferCrewOwnership`이 이미 쓰던 것과 같은 패턴
+ * (`err("forbidden", ...)`)으로 맞춘다 — 호출자 `updateCrewInfoAction`은 이미 `!result.ok`를
+ * 범용으로 처리하므로(`strings.crew.settings.info.errors.failed`) 이 파일 밖은 손대지
+ * 않아도 된다.
+ */
 export async function updateCrewInfo(
   id: Id,
   patch: UpdateCrewInfoInput,
@@ -250,7 +262,11 @@ export async function updateCrewInfo(
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // crews_update_staff_or_owner RLS·crews_guard_archived_immutable(I-066) 트리거가 여기서
+    // 거부될 수 있다 — D-030 ③에 따라 예외를 던지지 않고 도메인 오류로 표현한다(I-070).
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
   return ok(toCrew(data));
 }
@@ -260,6 +276,10 @@ export async function updateCrewInfo(
  * `crews_guard_owner_only_fields` 트리거가 `visibility`·`status`·`owner_id` 변경을 오너로
  * 다시 좁힌다 — 호출자(Server Action)가 이미 `crew:update_visibility`(오너 전용) 권한을
  * 확인했다는 전제이며, 이 트리거는 그 판정이 이미 실패했어야 할 상황의 2차 방어선이다.
+ *
+ * **I-070 해소(20일차, CORE)** — `updateCrewInfo`와 같은 이유로 `throw` 대신 `err("forbidden")`
+ * 을 반환한다(`crews_guard_archived_immutable` 트리거 포함). 호출자 `updateCrewVisibilityAction`
+ * 도 이미 `!result.ok`를 범용으로 처리하므로 변경이 필요 없다.
  */
 export async function updateCrewVisibility(
   id: Id,
@@ -272,7 +292,9 @@ export async function updateCrewVisibility(
     .eq("id", id)
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `crew ${id} 를 찾을 수 없다.`);
   return ok(toCrew(data));
 }

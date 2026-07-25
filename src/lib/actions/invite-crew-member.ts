@@ -81,12 +81,18 @@ export async function inviteCrewMemberAction(
     return { formError: strings.crew.members.invite.errors[eligibility.reason] };
   }
 
-  await createInvitation({
+  // Task 042A(FR-081 AC2) — 대상자가 나를 차단했으면 RLS가 INSERT 자체를 거부한다(값으로
+  // 반환, `invitation.ts` docstring 참고). 이유를 구분하지 않고 일반 문구로 감싼다 — "차단됐다"
+  // 자체가 requirements.md FR-020 E3이 노출을 금지하는 정보다.
+  const result = await createInvitation({
     crewId,
     inviteeId: invitee.id,
     inviterId: session.profileId,
     expiresAt: new Date(Date.now() + INVITATION_EXPIRY_MS).toISOString(),
   });
+  if (!result.ok) {
+    return { formError: strings.crew.members.invite.errors.blocked };
+  }
 
   refresh();
   return { success: true };

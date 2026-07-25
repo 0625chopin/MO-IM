@@ -2,7 +2,7 @@
 
 import { AlertTriangleIcon, CheckCircle2Icon, EyeIcon, EyeOffIcon, Loader2Icon, MailCheckIcon } from "lucide-react";
 import Link from "next/link";
-import { useActionState, useState, useTransition, type FocusEvent } from "react";
+import { useActionState, useRef, useState, useTransition, type FocusEvent } from "react";
 
 import { ResendSignupEmailButton } from "@/components/auth/ResendSignupEmailButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,7 +32,8 @@ type HandleCheckStatus =
   | { kind: "checking" }
   | { kind: "invalid_format" }
   | { kind: "available" }
-  | { kind: "taken" };
+  | { kind: "taken" }
+  | { kind: "rate_limited" };
 
 /**
  * FR-001 회원가입 폼 — 이 화면의 유일한 클라이언트 경계다(팀장 지침 4번 "인터랙티브 필드/폼
@@ -47,13 +48,31 @@ type HandleCheckStatus =
  *
  * **핸들 실시간 중복 검사(FR-001 AC2)**: blur 시점에 먼저 형식을 검사하고(로컬, 왕복 없음),
  * 통과한 값만 `checkHandleAvailabilityAction`(서버)에 물어본다 — 형식이 틀린 값을 서버에
- * 물어볼 필요가 없다.
+ * 물어볼 필요가 없다. **D-047(20일차)** — 그 서버 액션은 IP당 분당 10회로 제한돼 있다.
+ * 초과하면 `rateLimited: true`가 오고, 이건 "이미 사용 중"(taken)과 다른 상태(`rate_limited`)
+ * 로 다룬다 — blur 미리보기 단계에서는 제출 버튼을 막지 않는다(윈도가 60초라 클릭 시점엔
+ * 이미 풀렸을 수 있다). **다만 제출 자체는 `signupAction`(서버)이 같은 리밋을 다시 확인해
+ * 여전히 걸려 있으면 실제로 막는다**(20일차 안에 뒤집힌 판단 — 최초엔 제출을 막지 않고 DB
+ * UNIQUE 제약에 맡겼으나, 그러면 리밋에 걸린 채로 넘어간 요청이 `signUpWithPassword`를 먼저
+ * 실행해 되돌릴 수 없는 고아 `auth.users` 계정을 만드는 결함으로 이어짐을 BOARD가 발견했다
+ * — `signupAction` docstring·D-047·I-065 참고).
+ *
+ * **blur 중복 호출 완화(20일차, DESIGN 지적 → BOARD 재확인 → CORE 적용)**: 같은 값으로 이미
+ * 서버에 확인했다면 다시 blur해도 재호출하지 않는다(`lastCheckedHandleRef`) — 리밋을 정직한
+ * 사용자가 우연히 소진하는 확률을 낮춰, 위 제출 차단이 실제로 발동할 일을 줄이는 게 목적이다
+ * (두 결함이 서로를 강화하던 고리를 끊는다).
  */
 export function SignupForm() {
   const [state, formAction, isPending] = useActionState(signupAction, INITIAL_SIGNUP_FORM_STATE);
   const [handleStatus, setHandleStatus] = useState<HandleCheckStatus>({ kind: "idle" });
   const [isCheckingHandle, startHandleCheck] = useTransition();
   const [passwordVisible, setPasswordVisible] = useState(false);
+  // D-047 — 이미 서버에 확인한 값으로 다시 blur해도 재호출하지 않는다(20일차, 리밋 소진
+  // 완화). 값뿐 아니라 그때의 결과 상태도 같이 기억해야 한다 — 그 사이 `onChange`가
+  // `handleStatus`를 "idle"로 되돌려 놨을 수 있어(타이핑했다가 원래 값으로 되돌린 경우),
+  // 서버를 다시 안 부르는 대신 마지막 결과를 그대로 복원해 줘야 사용자가 "확인 중" 표시
+  // 없이 결과를 계속 볼 수 있다. `null`은 "아직 아무 값도 서버에 확인하지 않았다"를 뜻한다.
+  const lastCheckedHandleRef = useRef<{ handle: string; status: HandleCheckStatus } | null>(null);
 
   function handleHandleBlur(event: FocusEvent<HTMLInputElement>) {
     const handle = event.currentTarget.value.trim();
@@ -68,10 +87,26 @@ export function SignupForm() {
       return;
     }
 
+    if (handle === lastCheckedHandleRef.current?.handle) {
+      // 값이 안 바뀌었다 — 서버를 다시 부르지 않고 마지막 결과를 그대로 복원한다(리밋 소진
+      // 완화가 목적, D-047).
+      setHandleStatus(lastCheckedHandleRef.current.status);
+      return;
+    }
+
     setHandleStatus({ kind: "checking" });
     startHandleCheck(async () => {
       const result = await checkHandleAvailabilityAction(handle);
-      setHandleStatus(result.available ? { kind: "available" } : { kind: "taken" });
+      // D-047 — 리밋 초과도 `available: null`이라 `rateLimited`를 먼저 분기해야 한다. 그냥
+      // `result.available ? available : taken`을 쓰면 리밋 초과가 "이미 사용 중"으로
+      // 잘못 보인다(둘 다 falsy) — 사실이 아닌 안내다.
+      const status: HandleCheckStatus = result.rateLimited
+        ? { kind: "rate_limited" }
+        : result.available
+          ? { kind: "available" }
+          : { kind: "taken" };
+      lastCheckedHandleRef.current = { handle, status };
+      setHandleStatus(status);
     });
   }
 
@@ -83,6 +118,10 @@ export function SignupForm() {
         ? strings.auth.signup.errors.handleInvalidFormat
         : undefined);
 
+  // rate_limited는 사용자 입력 오류가 아니라 일시적 상태다(D-047, IP 리밋) — blur 미리보기
+  // 단계에서 제출 버튼을 막지는 않는다(클릭 시점엔 60초 윈도가 이미 풀렸을 수 있다). 다만
+  // 실제로 여전히 걸려 있으면 제출 자체는 `signupAction`(서버)이 막는다 — `state.fieldErrors.handle`
+  // 로 돌아와 위 `handleFieldError`에 반영된다(20일차, 위 컴포넌트 docstring 참고).
   const submitDisabled =
     isPending || isCheckingHandle || handleStatus.kind === "taken" || handleStatus.kind === "invalid_format";
 
@@ -192,6 +231,7 @@ export function SignupForm() {
                   {strings.auth.signup.handleStatus.available}
                 </>
               )}
+              {handleStatus.kind === "rate_limited" && strings.auth.signup.handleStatus.rateLimited}
               {(handleStatus.kind === "idle") && strings.auth.signup.fields.handleDescription}
             </FieldDescription>
           )}

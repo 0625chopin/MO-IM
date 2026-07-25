@@ -8,6 +8,8 @@ export interface ChatMessageListPreviewProps {
   messages: ChatTimelineItem[];
   viewerProfileId: string;
   hasMore?: boolean;
+  /** FR-081 AC1(Task 042A, 20일차) — 데모용 차단 목록. 기본값 빈 집합. */
+  blockedProfileIds?: ReadonlySet<string>;
 }
 
 /**
@@ -29,6 +31,7 @@ export function ChatMessageListPreview({
   messages,
   viewerProfileId,
   hasMore = false,
+  blockedProfileIds = new Set(),
 }: ChatMessageListPreviewProps) {
   return (
     <MessageList
@@ -39,6 +42,7 @@ export function ChatMessageListPreview({
       isLoadingMore={false}
       onLoadMore={() => {}}
       onRetry={() => {}}
+      blockedProfileIds={blockedProfileIds}
     />
   );
 }

@@ -4,7 +4,7 @@ import { MESSAGE_PAGE_SIZE } from "@/components/chat/message-view-models";
 import { MessageRoomContainer } from "@/components/chat/MessageRoomContainer";
 import { resolveChatViewer } from "@/components/chat/resolve-chat-viewer";
 import { toMessageViewModel } from "@/components/chat/resolve-message-view-model";
-import { getChatRoomByCrewId, getCrewById, getProfileById, listMessages } from "@/lib/data";
+import { getChatRoomByCrewId, getCrewById, getProfileById, listMessages, listMyBlockedProfileIds } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import type { Id } from "@/lib/types";
 
@@ -22,6 +22,15 @@ import type { Id } from "@/lib/types";
  * 하다고 읽었기 때문이다. 별도 `chat:read` 행을 매트릭스에 추가하는 편이 더 명시적일 수
  * 있었지만 그건 권한 매트릭스 자체(Task 009B 산출물)를 바꾸는 결정이라 이 Task 범위를 넘는다고
  * 판단해 임의로 추가하지 않았다 — `docs/ISSUES.md` I-039로 등재했다.
+ *
+ * **20일차(Task 042A, FR-081 AC1) — 차단한 사용자의 메시지는 접힘 처리한다.**
+ * `listMyBlockedProfileIds`를 최초 조회 시점에 한 번만 불러 `MessageRoomContainer`(클라이언트)에
+ * 배열로 내려준다 — `Set`은 서버→클라이언트 props로 직렬화할 수 없다(NFR-037). 이 목록은
+ * 세션당 한 번만 조회되고 실시간 구독 중에는 갱신되지 않는다 — 채팅 중에 새로 차단해도
+ * 그 세션에서는 새로고침 전까지 반영되지 않는다(알려진 한계, `docs/decisions/
+ * report-block-042a.md` §7 참고). Realtime으로 도착하는 메시지도 이 같은 배열을 그대로
+ * 참조하는 `MessageList`의 매 렌더 판정을 타므로(초기 메시지와 별도 코드 경로가 없다)
+ * 구조적으로 동일하게 접힘이 적용된다 — 상세 근거는 `MessageRoomContainer` 모듈 docstring.
  */
 export async function MessageListContainer({ crewId }: { crewId: Id }) {
   const room = await getChatRoomByCrewId(crewId);
@@ -61,6 +70,10 @@ export async function MessageListContainer({ crewId }: { crewId: Id }) {
   const crew = await getCrewById(crewId);
   const canSend = checkPermission({ role, action: "chat:send_message" }).allowed && crew?.status === "active";
 
+  // FR-081 AC1(Task 042A) — 뷰어의 차단 목록. 메시지마다 다시 조회하지 않는다(BoardListContainer
+  // 와 같은 N+1 방지 패턴).
+  const blockedProfileIds = await listMyBlockedProfileIds();
+
   return (
     <MessageRoomContainer
       crewId={crewId}
@@ -69,6 +82,7 @@ export async function MessageListContainer({ crewId }: { crewId: Id }) {
       initialMessages={initialMessages}
       initialCursor={page.nextCursor}
       canSend={canSend}
+      blockedProfileIds={blockedProfileIds}
     />
   );
 }

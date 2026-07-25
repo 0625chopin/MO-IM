@@ -23,6 +23,10 @@ export interface MessageListProps {
   onLoadMore: () => void;
   /** 실패한 메시지의 재전송(FR-051 E1) — `clientKey`로 대상을 지목한다. */
   onRetry?: (clientKey: string) => void;
+  /** FR-081 AC1(Task 042A) — 뷰어가 차단한 프로필 id 집합. `MessageBubble`에 항목별로
+   *  `blockedProfileIds.has(message.senderId)`를 넘긴다(`MessageRoomContainer` 모듈 docstring
+   *  참고 — 실시간 메시지도 이 판정을 그대로 탄다). */
+  blockedProfileIds: ReadonlySet<Id>;
 }
 
 /**
@@ -60,6 +64,7 @@ export function MessageList({
   isLoadingMore,
   onLoadMore,
   onRetry,
+  blockedProfileIds,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -214,6 +219,7 @@ export function MessageList({
             message={message}
             isOwn={message.senderId === viewerProfileId}
             onRetry={onRetry ? () => onRetry(message.clientKey) : undefined}
+            isSenderBlocked={blockedProfileIds.has(message.senderId)}
           />
         ))}
       </div>

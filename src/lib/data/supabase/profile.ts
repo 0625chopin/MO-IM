@@ -55,9 +55,17 @@ import type { Database } from "./database.types";
  * 그쪽으로 재배선했다.
  *
  * - `getProfileByHandle`의 실 소비자는 `check-handle-availability.ts`(가입/핸들 변경 시 중복
- *   확인, `.id`만 내부적으로 씀)·`invite-crew-member.ts`(초대 대상 handle→id 재해석)·
- *   `signup.ts`(가입 폼 핸들 중복 검사, `anon` 컨텍스트) 셋뿐이다 — 셋 다 화면에 `Profile`
- *   전체를 노출하지 않고 boolean/`id` 파생값만 쓴다.
+ *   확인, `.id`만 내부적으로 씀)·`invite-crew-member.ts`(초대 대상 handle→id 재해석) 둘뿐이다
+ *   — 둘 다 화면에 `Profile` 전체를 노출하지 않고 boolean/`id` 파생값만 쓴다.
+ *   **20일차(I-065 major①) 규약**: 이 함수는 service-role로 RLS를 완전히 우회하는 무제한
+ *   조회이므로, **미인증(anon) 컨텍스트에서 호출하는 자리는 반드시 `check-
+ *   handle-availability.ts`의 `checkHandleAvailabilityAction`(D-047, IP당 분당 10회) 하나만
+ *   거쳐야 한다** — 이 함수를 익명 컨텍스트에서 직접(그 액션을 우회해) 호출하는 새 코드를
+ *   추가하지 않는다. `signup.ts`가 한때 직접 호출해 리밋을 완전히 우회하는 두 번째 진입문이
+ *   됐던 사고가 있었다(I-058 major①과 같은 "다른 경로로 같은 오라클 재도달" 구조, 20일차
+ *   BOARD 교차검증이 발견 → CORE가 `checkHandleAvailabilityAction` 재사용으로 수정) — 셋째
+ *   진입문이 또 생기지 않도록 이 규약을 여기 남긴다. `invite-crew-member.ts`는 예외다 — 인증
+ *   세션 + `checkPermission("crew:invite_member")` 뒤에만 실행되어 익명 벡터가 아니다.
  * - `searchProfilesByHandle`은 FR-006 검색이므로 **반드시 `profile_search` RPC를 경유**한다
  *   (NFR-013 3필드 제한, D-005 SQL 강제 레이트 리밋). RPC는 정확 일치·대소문자 구분·단일
  *   인자라 Mock의 `query`(부분 일치, 대소문자 무시, `limit` 옵션)와 동작이 달라진다 — Mock

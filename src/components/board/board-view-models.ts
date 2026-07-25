@@ -14,6 +14,11 @@ export interface BoardPostSummary {
   createdAt: ISODateTimeString;
   /** `type === "general"`이면 항상 null — 제안글에만 투표가 딸려 있다. */
   pollStatus: PollStatus | null;
+  /** FR-081 AC1(Task 042A, 20일차 팀장 지시로 배선) — 뷰어가 작성자를 차단했는가. `authorId`
+   *  자체는 노출하지 않는다(이 판정 하나만 필요하고, 표현 컴포넌트는 원본 id를 몰라도 된다 —
+   *  `canWrite` 등 다른 사전 판정 불리언과 같은 원칙). `BoardListItem`이 `true`면 전체 카드를
+   *  `BlockedContentNotice`로 감싼다. */
+  isAuthorBlocked: boolean;
 }
 
 /** 목록 배지가 노출하는 투표 상태 4종(요구사항 §4.D AC3). `cancelled`·미종료 중간 상태는 뺀다 —
@@ -49,4 +54,8 @@ export interface PostDetailViewModel {
   canDelete: boolean;
   /** `hasLockedFields(type)` 판정 결과 — true면 모임 예정일 잠금 안내를 보여준다. */
   meetupDateLocked: boolean;
+  /** FR-081 AC1(Task 042A, 20일차) — `BoardPostSummary.isAuthorBlocked`와 같은 원칙. `PostDetail`
+   *  이 `true`면 본문(`CardContent`)만 `BlockedContentNotice`로 감싼다 — 제목·작성자 표기는
+   *  목록에서 이미 봤을 정보라 그대로 둔다. */
+  isAuthorBlocked: boolean;
 }

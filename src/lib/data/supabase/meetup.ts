@@ -87,6 +87,12 @@ export interface CreateMeetupFromPollInput {
  * 가결 Meetup 자동 등록(FR-060). `meetups_insert_proposal_author_or_staff` RLS가 제안자
  * 본인 또는 임원 이상만 허용한다 — 호출자(Server Action, 종료 트리거 문맥)가 이미 그 역할로
  * 실행 중이라는 전제(Mock과 동일하게 이 함수는 가결 여부를 재판정하지 않는다).
+ *
+ * **Task 034(20일차)부터 실제 프로덕션 경로는 이 함수가 아니다** — Meetup 생성은
+ * `public.finalize_closed_poll`(DB AFTER UPDATE 트리거, SECURITY DEFINER, RLS 우회)이
+ * 담당한다(`docs/decisions/poll-pipeline-034.md`). 이 TS 함수는 현재 아무도 호출하지
+ * 않는다(grep 확인) — RLS를 우회하지 않는 별도 호출부가 필요해지면(예: 관리자 수동 보정
+ * 도구) 그때 다시 쓰일 수 있어 남겨 뒀다.
  */
 export async function createMeetupFromPoll(input: CreateMeetupFromPollInput): Promise<Meetup> {
   const supabase = await createSupabaseServerClient();

@@ -78,6 +78,8 @@ const SAMPLE_MEMBER_ROWS: MemberRowViewModel[] = [
     leaveBlockedReason: strings.crew.members.leave.errors.ownerMustTransferOrDisband,
     canTransferOwnership: false,
     canRemove: false,
+    isBlockedByViewer: false,
+    canReportOrBlock: false,
   },
   {
     profileId: "profile-2",
@@ -91,6 +93,8 @@ const SAMPLE_MEMBER_ROWS: MemberRowViewModel[] = [
     leaveBlockedReason: null,
     canTransferOwnership: true,
     canRemove: true,
+    isBlockedByViewer: false,
+    canReportOrBlock: true,
   },
   {
     profileId: "profile-3",
@@ -104,6 +108,8 @@ const SAMPLE_MEMBER_ROWS: MemberRowViewModel[] = [
     leaveBlockedReason: null,
     canTransferOwnership: true,
     canRemove: true,
+    isBlockedByViewer: false,
+    canReportOrBlock: true,
   },
 ];
 

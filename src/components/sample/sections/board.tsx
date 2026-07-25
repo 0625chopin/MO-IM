@@ -39,6 +39,7 @@ const SAMPLE_POSTS: BoardPostSummary[] = [
     authorAvatarUrl: null,
     createdAt: "2026-07-20T09:00:00.000Z",
     pollStatus: null,
+    isAuthorBlocked: false,
   },
   {
     id: "post-2",
@@ -48,6 +49,7 @@ const SAMPLE_POSTS: BoardPostSummary[] = [
     authorAvatarUrl: null,
     createdAt: "2026-07-22T10:00:00.000Z",
     pollStatus: "open",
+    isAuthorBlocked: false,
   },
   {
     id: "post-3",
@@ -57,6 +59,22 @@ const SAMPLE_POSTS: BoardPostSummary[] = [
     authorAvatarUrl: null,
     createdAt: "2026-07-10T09:00:00.000Z",
     pollStatus: "closed_passed",
+    isAuthorBlocked: false,
+  },
+];
+
+/** FR-081 AC1(Task 042A, 20일차) 데모용 — 차단한 사용자의 글(`BoardListItem`이 접힘 처리). */
+const SAMPLE_POSTS_WITH_BLOCKED: BoardPostSummary[] = [
+  ...SAMPLE_POSTS,
+  {
+    id: "post-blocked-1",
+    title: "차단된 사용자의 게시글 제목(펼치기 전까지 안 보임)",
+    type: "general",
+    authorDisplayName: "차단된사용자",
+    authorAvatarUrl: null,
+    createdAt: "2026-07-23T09:00:00.000Z",
+    pollStatus: null,
+    isAuthorBlocked: true,
   },
 ];
 
@@ -79,6 +97,16 @@ const SAMPLE_POST_DETAIL: PostDetailViewModel = {
   canEditTitleBody: true,
   canDelete: true,
   meetupDateLocked: true,
+  isAuthorBlocked: false,
+};
+
+/** FR-081 AC1(Task 042A, 20일차) 데모용 — 차단한 사용자의 게시글 상세(본문만 접힘, 제목·작성자는
+ *  그대로 — `PostDetail.tsx` docstring 참고). */
+const SAMPLE_POST_DETAIL_BLOCKED: PostDetailViewModel = {
+  ...SAMPLE_POST_DETAIL,
+  id: "sample-demo-post-blocked",
+  authorDisplayName: "차단된사용자",
+  isAuthorBlocked: true,
 };
 
 const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = [
@@ -90,7 +118,12 @@ const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: stri
   {
     kind: "forbidden",
     name: "글쓰기 권한 없음 (post:create 거부)",
-    note: "PostWriteContainer가 던진다(Task 018B) — (app)/crews/[crewId]/layout.tsx(D-039)가 크루원 여부를 이미 걸렀지만, Server Component가 다른 경로로 렌더될 가능성에 대한 방어로 컨테이너가 다시 판정한다. 실제 화면 결과는 위 게시판 접근 항목과 같다(둘 다 kind='forbidden').",
+    note: "PostWriteContainer가 던진다(Task 018B) — (app)/crews/[crewId]/layout.tsx(D-039)가 크루원 여부를 이미 걸렀지만, Server Component가 다른 경로로 렌더될 가능성에 대한 방어로 컨테이너가 다시 판정한다. 실제 화면 결과는 위 게시판 접근 항목과 같다(둘 다 kind='forbidden'). 20일차 확인 — post:create는 현재 권한 매트릭스에서 crew_member 이상 전원 allow라 이 분기는 도달 불가능한 방어적 코드다(19일차 영향 범위 인벤토리 #7) — 그래서 이번 회차 전환(아래 항목) 대상에서 뺐고 여전히 throw다(I-069 근본 해결 범위 밖).",
+  },
+  {
+    kind: "forbidden",
+    name: "글쓰기 차단 — 해산된 크루 (crew_archived)",
+    note: "PostWriteContainer가 값으로 직접 반환한다(20일차, I-069 근본 해결) — 해산된 크루원이 /board/new에 직접 접근하는 경로다(19일차 영향 범위 인벤토리 #4, DESIGN이 이 지점에서 I-069를 최초 발견). 예전엔 cause:{code:'forbidden', message:'crew_archived'}를 던졌지만 프로덕션에서 Next.js가 서버 컴포넌트 예외의 cause를 클라이언트로 넘기지 않아 error.tsx가 항상 오분류했다 — 지금은 <RouteErrorBoundary kind=\"forbidden\"/>을 직접 반환해 이 문제를 구조적으로 피한다. HTTP 응답은 500 대신 200이다(정상 도달 화면 상태로 취급, docs/decisions/domain-error-channel-069.md).",
   },
 ];
 
@@ -146,6 +179,27 @@ export const boardSection = defineSection({
           <PreviewFrame height={160}>
             <div className="p-4">
               <BoardErrorStatePreview />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "게시판 목록 — 차단한 사용자의 글 (FR-081 AC1, Task 042A)",
+      note: "마지막 카드(post-blocked-1)의 작성자를 뷰어가 차단했다고 가정합니다. isAuthorBlocked=true인 글은 BlockedContentNotice로 감싸져 카드 전체(제목·작성자·날짜)가 접히고 '펼치기'를 눌러야 보입니다 — 이 카드는 목록 전체가 <Link>라(BoardListItem.tsx docstring) 접힌 동안은 클릭도 되지 않습니다. 게시판·채팅에는 이번 회차(20일차)에 배선했고, 크루원 목록(MemberList)에는 이미 배선돼 있습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={620}>
+            <div className="p-4">
+              <BoardList
+                crewId="crew-1"
+                posts={SAMPLE_POSTS_WITH_BLOCKED}
+                totalCount={SAMPLE_POSTS_WITH_BLOCKED.length}
+                page={1}
+                totalPages={1}
+                canWrite
+                writeHref="/crews/crew-1/board/new"
+              />
             </div>
           </PreviewFrame>
         ),
@@ -244,6 +298,19 @@ export const boardSection = defineSection({
                 crewId="crew-1"
                 post={{ ...SAMPLE_POST_DETAIL, canEditTitleBody: false, canDelete: false }}
               />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "게시글 상세 — 차단한 사용자의 글 (FR-081 AC1, Task 042A)",
+      note: "isAuthorBlocked=true면 본문(CardContent)만 BlockedContentNotice로 감싸 접힙니다 — 제목·작성자·날짜는 그대로 보입니다(PostDetail.tsx docstring: 이미 목록에서 본 정보이고 신고 대상을 특정하려면 계속 보여야 함). 이 컴포넌트는 <Link>로 감싸여 있지 않아 BoardListItem과 달리 카드 전체를 접을 필요가 없습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={420}>
+            <div className="p-4">
+              <PostDetail crewId="crew-1" post={SAMPLE_POST_DETAIL_BLOCKED} />
             </div>
           </PreviewFrame>
         ),

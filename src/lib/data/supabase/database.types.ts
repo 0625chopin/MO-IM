@@ -1,66 +1,3 @@
-/**
- * Supabase 프로젝트(damruradpliktkrlkakl, MO-IM)의 `public` 스키마로부터
- * `generate_typescript_types`로 생성한 타입. Task 028 최초 생성, Task 029B(16일차)에서
- * RLS 신규 RPC(`poll_vote_tally`·`crew_directory_summary`·`profile_search`) 반영을 위해
- * 재생성. **17일차(Task 031 후속) 재생성** — CORE의 `poll_vote_tally_for_decision`
- * RPC(D-031 숨김을 적용하지 않는 판정 전용 집계, `docs/decisions/
- * poll-vote-tally-for-decision-hotfix.md`)와 CREW의 `email_resend_attempts` 테이블
- * (`create_email_resend_attempts_table` 마이그레이션)을 반영했다.
- *
- * **18일차(Task 032, 쓰기 경로) 재생성** — `profiles.onboarding_completed_at`(I-046) 컬럼과
- * `public.respond_meetup_attendance` RPC(D-019 정원 원자성, `docs/decisions/
- * write-path-realdata-032.md`)를 반영했다.
- *
- * **18일차(Task 039, 계정 생애주기) 재생성** — `profiles.deactivated_at` 컬럼(FR-005 30일
- * 유예)과 `public.request_account_deactivation`·`public.restore_deactivated_account`·
- * `public.anonymize_expired_deactivated_profiles` RPC(D-010·NFR-031, `docs/decisions/
- * account-lifecycle-039.md`)를 반영했다. 이 재생성 시점에 `handle_search_attempts` 테이블도
- * 함께 나타났다 — BOARD가 병렬로 작업 중인 레이트 리밋 모듈(`src/lib/actions/
- * search-user-by-handle.ts` 등) 소관이라 이 회차에서 손대지 않는다.
- *
- * **19일차(I-058 해소) 재생성** — `public.get_profile_public_by_id`·
- * `public.get_profile_public_by_handle` RPC 2건이 새로 나타난다. `profiles_select_authenticated`
- * 정책을 self-row 전용으로 좁히면서(마이그레이션
- * `profiles_narrow_select_policy_and_public_profile_rpcs`), 타인 프로필의 "작성자 표기"용
- * 조회는 이 두 RPC로 이전했다 — `profiles` 테이블 자체의 `Row` 타입(컬럼 목록)은 바뀌지 않았다.
- * 상세: `docs/decisions/rls-policies-029b.md` §16, `docs/ISSUES.md` I-058.
- *
- * **19일차(I-058 major① 교차검증) 재재생성** — 위 `get_profile_public_by_handle`이 팀장
- * 교차검증에서 "무제한 핸들 오라클"로 지적돼(`authenticated` EXECUTE + `STABLE`이라 리밋을
- * 넣을 수 없는 구조) `public`·`private` 양쪽에서 완전히 삭제됐다(마이그레이션
- * `profiles_drop_public_handle_lookup_rpc_i058_major1`) — 그래서 `Functions`에서
- * `get_profile_public_by_handle`이 다시 사라진다. `get_profile_public_by_id`는 그대로 남는다
- * (UUID 기반이라 팀장이 수정 대상에서 제외). handle→id 내부 재해석은 이제 RPC 없이
- * `profile.ts`의 `getProfileByHandle`이 service-role 클라이언트로 직접 처리한다(client-
- * invokable 엔드포인트 자체가 없다). 상세: `docs/decisions/rls-policies-029b.md` §17,
- * `docs/ISSUES.md` I-058·I-062.
- *
- * 이 파일은 자동 생성 파일이다 — 손으로 고치지 않는다. 스키마가 바뀌면
- * 새 마이그레이션을 적용한 뒤 다시 생성해 이 파일을 통째로 교체한다.
- *
- * src/lib/types/*(Task 006 수기 도메인 타입)와는 별개다. 도메인 타입은
- * camelCase·React/Mock 친화적 형태이고, 이 파일은 DB 컬럼명(snake_case)을
- * 그대로 반영한다 — 데이터 접근 레이어(NFR-034)가 둘 사이를 매핑한다.
- * R-003 대조 결과는 docs/decisions/schema-migration-028.md 참고.
- *
- * `private` 스키마(SECURITY DEFINER 헬퍼·RPC 구현체)는 여기 나타나지 않는다 — PostgREST
- * Exposed schemas에 없어 애초에 API 표면이 아니기 때문이다(docs/decisions/rls-policies-029b.md
- * §8 참고). `public.*` RPC 래퍼(`poll_vote_tally`·`poll_vote_tally_for_decision`·
- * `crew_directory_summary`·`profile_search`·`respond_meetup_attendance`·
- * `request_account_deactivation`·`restore_deactivated_account`·
- * `anonymize_expired_deactivated_profiles`·`get_profile_public_by_id`·`disband_crew`)만
- * `Functions`에 나타나는 것이 정상이다(`get_profile_public_by_handle`은 위 major① 재재생성
- * 단락 참고 — 삭제되어 더 이상 나타나지 않는다).
- *
- * **19일차(Task 040, 크루 생애주기) 재생성** — `public.disband_crew` RPC(FR-013 크루 해산,
- * `docs/decisions/crew-lifecycle-040.md`)가 새로 나타난다. 오너 이양(FR-025)·강퇴(FR-027)는
- * 기존 `crews`·`crew_memberships` 테이블의 단순 UPDATE라 새 RPC가 필요 없었다 — 관련 트리거
- * 변경은 `Row`/`Insert`/`Update` 컬럼 목록에 나타나지 않는다(트리거는 타입에 반영되지 않는다).
- * 이 재생성 시점에 CORE의 `profiles_narrow_select_policy_and_public_profile_rpcs`(I-058)도
- * 함께 반영됐다 — `get_profile_public_by_id`·`get_profile_public_by_handle`는 그쪽 소관이며
- * 이 회차에서 손대지 않았다(단, `get_profile_public_by_handle`은 이후 CORE가 삭제했다 — 위
- * major① 재재생성 단락 참고).
- */
 export type Json =
   | string
   | number
@@ -416,6 +353,24 @@ export type Database = {
         ]
       }
       email_resend_attempts: {
+        Row: {
+          id: number
+          identifier: string
+          requested_at: string
+        }
+        Insert: {
+          id?: never
+          identifier: string
+          requested_at?: string
+        }
+        Update: {
+          id?: never
+          identifier?: string
+          requested_at?: string
+        }
+        Relationships: []
+      }
+      handle_availability_check_attempts: {
         Row: {
           id: number
           identifier: string
@@ -1014,6 +969,23 @@ export type Database = {
         Args: { batch_size?: number; max_duration?: string }
         Returns: number
       }
+      create_block: {
+        Args: { p_blocked_id: string }
+        Returns: {
+          already_blocked: boolean
+          ok: boolean
+          reason_code: string
+        }[]
+      }
+      create_report: {
+        Args: { p_reason: string; p_target_id: string; p_target_type: string }
+        Returns: {
+          id: string
+          merged: boolean
+          ok: boolean
+          reason_code: string
+        }[]
+      }
       crew_directory_summary: {
         Args: { p_crew_id: string }
         Returns: {
@@ -1081,6 +1053,10 @@ export type Database = {
       }
       purge_expired_chat_messages: {
         Args: { batch_size?: number; max_duration?: string }
+        Returns: number
+      }
+      purge_expired_handle_availability_check_attempts: {
+        Args: never
         Returns: number
       }
       purge_expired_rate_limit_counters: { Args: never; Returns: number }

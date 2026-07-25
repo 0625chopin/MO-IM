@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
+import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import { assertAuthenticatedSession } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewById, getCrewMembership } from "@/lib/data";
@@ -57,6 +58,30 @@ import type { ReactNode } from "react";
  * 대체하며 생긴 병렬 렌더 부작용이다. 이 레이아웃(크루원 게이트)의 차단 방식은 여전히 그대로인
  * `throw new Error(...)`(예외 기반, D-030 ③)이지 클라이언트 컴포넌트 리다이렉트가 아니다 —
  * 이번 변경은 통과한 뒤에 배너 하나를 추가로 렌더하는 것뿐이라 그 부작용 경로에 들어가지 않는다.
+ *
+ * **20일차(I-069 근본 해결, DESIGN) — 크루원 아님 판정은 더 이상 throw하지 않는다.** 프로덕션
+ * 빌드에서 Next.js가 서버 컴포넌트 예외의 `cause`를 클라이언트로 넘기지 않아(공식 보안 동작,
+ * `error.md` 확인) `error.tsx`의 `classifyError`가 이 throw를 절대 `forbidden`으로 읽지
+ * 못하고 항상 `unknown`으로 떨어뜨렸다(I-069, 19일차 DESIGN이 이 정확한 지점에서 최초 발견).
+ * `forbidden()`/`unauthorized()`는 이 Next 버전에서 여전히 experimental/canary라(D-040)
+ * 도입하지 않고, 대신 이 레이아웃이 **값을 반환**해 `RouteErrorBoundary(kind="forbidden")`를
+ * 직접 렌더한다 — `cause` 직렬화를 거치지 않으므로 프로덕션 정화 문제 자체가 발생하지 않는다.
+ *
+ * **왜 "판정만 하고 자식에 넘기기"가 아니라 "레이아웃이 직접 렌더"인가**: 이 파일이 이미 위에서
+ * 밝혔듯 RSC는 부모가 자식(`children`, 이미 렌더된 트리)에게 값을 나중에 꽂아 넣지 못한다
+ * (`ArchivedCrewBanner` 판단에서 확인한 것과 같은 제약). 즉 "판정 결과를 `children`에 넘겨
+ * 각 페이지·컨테이너가 다시 렌더 여부를 결정한다"는 선택지가 애초에 없다 — 있다면 이미
+ * D-039가 "컨테이너마다 반복하면 하나를 빠뜨린다"고 지적한 문제(I-035)가 그대로 재발한다.
+ * 유일한 방법은 이 레이아웃이 `children` 대신 표현 컴포넌트를 직접 렌더하는 것이다. 이때
+ * `children`이 차지했을 `<main>` 랜드마크가 비므로(각 페이지가 원래 자기 `<main>`을 소유했다,
+ * `docs/CONVENTIONS.md`) 이 레이아웃이 대신 `<main>`을 연다 — `app/not-found.tsx`와 같은 패턴이다.
+ *
+ * **트레이드오프(정직하게 기록)**: 예외를 던지지 않으므로 HTTP 응답이 500이 아니라 **200**이다.
+ * `digest`가 없어 "다시 시도" 버튼도, `reportClientErrorAction`(NFR-028 오류 수집)의 telemetry도
+ * 없다 — 이건 예외 상황이 아니라 정상적으로 도달하는 화면 상태이기 때문이다(`PrivateCrewNotice`와
+ * 같은 성격). I-044가 우려한 "500이 오류율 지표를 오염시킨다"는 이 네 곳에서는 해소되지만,
+ * 요구사항이 명시하는 403 자체는 여전히 아니다(200) — `docs/prioritization-and-risks.md` D-040
+ * 갱신 이력과 `docs/decisions/domain-error-channel-069.md` 참고.
  */
 export default async function CrewMemberGateLayout({
   children,
@@ -77,9 +102,11 @@ export default async function CrewMemberGateLayout({
 
   const membership = await getCrewMembership(crewId, session.profileId);
   if (!membership || !isActiveMembership(membership.status)) {
-    throw new Error("이 크루의 크루원만 볼 수 있다.", {
-      cause: { code: "forbidden", message: "not_crew_member" },
-    });
+    return (
+      <main className="flex flex-1 items-center justify-center px-4 py-12">
+        <RouteErrorBoundary kind="forbidden" />
+      </main>
+    );
   }
 
   return (

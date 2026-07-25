@@ -63,8 +63,24 @@ export interface CreateInvitationInput {
   expiresAt: string;
 }
 
-/** 초대 발급(FR-020). `invitations_insert_staff_or_owner` RLS가 오너·임원만 허용한다. */
-export async function createInvitation(input: CreateInvitationInput): Promise<Invitation> {
+/**
+ * 초대 발급(FR-020). `invitations_insert_staff_or_owner` RLS가 오너·임원만 허용한다.
+ *
+ * **Task 042A(FR-081 AC2) — 반환 타입이 `Invitation`에서 `DataResult<Invitation>`으로
+ * 바뀌었다.** 그 정책의 `WITH CHECK`에 `not private.is_blocked(invitee_id, inviter_id)`가
+ * 추가돼(대상자가 초대자를 차단했으면 초대 INSERT 자체가 거부됨, `report-block-rpcs-042a.sql`
+ * 참고), 이 경로가 이제 "권한 있는 오너·임원이 정당하게 호출했는데도 RLS가 거부하는" 상황을
+ * 만든다 — 예전에는 이 함수에 도달했다는 것 자체가 성공을 뜻했지만 더는 아니다. RLS 42501을
+ * 예외로 던지면 `inviteCrewMemberAction`이 처리하지 못한 채 그대로 터진다(D-030 ③ 위반) —
+ * 그래서 `forbidden`으로 감싸 값으로 반환한다. **이유를 구분하지 않는다** — "차단됐다"는
+ * 사실이 노출되면 requirements.md FR-020 정상 흐름 E3("사유는 노출하지 않음")를 어기므로,
+ * 다른 이유의 42501(예: 호출자가 실제로는 임원이 아닌 경쟁 상태)과 같은 일반 메시지로
+ * 뭉뚱그린다 — 호출부는 이미 `checkPermission`으로 권한을 먼저 확인하므로 정상 경로에서
+ * 이 42501은 사실상 차단 케이스만 남는다.
+ */
+export async function createInvitation(
+  input: CreateInvitationInput,
+): Promise<DataResult<Invitation>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("invitations")
@@ -76,8 +92,13 @@ export async function createInvitation(input: CreateInvitationInput): Promise<In
     })
     .select("*")
     .single();
-  if (error) throw error;
-  return toInvitation(data);
+  if (error) {
+    if (error.code === "42501") {
+      return err("forbidden", "이 사용자를 초대할 수 없다(RLS 거부).");
+    }
+    throw error;
+  }
+  return ok(toInvitation(data));
 }
 
 /**

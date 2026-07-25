@@ -25,11 +25,15 @@ import type { Id, Poll } from "@/lib/types";
  * R-015) — Task 034가 pg_cron 잡을 붙일 때 이 함수를 그대로 재사용하면 되고, 걷어낼 대상은
  * 호출부(트리거 발화 방식)이지 이 함수가 아니다.
  *
- * **Meetup 생성(FR-060)·알림 적재(FR-045)는 여기서 하지 않는다** — Task 019(투표 UI)의 참조
- * 범위는 FR-040~045까지이고, FR-060은 Task 034("투표 자동 종료·판정·Meetup 생성·알림
- * 파이프라인")가 명시적으로 소유한다. 그래서 `closed_passed`가 되어도 Meetup 레코드가 즉시
- * 따라오지 않는다 — `PollResult`가 그 간극을 "Meetup이 아직 없으면 링크를 보여주지 않는다"로
- * 방어적으로 다룬다(`getMeetupByPollId`가 null을 정상 상태로 반환).
+ * **Meetup 생성(FR-060)·알림 적재(FR-045)는 이 함수가 직접 하지 않는다** — 대신 아래
+ * `closePoll()` 호출이 성공시키는 `polls` UPDATE에 **DB AFTER UPDATE 트리거**
+ * (`public.finalize_closed_poll`, Task 034 · `docs/decisions/poll-pipeline-034.md`)가 걸려
+ * 있어 같은 트랜잭션 안에서 자동으로 처리된다 — TS 쪽에서 추가로 호출할 게 없다(I-054
+ * 회피: 이 함수가 별도로 Meetup·알림 API를 호출했다면 `closePoll` 성공 후의 두 번째
+ * 왕복이 되어 원자성이 깨졌을 것이다). `getMeetupByPollId`는 여전히 null을 정상 상태로
+ * 반환할 수 있다 — 트리거가 아직 못 끝냈거나(드문 재시도 경로, `run_poll_auto_close_job`의
+ * 재시도 스윕이 5분 내 따라잡는다) `closed_passed`가 아니면 애초에 Meetup을 만들지
+ * 않는다(FR-060 AC2). `PollResult`는 이 간극을 그대로 방어적으로 다룬다.
  *
  * **집계는 `getPollTallyForDecision`을 쓴다 — `getPollTally`(화면 표시용, D-031 숨김 적용)가
  * 아니다.** 이 함수가 `open` 상태에서 호출된다는 사실 때문에 표시용 함수를 쓰면 대상자 5명

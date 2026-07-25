@@ -13,6 +13,11 @@ import { strings } from "@/lib/strings";
  * 직렬화해 넘길 수 없으므로(`BoardErrorStatePreview`·`ConnectionBannerPreview`와 같은 이유)
  * 이 클라이언트 래퍼가 `simulateScheduledPollClosureAction`을 직접 호출한다.
  *
+ * **Task 034(20일차)부터 이 버튼은 유일한 트리거①이 아니다** — 실제로는 pg_cron 잡
+ * `poll_auto_close_and_finalize`(5분 주기, `docs/decisions/poll-pipeline-034.md`)가 마감
+ * 시각이 지난 `open` 투표를 자동으로 찾아 종료한다. 이 버튼은 5분을 기다리지 않고 QA 중
+ * 즉시 트리거①의 배선을 확인하려는 수동 단축 경로로 남겨 뒀다 — 걷어내지 않기로 했다.
+ *
  * **실제 크루 데이터를 건드리지 않는다** — `pollId`는 실재하지 않는 값
  * (`sample-poll-auto-close`)이라 항상 `not_found`로 안전하게 실패한다
  * (`MeetupAttendanceActions`가 가짜 `meetupId`로 안전하게 실패하는 것과 같은 관례). 이 버튼이

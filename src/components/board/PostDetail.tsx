@@ -5,6 +5,7 @@ import { formatPostDate } from "@/components/board/format-post-date";
 import { PollStatusBadge } from "@/components/board/PollStatusBadge";
 import { PostActions } from "@/components/board/PostActions";
 import { PostTypeBadge } from "@/components/board/PostTypeBadge";
+import { BlockedContentNotice } from "@/components/moderation/BlockedContentNotice";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { strings } from "@/lib/strings";
@@ -15,6 +16,12 @@ import type { Id } from "@/lib/types";
  * (`canEditTitleBody`·`canDelete`·`meetupDateLocked`), 판정 자체는 하지 않는다(D-030 ①,
  * NFR-036). 본문은 `{post.body}`로만 렌더한다 — `dangerouslySetInnerHTML`을 쓰지 않아 React
  * 기본 텍스트 이스케이프가 스크립트 문자열을 문자 그대로 표시한다(NFR-014, FR-030 AC3).
+ *
+ * **FR-081 AC1(Task 042A, 20일차)** — `post.isAuthorBlocked`면 본문(`CardContent`)만
+ * `BlockedContentNotice`로 감싼다. 제목·작성자·날짜(`CardHeader`)는 그대로 둔다 — 목록에서
+ * 이미 보고 클릭해 들어온 정보이고, 신고 대상을 특정하려면 누구 글인지 계속 보여야 한다.
+ * `Card`가 `<Link>`로 감싸여 있지 않으므로(이 컴포넌트는 상세 페이지 자체다) `BoardListItem`
+ * 과 달리 상호작용 요소 중첩 문제가 없다.
  */
 export function PostDetail({ crewId, post }: { crewId: Id; post: PostDetailViewModel }) {
   const showPollBadge = post.type === "meetup_proposal" && post.pollStatus !== null;
@@ -57,7 +64,13 @@ export function PostDetail({ crewId, post }: { crewId: Id; post: PostDetailViewM
         )}
 
         {/* 본문 — 절대 dangerouslySetInnerHTML을 쓰지 않는다(NFR-014). */}
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.body}</p>
+        {post.isAuthorBlocked ? (
+          <BlockedContentNotice>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.body}</p>
+          </BlockedContentNotice>
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{post.body}</p>
+        )}
       </CardContent>
 
       <CardFooter className="flex-col items-stretch gap-3 border-t">

@@ -73,8 +73,8 @@ const EMPTY_PARTICIPANTS: MeetupParticipantGroupsView = {
 const DOMAIN_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; note: string }> = [
   {
     kind: "forbidden",
-    name: "Meetup 상세 — 크루원 아님 (403)",
-    note: "FR-064 AC2 — 비소속 회원의 Meetup 상세 접근은 403이다. MeetupDetailContainer가 (app)/crews/[crewId]/layout.tsx(D-039)와 같은 방식(getCrewMembership + isActiveMembership)으로 다시 판정해 cause:{code:'forbidden'}을 던지고 error.tsx가 받는다 — 이 라우트는 /crews/[crewId] 트리 밖(리소스 ID 기준)이라 그 레이아웃을 거치지 않는다.",
+    name: "Meetup 상세 — 크루원 아님 (요구사항상 403, 실제로는 도달 불가)",
+    note: "FR-064 AC2 — 비소속 회원의 Meetup 상세 접근은 403이 반환돼야 한다. MeetupDetailContainer가 (app)/crews/[crewId]/layout.tsx(D-039)와 같은 방식(getCrewMembership + isActiveMembership)으로 다시 판정해 20일차부터 cause:{code:'forbidden'}을 던지지 않고 <RouteErrorBoundary kind=\"forbidden\"/>을 값으로 직접 반환한다(I-069 근본 해결). ⚠️ 20일차 프로덕션 실측 결과 이 분기는 실제로 도달하지 않는다 — meetups 테이블 RLS(meetups_select_members)가 비소속자에게 행 자체를 0건으로 숨겨 getMeetupById가 먼저 notFound()를 던지고, 이 forbidden 분기보다 그쪽이 항상 먼저 실행된다. 그 결과 실사용자는 \"페이지를 찾을 수 없어요\"(404, HTTP 200)를 본다 — FR-064 AC2 미해소, 별도 이슈 I-073으로 등재(board.tsx의 post:create 항목과 같은 '도달 불가능' 성격의 caveat). 상세: docs/decisions/domain-error-channel-069.md §6.",
   },
 ];
 

@@ -10,6 +10,7 @@ import {
   getProfileById,
   listCrewMembers,
   listJoinRequestsForCrew,
+  listMyBlockedProfileIds,
 } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { checkPermission } from "@/lib/rules/permission";
@@ -64,6 +65,10 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
     .filter((m) => isActiveMembership(m.status))
     .sort((a, b) => ROLE_RANK[a.role] - ROLE_RANK[b.role] || a.joinedAt.localeCompare(b.joinedAt));
 
+  // FR-081(Task 042A) — 신고·차단 버튼 노출용. 크루 판정과 무관한 전역 목록이라 역할 계산과
+  // 병렬로 조회한다.
+  const blockedIds = new Set(await listMyBlockedProfileIds());
+
   const members: MemberRowViewModel[] = await Promise.all(
     memberships.map(async (membership) => {
       const profile = await getProfileById(membership.profileId);
@@ -90,6 +95,8 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
             : null,
         canTransferOwnership: canTransferOwnership && !isSelf && membership.role !== "owner",
         canRemove: !isSelf && membership.role !== "owner" && removePermission.allowed,
+        isBlockedByViewer: blockedIds.has(membership.profileId),
+        canReportOrBlock: !isSelf,
       };
     }),
   );

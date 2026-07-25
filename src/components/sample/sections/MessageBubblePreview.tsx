@@ -6,6 +6,8 @@ import { MessageBubble } from "@/components/chat/MessageBubble";
 export interface MessageBubblePreviewItem {
   message: ChatTimelineItem;
   isOwn: boolean;
+  /** FR-081 AC1(Task 042A, 20일차) 데모용. */
+  isSenderBlocked?: boolean;
 }
 
 export interface MessageBubblePreviewProps {
@@ -26,12 +28,13 @@ export interface MessageBubblePreviewProps {
 export function MessageBubblePreview({ items }: MessageBubblePreviewProps) {
   return (
     <div className="flex flex-col gap-3 p-4">
-      {items.map(({ message, isOwn }) => (
+      {items.map(({ message, isOwn, isSenderBlocked }) => (
         <MessageBubble
           key={message.id}
           message={message}
           isOwn={isOwn}
           onRetry={message.deliveryStatus === "failed" ? () => {} : undefined}
+          isSenderBlocked={isSenderBlocked}
         />
       ))}
     </div>

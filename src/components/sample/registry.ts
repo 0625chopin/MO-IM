@@ -11,6 +11,7 @@ import { formsSection } from "@/components/sample/sections/forms";
 import { foundationSection } from "@/components/sample/sections/foundation";
 import { invitationsSection } from "@/components/sample/sections/invitations";
 import { meetupSection } from "@/components/sample/sections/meetup";
+import { moderationSection } from "@/components/sample/sections/moderation";
 import { notificationsSection } from "@/components/sample/sections/notifications";
 import { overlaysSection } from "@/components/sample/sections/overlays";
 import { pollSection } from "@/components/sample/sections/poll";
@@ -50,5 +51,6 @@ export const SHOWCASE_SECTIONS: ShowcaseSection[] = [
   crewsSection,
   notificationsSection,
   invitationsSection,
+  moderationSection,
   a11ySection,
 ];
