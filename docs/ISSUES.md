@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-100** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-111** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
 - **새 이슈는 상태와 무관하게 파일 맨 끝(아래 "이슈 기록" 절의 마지막)에 번호순으로 붙인다.** 절 제목을 보고 "열린 이슈" 절에 넣지 않는다 — 그 절은 **외부 입력(고객 답변·요금제 선정 등)을 기다리는 초기 미결 4~11건만 남은 역사적 구획**이고, I-027 이후는 전부 아래 시간순 기록에 쌓여 있다. **각 이슈가 열렸는지 닫혔는지는 절 위치가 아니라 항목 안의 `상태` 필드가 단일 소스다.** (18일차에 한 팀원이 절 제목을 그대로 믿고 열린 이슈를 위쪽 절에 등재해 30건 넘는 기존 항목과 어긋났다 — 팀장이 옮기고 이 규칙을 명시했다.)
@@ -3418,8 +3418,10 @@ FR-013·FR-025의 알림 생성이 100% 조용히 실패해 왔다 — 이번에
 
 ### I-098 · MAJOR — `/sample`의 `PreviewFrame` 폭 토글(768/1280/전체)이 `AppShell`의 430px 프레임 제약에 막혀 실질적으로 무력화된다
 
-- **상태**: 열림 — 수정은 하지 않음(원인은 DESIGN이 만든 `PreviewFrame`이 아니라 CORE의
-  day-21 모바일 프레임 도입이 만든 전역 제약이라 담당 조율 필요)
+- **상태**: **해결됨(2026-07-29, 23일차)** — DESIGN. Next.js 16 "복수 루트 레이아웃"(route
+  groups)으로 `/sample`을 `AppShell` 조립 밖 형제 루트 트리로 분리했다. 근거·실측 전문은
+  `docs/decisions/sample-frame-escape-098.md`, 결정은 `docs/prioritization-and-risks.md`
+  **D-069**.
 - **영역**: 디자인 시스템 / `/sample` 인프라
 - **제보**: DESIGN (2026-07-29, 22일차 — Task 045 NFR-040 재검증, 팀장 지시로 공유
   Playwright 세션이 풀린 뒤 처음으로 실 브라우저 확인)
@@ -3448,12 +3450,47 @@ FR-013·FR-025의 알림 생성이 100% 조용히 실패해 왔다 — 이번에
   별도 스위치. `AppShell`이 `src/app/layout.tsx`에 하드코딩돼 있어(라우트 그룹 없이 전
   라우트 공통) 간단한 예외 처리가 아니다 — CORE(day-21 원 구현자)와 조율이 필요해 이번
   회차엔 수정하지 않았다.
-- **근거**: `docs/decisions/observability-browser-045.md` §5.4-A.
+- **해결**: 위 후속 제안대로 route groups 분리를 실행했다(23일차, DESIGN이 인계받음).
+  1. `src/app/(shell)/layout.tsx`(구 `src/app/layout.tsx`)를 하나의 루트 레이아웃으로,
+     `src/app/sample/layout.tsx`(신규, `AppShell` 없음)를 또 다른 루트 레이아웃으로 분리했다.
+     `AppShell`이 필요한 라우트 전부(랜딩·`login`·`signup`·`onboarding`·`account`·`auth`·
+     `crews`·`reset-password`·`(app)` 그룹)를 `(shell)/` 아래로 `git mv`했다 — route group은
+     URL에 나타나지 않으므로 기존 경로는 그대로다.
+  2. **CORE 인계 문서가 다루지 않은 공백을 추가로 발견**: `error.tsx`·`not-found.tsx`는 세그먼트
+     경계 파일이라 최상위에 홀로 남으면 어느 루트 레이아웃에도 속하지 못한다 — `(shell)/`
+     아래로 함께 옮기고 `sample/`에 짝을 신설했다. 더 심각한 공백은 **"그 어떤 라우트도
+     매칭되지 않는 URL"**이 두 `not-found.tsx` 중 어느 쪽도 타지 않고 Next.js 내장 제네릭
+     404로 떨어지는 것 — 복수 루트 레이아웃에서는 구조적으로 성립하지 않는 케이스였다.
+     공식 문서가 정확히 이를 위해 제공하는 `experimental.globalNotFound` + 신규
+     `src/app/global-not-found.tsx`로 해소했다(실측 재확인).
+  3. `globals.css`의 `@custom-variant`가 `sm:`/`md:`/`lg:`를 "이름이 `appframe`인 조상"
+     기준으로 전역 재정의해 두고 있어, `/sample`이 `AppShell` 밖으로 나가면 그 이름의 조상이
+     사라져 CORE가 "c"(DESIGN 인계)로 남긴 5곳이 오히려 영구적으로 죽을 상황이었다.
+     `sample/layout.tsx`의 `<body>`에 하드캡 없는 `@container/appframe`을 주고,
+     `PreviewFrame`도 자신을 같은 이름의 컨테이너로 선언해(named query는 최근접 조상 매칭이라
+     `AppShell` 데모와 충돌하지 않는다) 그 5곳과 폭 토글 둘 다 실제로 반응하게 만들었다.
+     `sample/page.tsx`의 `<main>` 최대 폭도 `max-w-4xl`→`max-w-[90rem]`로 넓혀 `lg:`(1024px)가
+     실제로 켜질 여지를 줬다.
+  4. **실 브라우저 재검증(격리 프로덕션 빌드, Playwright)**: 폭 토글 360/768/1280/전체가
+     각각 360/768/1280/1392px로 **서로 다른 렌더 폭**과 서로 다른 `grid-template-columns`를
+     냈다(이 이슈가 보고했던 "전부 175px 175px"는 재발하지 않음). 앱 본체(`/crews`)는
+     360/768/1280 세 폭 모두 프레임 430px 캡·탭바 전용 내비가 그대로임을 재확인해 회귀
+     없음을 확인했다. `/sample` 4상태 토글도 회귀 없이 동작.
+  5. 조사 중 공유 `mo_im` 디렉터리에서 다른 팀원의 동시 빌드/서버와 레이스로 `/crews/[crewId]`가
+     500(client reference manifest 오류)을 낸 것을 처음엔 Turbopack 버그로 의심했으나, 격리
+     사본에서 재현되지 않아 레이스였음을 확인했다 — 그 과정에서 공유 디렉터리 `rm -rf .next`
+     재빌드 2회를 수행해 포트 3012의 다른 팀원 서버 프로세스가 내려간 것으로 보인다(팀장 별도
+     고지).
+  전문: `docs/decisions/sample-frame-escape-098.md`.
+- **근거**: `docs/decisions/observability-browser-045.md` §5.4-A,
+  `docs/decisions/sample-frame-escape-098.md`(해소 전문).
 
 ### I-099 · MAJOR — 앱 셸의 `HeaderNav`↔`MobileTabBar` 데스크톱·모바일 전환이 실제로는 전혀 일어나지 않는다 — NFR-026 요구사항 미충족(실 브라우저 확인 결과)
 
-- **상태**: 열림 — `AppShell.tsx`·`MobileTabBar.tsx` 문서 주석이 서로 다른 말을 한다(아래).
-  수정 방향 결정 필요, 이번 회차엔 확인만 하고 고치지 않았다(CORE 소관, day-21 원 구현)
+- **상태**: **해결됨(2026-07-29, 23일차)** — CORE, 팀장이 사전 확정한 방향("430px 모바일
+  프레임 유지, 프레임 폐기·확장 안은 기각")을 집행. **"버그 수정"이 아니라 "요구사항 해석
+  정정"으로 종결한다** — NFR-026 원문에 "데스크톱↔모바일 전환"을 요구하는 문구가 없었고,
+  `AppShell.tsx`의 이전 docstring이 그 조건을 스스로 추가한 것이었다(D-066).
 - **영역**: 디자인 시스템 / 반응형 / 앱 셸
 - **제보**: DESIGN (2026-07-29, 22일차 — Task 045 NFR-040 재검증, 팀장이 지목한 "헤더↔
   탭바 전환에 같은 종류의 결함이 더 있는지" 확인 중 발견)
@@ -3484,16 +3521,36 @@ FR-013·FR-025의 알림 생성이 100% 조용히 실패해 왔다 — 이번에
   발견된 "로그아웃 버튼이 `hidden md:flex` 탓에 렌더되지 않던" 결함(팀장이 이번 재검증을
   지시하며 인용한 사례)이 부분 수정(컴포넌트 교체로 두 진입점 일관성 확보)만 되고 **근본
   원인(전환 자체가 안 일어남)은 그대로 남아 있었음**을 이번에 확인했다.
-- **후속(제안, 수정은 하지 않음)**: 결정이 필요하다 — ① 이 앱은 **의도적으로 항상
-  "모바일 폭 프레임" 형태로만 보여준다**는 것이 최종 결정이면(즉 데스크톱에서도 하단
-  탭바만 쓰는 것이 제품 방향이면), `AppShell.tsx`의 NFR-026 인용 docstring을 정정하고
-  `HeaderNav`의 `primaryNav`/`accountNav`(md: 전용, 현재 죽은 코드)를 정리하거나 제거
-  여부를 결정해야 한다. ② 데스크톱·태블릿에서 진짜 전환이 필요하면, `HeaderNav`·
-  `MobileTabBar`의 `md:` 클래스만 `AppShell.tsx`의 `border-x`가 이미 쓴 방식(순수
-  뷰포트 `min-[…]` 임의값)으로 되돌려야 한다 — `globals.css` 주석이 스스로 "이 파일에서
-  유일하게 뷰포트 기준으로 남겨 둔 조건"이라고 부른 그 패턴이다. 어느 쪽이든 CORE
-  (day-21 원 구현자)의 판단이 필요해 이번 회차엔 고치지 않았다.
-- **근거**: `docs/decisions/observability-browser-045.md` §5.4-B.
+- **해결**: 위 후속 제안 ①("항상 모바일 폭 프레임"을 최종 결정으로 확정)로 종결했다 — ②(진짜
+  뷰포트 전환 복원)는 팀장이 사전에 기각했다. 조치:
+  1. **NFR-026 재판정**: requirements.md 원문("360/768/1280px 검증")은 "전환"을 요구하지
+     않는다. 검증 기준을 "그 세 폭에서 하단 탭바가 유일한 1차 내비게이션으로 정상 동작하고,
+     프레임 폭이 항상 ≤430px로 고정되며, 가로 스크롤이 없다"로 재해석해 **충족**으로
+     확정(D-066).
+  2. `AppShell.tsx`·`MobileTabBar.tsx`의 모순된 docstring을 D-066 기준으로 일치시켰다.
+     `HeaderNav.tsx`의 "데스크톱에서만 보여준다" 서술도 정정하고, `primaryNav`/`accountNav`
+     (`md:flex`, 영구 비활성)는 **제거하지 않고** 각 자리에 유지 사유를 주석으로 남겼다
+     (`MobileTabBar`가 이미 기능을 커버해 손실 없음 + 프레임 정책이 재변경될 때 즉시
+     되살아나는 이점). `LogoutButton.tsx` docstring의 "프레임이 넓어지면 다시 보인다"는
+     서술도 D-066(확장 안 기각)에 맞춰 정정했다.
+  3. **`sm:`/`md:`/`lg:`/`xl:`/`2xl:` 전수 조사(55곳 — `globals.css` 머리 주석의 기존
+     "89곳"은 어림값이었고 틀렸다, 정정함)**: 28곳은 영구 비활성이 확정적이라 제거(그중 4곳은
+     `Dialog`/`Drawer`/`Toast`가 Portal로 렌더돼 `appframe` 컨테이너의 DOM 조상 자체가 없는
+     **다른 원인**의 죽은 코드임을 새로 발견 — 프레임 폭과 무관하게 항상 죽어 있었다). 15곳은
+     `HeaderNav`/`MobileTabBar`/`AppShell` 등 이슈 당사자라 사유를 남기고 유지. 5곳
+     (`/sample`)은 DESIGN의 I-098 완료 후 살아날 예정이라 보존.
+  4. **실 브라우저 재검증**(`npm run build && npm start`, 별도 포트, Playwright MCP):
+     360/768/1280px 전부 프레임 `clientWidth`≤430, 헤더 인라인 내비 `display:none`, 탭바
+     `display:flex`/`fixed`로 동일 — 정정한 docstring과 실제 렌더가 일치함을 확인.
+  5. **DESIGN(I-098) 인계**: `/sample`이 프레임을 우회하려면 Next.js "복수 루트 레이아웃"
+     (route groups) 패턴이 유일한 규약 준수 방법이다 — 상세 구조·트레이드오프는 근거 문서 참고.
+  `npx tsc --noEmit`·`npm run lint` 통과.
+- **남긴 것**: `DayDetailPanel.tsx`가 실 뷰포트(`matchMedia`) 기준으로 `Drawer`
+  `swipeDirection`을 전환하는 코드를 갖고 있어 이 결정과 상충할 가능성이 있다 — 정적 분석
+  추정만 했고 실측하지 않았다. 별도 이슈 **I-104**로 등재.
+- **근거**: `docs/decisions/observability-browser-045.md` §5.4-B(원 발견),
+  `docs/decisions/appframe-responsive-audit-099.md`(23일차 해소 전문 — NFR-026 판정 근거,
+  전수 조사 표, 실측, DESIGN 인계), `docs/prioritization-and-risks.md` **D-066**.
 
 ### I-100 · MAJOR — `join_requests.decided_at`(D-059, KPI-4)를 self-service·staff 양쪽이 임의 값으로 위조할 수 있었다 — 발견 즉시 수정
 
@@ -3624,3 +3681,577 @@ DELETE·TRUNCATE도 함께 회수했다 — 지금은 DELETE 정책이 없어 �
 UPDATE를 훑었다면, 이 건은 **INSERT 쪽에 같은 종류의 표가 없다**는 것을 드러낸다.
 
 - **근거**: `docs/decisions/meetups-insert-bypass-101.md`(BOARD의 SSOT).
+
+### I-102 · CRITICAL — `crew_memberships` 자기 가입 신청 INSERT가 role·크루 공개여부를 검사하지 않아, 정상 가입 승인 한 번만으로 role=owner 격상이 가능했다 — I-101이 남긴 INSERT 축 전수조사에서 발견
+
+- **상태**: 해결됨(23일차, 2026-07-29) — 마이그레이션
+  `20260729093252_major_fix_i102_crew_memberships_self_insert_guard`
+- **영역**: 데이터 / 보안 / 크루·멤버십
+- **제보**: CREW(팀장이 I-101 후속 "INSERT 축 전수조사"로 배정, 로드맵 Task 아님)
+
+#### 경위
+
+`crew_memberships_insert_self_request` RLS의 `WITH CHECK`는 `profile_id = auth.uid() AND
+status = 'requested'`만 봤다 — **`role` 컬럼**과 **대상 크루의 `visibility`/`status`**를 전혀
+검사하지 않았다. `crew_memberships`에는 BEFORE INSERT 트리거가 0개였다(BEFORE UPDATE 가드
+`crew_memberships_guard_self_transition`만 있었다). I-101과 정확히 같은 축의 결함 —
+RLS INSERT 정책이 유일한 문이었는데 도메인 불변식(FR-022 사전조건·D-002 오너 유일성)을 안 봤다.
+
+#### 실측 재현(실 REST, `chopin0625@gmail.com`=A(오너)·`0625chopin@gmail.com`=B(공격자), 신규
+테스트 크루로 재현 — 시드 데이터 미오염)
+
+| # | 시나리오 | 결과(수정 전) |
+| --- | --- | --- |
+| 1 | B가 A 소유 **PUBLIC** 크루에 `role=owner, status=requested`로 자기 행 직접 INSERT | **201** |
+| 2 | B가 같은 크루에 정상적으로 보이는 `join_requests`(가입 신청) 제출 | **201** |
+| 3 | A(오너)가 그 신청을 평범한 `decideJoinRequest` 승인 흐름으로 승인 | **200** |
+| 4 | 승인 직후 조회 | **`role=owner, status=active`** — B가 정상 가입 승인 한 번으로 크루 공동 오너가 됐다 |
+| 5 | B가 A 소유 **PRIVATE** 크루에 `role=member, status=requested`로 직접 INSERT | **201**(FR-022 사전조건·E1 위반) |
+| 5-대조군 | 같은 PRIVATE 크루에 `join_requests` INSERT 시도 | **403**(정상 차단 — `join_requests` 정책은 이미 안전했다) |
+
+원인: `trg_join_requests_sync_membership_on_decision`(승인 부수효과 트리거)이 `status`만
+`active`로 바꾸고 `role`은 건드리지 않는다 — role이 애초에 잘못 심어져 있었다는 전제를 검증하지
+않는다.
+
+#### 심각도 — CRITICAL
+
+I-091 기준("다운스트림 캐스케이드 여부")으로 CRITICAL이다. 공격자가 얻는 것이 "위조된 행 하나"가
+아니라 **실제 크루의 오너 권한**이고, 획득 경로가 사회공학 없이 순수하게 "정상적으로 보이는 가입
+신청 + 정상적인 오너 승인 행위"만으로 완결된다 — 오너 입장에서는 자신이 평범한 가입 승인을 했을
+뿐이라는 점에서 I-101보다도 은밀하다.
+
+#### 수정 — D-064 원칙(트리거 vs REVOKE 분기) 재적용
+
+정당한 생성 경로가 SECURITY DEFINER 함수가 아니라 **클라이언트 직접 INSERT 자체**(`join-
+request.ts`의 `createJoinRequest`)라 REVOKE를 쓸 수 없다 — BEFORE INSERT 트리거로 (1) self-
+service INSERT는 `role=member`만 허용 (2) 대상 크루가 `visibility='public' AND status='active'`일
+때만 허용하도록 강제했다. `pg_trigger_depth() > 1`로 신뢰된 중첩 호출(크루 개설 오너 부트스트랩·
+초대 프로비저닝)을 우회하는 관용구는 `crew_memberships_guard_self_transition`이 이미 쓰는 것을
+재사용했다. SECURITY DEFINER로 만들어 크루 visibility/status 조회가 호출자의 RLS 가시성과
+무관하게 정확한 값을 보게 했다(I-092/D-055 원칙).
+
+#### 회귀 검증(실측)
+
+공격 재현 2종 전부 도메인 오류 메시지로 차단 확인. 정당 경로 4종(크루 개설 부트스트랩·정상 가입
+신청·정상 승인 흐름·초대 프로비저닝) 전부 생존 확인 — 특히 승인 흐름은 최종 `role=member,
+status=active`(에스컬레이션 없음)임을 재확인했다. `get_advisors(security)` 신규 WARN 0건(트리거
+함수 EXECUTE 회수 후). 근거·전문: `docs/decisions/insert-axis-audit-102-103.md`.
+
+### I-103 · MAJOR — `poll_eligible_voters` 자기 INSERT가 profile_id·poll 상태를 검사하지 않아 비회원 유령 인원 추가·투표 종료 후 정족수 분모 사후 조작이 가능했다 — I-101 후속 INSERT 축 전수조사에서 함께 발견
+
+- **상태**: 해결됨(23일차, 2026-07-29) — 마이그레이션
+  `20260729093323_major_fix_i103_poll_eligible_voters_insert_scope_guard`
+- **영역**: 데이터 / 보안 / 투표
+- **제보**: CREW(I-102와 같은 조사)
+
+#### 경위
+
+`poll_eligible_voters_insert_proposal_author_or_staff`의 `WITH CHECK`는 `poll_id`의 소유(제안자
+본인 또는 그 크루 staff/owner)만 검사하고, **`profile_id`가 실제로 그 크루의 활성 멤버인지**·
+**poll이 아직 `open`인지**를 전혀 보지 않았다. 테이블 코멘트 자체가 "스냅샷 고정 — 생성 후 행
+삭제/추가 없음(정족수 분모 불변)"이라 명시하고 `requirements.md`는 이 테이블 쓰기를 "서버 로직
+전용"이라 못 박았는데, 실제로는 클라이언트가 언제든 임의 `profile_id`를 추가할 수 있었다.
+
+#### 실측 재현(실 REST, 신규 테스트 크루·글·투표로 재현)
+
+| # | 시나리오 | 결과(수정 전) |
+| --- | --- | --- |
+| 1 | A(제안자)가 자기 poll에 자기 자신을 eligible voter로 추가 | 201(정상) |
+| 2 | A가 같은 poll에 **그 크루 멤버가 전혀 아닌 B**를 eligible voter로 추가 | **201**(유령 인원, 정족수 분모 오염) |
+| 3 | A가 실제 투표(for) 후 조기 종료 | 200, `closed_passed` 정상 확정 |
+| 4 | **poll이 이미 확정된 뒤** A가 제3의(크루 무관) 프로필을 eligible voter로 추가 | **201**(D-025 "생성 후 불변" 위반, 사후 정족수 조작) |
+
+부가 확인: phantom 자격(B)으로 실제 투표(`poll_votes` INSERT) 시도는 403으로 막혔으나, 그 방어가
+`poll_votes_insert_eligible_self`의 poll 가시성 서브쿼리가 `polls_select_members` RLS에 우연히
+기대는 것이었다(I-092/D-055가 경고한 것과 같은 종류의 "우연한 방어") — 이번 수정으로 애초에 그
+상황 자체를 없앴다.
+
+#### 심각도 — MAJOR
+
+정족수(`ceil(대상자/3)`)를 사후 조작할 수 있어 투표 가결/부결/무효 판정을 왜곡할 수 있지만,
+I-101·I-102와 달리 phantom 인원이 실제로 투표를 던지는 것 자체는(현재는) 막혀 있어 직접적인
+표 조작까지는 아니다 — 분모 조작을 통한 간접적 판정 왜곡으로 MAJOR 판정.
+
+#### 수정
+
+정당 경로가 클라이언트 직접 INSERT(`poll.ts`의 `createPoll`)라 BEFORE INSERT 트리거로 (1)
+`profile_id`는 그 poll이 속한 크루의 현재 활성 멤버여야 하고 (2) poll은 아직 `open`이어야 한다는
+두 조건을 강제했다. "생성 시점 단 한 번만" 같은 완전한 단일성 강제는 의도적으로 하지 않았다 —
+실측된 두 공격을 막는 데는 이 범위로 충분하다고 판단했다(과설계로 인한 불안정한 시간창 판정을
+피함).
+
+#### 회귀 검증(실측)
+
+공격 재현 2종(닫힌 poll에 추가, open이지만 비회원 추가) 전부 도메인 오류 메시지로 차단 확인.
+정당 경로(실제 활성 멤버를 open poll에 추가) 생존 확인. `get_advisors(security)` 신규 WARN 0건.
+근거·전문: `docs/decisions/insert-axis-audit-102-103.md`.
+
+#### 남은 것
+
+- `reports_insert_self`가 `status` 컬럼을 검사하지 않아 self-insert로 즉시 `resolved`/
+  `dismissed`를 지정할 수 있다 — 다운스트림 캐스케이드가 없어 이번 회차는 저위험으로 보류,
+  다음 회차 후보로 남긴다.
+- INSERT 축 전수조사는 이번에 끝났지만 `DELETE`/`TRUNCATE` 축은 아직 별도 전수 조사가 없다.
+
+### I-104 · MAJOR — `DayDetailPanel`의 데스크톱 사이드 패널이 진짜 뷰포트 기준으로 열려
+D-066("항상 430px 모바일 프레임")을 실측으로 위반하고 있었다 — 같은 회차(23일차)에 확정·수정
+
+- **상태**: **해결됨(2026-07-29, 23일차)** — CORE. 최초 등재는 정적 분석 추정이었으나 팀장이
+  "D-066을 반증할 유일한 후보를 추정으로 남기지 마라"고 반려해 같은 회차에 실측·확정·수정까지
+  끝냈다. 등급도 최초 MINOR(추정)에서 **MAJOR**로 올린다 — 확인해 보니 실제로 D-066의 전제를
+  깨는 확정 결함이었다(21·22일차와 같은 "브라우저를 안 열어봐서 절반만 고쳐진 채 남는" 패턴을
+  이번엔 반복하지 않았다)
+- **영역**: 디자인 시스템 / 반응형 / 캘린더
+- **제보**: CORE (2026-07-29, 23일차 — I-099 `sm:`/`md:`/`lg:` 전수 조사 중 발견, 팀장 지시로
+  같은 회차에 실측·수정)
+- **내용**: `src/components/calendar/DayDetailPanel.tsx`는 `useMediaQuery("(min-width:
+  768px)")`(실제 `window.matchMedia`, 컨테이너 쿼리가 아니다)로 `isDesktop`을 판정해 `Drawer`의
+  `swipeDirection`을 `"down"`(모바일 바텀시트)↔`"right"`(데스크톱 사이드 패널)로 실제로
+  전환한다 — 프레임이 아니라 **진짜 브라우저 창 폭**을 보는, 이 저장소에 남아 있던 유일한 실
+  뷰포트 반응형 분기였다. `Drawer`(`ui/drawer.tsx`)의 x축(좌우) 콘텐츠는 Portal이라
+  `appframe` 컨테이너의 DOM 조상이 없어(`DialogFooter`·`Toast`와 같은 원인) 기존 폭(`75%`)·
+  위치(`right-0`)가 **뷰포트** 기준으로 남아 있었다.
+- **실측**(`.tmp-e2e/core-i104/`, 실 로그인 `chopin0625@gmail.com` → `/calendar?month=2026-08`
+  → 크루 "심야 독서 모임"의 기존 시드 Meetup 이벤트 클릭 → `Drawer` 오픈, `getBoundingClientRect()`
+  직접 측정, 신규 데이터 생성 없음):
+
+  | 뷰포트 | `swipeDirection` | 패널 rect(폭) | 프레임 rect(폭) | 어긋남 |
+  | --- | --- | --- | --- | --- |
+  | 360px | down | 0.5~360.5 (360) | 0~360 | 없음 |
+  | 768px | **right** | 192~768 (576) | 169~599 (430) | 오른쪽으로 **169px** 초과 |
+  | 1280px | **right** | 320~1280 (960) | 425~855 (430) | 왼쪽 105px·오른쪽 425px 초과 — 프레임을 완전히 감싸고 뷰포트 우측 끝까지 덮음 |
+
+  `Dialog`·`Toast`(같은 Portal 축 대조군)는 같은 조건에서 768·1280px 모두 프레임 안에 정확히
+  들어와 있었다 — `Drawer` x축만 프레임 정합 처리가 빠져 있었던 것으로 확정.
+- **영향**: D-066이 확정한 "이 앱은 넓은 화면에서도 항상 모바일 폭 프레임 하나만 보여준다"가
+  `DayDetailPanel`의 데스크톱 경로에서 실제로 깨지고 있었다(추정이 아니라 확인). FR-063 기능
+  자체(날짜 상세 조회)는 막히지 않았지만, 넓은 화면에서 캘린더 화면 전체가 패널에 덮여
+  사실상 사용 불가에 가까운 시각 결과였다.
+- **수정**: `src/components/ui/drawer.tsx`의 `DrawerContent` x축 처리를 y축(바텀시트)이 이미
+  쓰던 프레임 기준 패턴으로 맞췄다 — 폭 `75%`(뷰포트) → `min(calc(100%-2rem),
+  calc(var(--container-app)-3rem))`(`Dialog`의 `min()` 관용구 재사용), 위치 `right-0`/`left-0`
+  (뷰포트 고정) → `right-[max(0px,calc((100%-var(--container-app))/2))]`(y축과 같은 계산식).
+- **재실측**(같은 스크립트·계정·데이터): 360/768/1280px 모두 패널 오른쪽 끝이 프레임 오른쪽
+  끝과 **정확히 일치**(Δ0px), 왼쪽은 설계한 48px 여백만큼 프레임 안쪽. `npx tsc --noEmit`·
+  `npm run lint` 재통과.
+- **2차 수정(같은 회차 후속, D-070) — 최종 해결**: BOARD가 이 D-066 교차검증 중
+  `requirements.md:868` FR-063 정상 흐름 ②가 "패널(**데스크톱**: 사이드 / 모바일: 바텀시트)"를
+  원문으로 요구하고 있음을 발견했다 — 위 1차 수정("프레임 안에 들어오는 사이드 패널")으로도
+  **여전히 요구사항 원문과 상충**하는 상태였다. 사용자가 그 원문 괄호 자체를 비구속으로
+  확정했다(**D-070**, requirements.md에 정정 이력 보존). 그 결정에 따라
+  `DayDetailPanel.tsx`에서 `useMediaQuery`/`isDesktop` 분기를 **완전히 제거**하고 `Drawer`를
+  항상 `swipeDirection="down"`으로 고정했다 — 이 저장소에 남아 있던 마지막 실 뷰포트 기준
+  반응형 분기가 없어졌다. `ui/drawer.tsx`의 x축 프레임 정합 CSS(1차 수정)는 되돌리지 않고
+  공용 프리미티브에 남겼다(현재 프로덕션 소비자 0곳, D-070 참고).
+- **최종 재실측**: 360/768/1280px 전부 `swipeDirection: "down"`·`swipeAxis: "y"`로 동일(768·
+  1280px에서 `matchMedia("(min-width:768px)")`는 여전히 `true`이지만 더 이상 `Drawer` 분기에
+  쓰이지 않음을 확인), 패널 rect가 프레임 rect와 **x·width·right 전부 완전히 일치**(Δ0,
+  1차 수정 때보다 더 정확 — 바텀시트라 좌우 inset 계산 자체가 y축 패턴 그대로 적용됨).
+  `Dialog`·`Toast` 대조군도 회귀 없음 재확인. `npx tsc --noEmit`·`npm run lint` 재통과.
+- **근거**: `docs/decisions/appframe-responsive-audit-099.md` §6(1차 실측)·§7(D-070 최종
+  실측), 결정 `docs/prioritization-and-risks.md` D-070, 요구사항 정정
+  `docs/requirements/requirements.md` FR-063.
+
+### I-106 · MAJOR — `join_requests`/`invitations` 승인·수락 트리거가 `role`을 정규화하지 않아, 강퇴·탈퇴 후 재신청·재초대 승인 한 번으로 과거 staff 권한이 되살아났다 — 팀장이 지시한 I-102 자기반증 중 발견
+
+- **상태**: 해결됨(23일차, 2026-07-29) — 마이그레이션
+  `20260729095113_major_fix_i104_membership_role_normalization_on_approval`(**주의**: 파일명은
+  작성 당시 임시로 붙인 `i104`를 그대로 쓴다 — 같은 회차에 DESIGN이 실제 I-104를, 다른
+  팀원이 또 I-105를 먼저 등재해(2회 연속 충돌) 번호가 이 항목과 두 단계 어긋났다. 원격에 이미
+  적용된 마이그레이션 이력을 되돌리는 리스크가 파일명 불일치보다 크다고 판단해 파일명은
+  고치지 않고, 이 항목만 올바른 번호 I-106으로 등재한다)
+- **영역**: 데이터 / 보안 / 크루·멤버십
+- **제보**: 팀장(I-102 수정에 대한 자기반증을 CREW에 지시하며 "`join_requests_sync_
+  membership_on_decision`이 role을 한 번도 언급하지 않는다"는 관찰을 함께 전달) → CREW가 실
+  REST로 재현·확정·수정
+
+#### 경위
+
+I-102는 **진입점**(crew_memberships self-insert)에서 `role`을 조작하는 경로를 막았다. 이
+이슈는 그 진입점을 건드리지 않고도, **정당하게 부여됐던 role이 상태 전이 과정에서 결코
+reset되지 않아 재신청·재초대 승인 한 번으로 되살아나는** 별개의 경로다.
+`join_requests_sync_membership_on_decision`(FR-023 승인)과 `invitations_sync_membership_
+on_response`(FR-021 수락) 둘 다 `crew_memberships.status`만 `'active'`로 바꾸고 `role`은
+전혀 건드리지 않는다 — "이 행이 `requested`/`invited`로 들어올 때 role이 항상 `member`였다"는
+전제를 검증 없이 신뢰한다.
+
+#### 실측 재현(실 REST, `chopin0625@gmail.com`=A(오너)·`0625chopin@gmail.com`=B, 신규 테스트
+크루로 재현 — 시드 데이터 미오염)
+
+1. A가 B를 FR-024로 정식 **staff** 임명(role=staff, status=active).
+2. B가 FR-026 자진 탈퇴(`active`→`left`) — `role`은 `staff` 그대로(이 전이는 `status`만
+   바꾼다).
+3. B가 FR-022 자기 서비스 재신청(`left`→`requested`) — `role`은 여전히 `staff`(self-service
+   전이 가드가 role 변경 자체를 금지하므로 역설적으로 리셋도 일어나지 않는다).
+4. B가 완전히 평범해 보이는 새 `join_requests` 행 제출.
+5. A(오너)가 **평범한 신규 가입 신청으로 착각하고 승인**.
+6. 결과: `crew_memberships`가 **role=staff, status=active**로 확정 — **A가 FR-024 임원 임명을
+   다시 하지 않았는데도 B가 staff 권한을 그대로 되찾았다.**
+
+같은 패턴을 `invitations_sync_membership_on_response`(FR-021 초대 수락)에서도 확인했다 —
+강퇴 후 재초대(ON CONFLICT DO UPDATE로 `status='invited'`, `role`은 안 건드림) → 수락
+(`invited`→`active`) → 역시 role=staff가 그대로 살아난다.
+
+#### 심각도 — MAJOR
+
+D-002("role은 크루 개설·FR-024 임원 임명·FR-025 오너 이양으로만 부여된다")를 우회해 **오너의
+명시적 재임명 없이** staff 권한이 자동 복원된다. I-102(CRITICAL, role=owner 획득)보다는
+좁다 — 이 경로로 얻는 최댓값은 "과거에 실제로 부여됐던 role"뿐이라 전혀 없던 권한을 새로
+만들 수는 없지만(공격자가 먼저 정당하게 staff/owner였어야 한다), 오너 입장에서는 평범한 가입
+승인 하나로 신뢰를 재확인 없이 되돌려주는 셈이라 위험하다.
+
+#### 수정
+
+`join_requests_sync_membership_on_decision`·`invitations_sync_membership_on_response` 둘
+다, `status='active'`로 확정하는 UPDATE에 `role='member'`를 함께 강제하도록
+`CREATE OR REPLACE FUNCTION`했다. "가입 승인/초대 수락은 항상 role=member 결과"라는 FR-021·
+FR-023의 정의 자체를 SQL로 고정한 것이다.
+
+#### pg_trigger_depth() 관점 부수 검증(팀장이 함께 지시)
+
+`crew_memberships`에 INSERT하는 함수를 `pg_proc.prosrc` 전수 조회로 확인한 결과 정확히 3개
+(`crews_provision_owner_bootstrap`·`invitations_provision_membership`·`crews_sync_
+membership_on_owner_transfer`)이며, 전부 트리거 전용(별도 RPC 없음) + `anon`/`authenticated`
+EXECUTE 전부 `false`로 확인됐다 — I-102의 `pg_trigger_depth()>1` 우회가 다른 정당 경로를
+막거나, 반대로 공격자가 도달 가능한 우회 구멍이 되는 경우 둘 다 없다.
+
+#### 회귀 검증(실측)
+
+공격 시나리오 재현 → 최종 상태 **role=member, status=active**로 확정(더 이상 staff가
+되살아나지 않음). 초대 수락 경로도 동일 확인. 정상 최초 가입(첫 신청·첫 초대, role이 애초에
+member)도 회귀 없이 그대로 확정. `get_advisors(security)` 신규 WARN 0건. 오너 이양(D-002)·
+강퇴 후 재가입 경로도 별도로 재검증(둘 다 PASS — 오너 이양은 앱 코드가 `crews.owner_id` UPDATE
+하나만 하고 `crew_memberships` 부수효과는 `pg_trigger_depth()>1`로 우회되는 트리거가 전담,
+강퇴 후 재가입은 PK 복합키 때문에 애초에 INSERT가 아니라 UPDATE로만 가능해 내 신규 가드와
+무관함을 확인). 근거·전문: `docs/decisions/insert-axis-audit-102-103.md` §9.
+
+### I-105 · MAJOR — `PollLiveContainer`의 실시간 투표 갱신이 브로드캐스트를 받고도 화면을 갱신하지 않는다 — FR-042 AC2·NFR-004 미충족
+
+- **상태**: 열림 — 증상은 확정, 근본 원인은 미확정
+- **영역**: 실시간 / 투표 / 성능(NFR-004)
+- **제보**: BOARD (2026-07-29, 23일차 — Task 043A, Task 037이 남긴 "`PollLiveContainer` 전체
+  왕복 미측정" 인계 항목을 실측하다 발견)
+- **내용**: 실 계정 2개로 브라우저(A)와 REST(B, 같은 페이지 컨텍스트에서 발신해 클럭 스큐를
+  없앰)를 이용해 "B가 A의 화면이 열려 있는 poll에 투표 → A의 화면이 3초 안에 갱신되는가"
+  (FR-042 AC2)를 재현했다. **DB 트리거(`poll_votes_broadcast`)는 매번 투표 커밋과 같은
+  타임스탬프로 정확한 topic·payload를 브로드캐스트한다 — DB 쪽은 정상.** 브라우저 소켓도
+  `crew:{crewId}:polls`·`user:{profileId}:notifications` 채널 모두 `SUBSCRIBED`에 정상
+  도달한다. 그런데도 **`PollPanel`의 "참여 N명" 텍스트가 최대 15초 대기까지 한 번도
+  갱신되지 않았다**(4회 재현, 콜드/워엄 조건 모두).
+- **근본 원인 진단(3차 실측, `docs/decisions/performance-043a.md` §4.4)**: `broadcast.ts`의
+  `channel.on("broadcast", { event: "*" }, …)` 콜백 진입부에 임시 `console.log`를 넣고
+  프로덕션 빌드로 재확인한 결과, **채널이 `SUBSCRIBED`이고 DB가 정상 발신했는데도 이
+  콜백 자체가 단 한 번도 호출되지 않았다.** 즉 원인은 `PollLiveContainer`의 앱 로직
+  (`payloadMatchesPoll`·`event.type` 비교)이 아니라 그보다 앞선 supabase-js 브라우저
+  클라이언트의 브로드캐스트 디스패치 단계로 좁혀진다. 진단용 로그는 확인 직후 원복했다
+  (`git diff` 무출력으로 확인).
+- **후속 실측(같은 날, 팀장 지시)으로 후보 3개를 기각하고 "브라우저 런타임 고유"로 좁혔다**:
+  1. **와일드카드 매칭**(`{event: "*"}`가 브로드캐스트에서 안 먹는 것 아닌가) — 팀장이
+     `node_modules/@supabase/realtime-js/dist/main/RealtimeChannel.js:684-695`를 직접 읽고
+     **미리 배제**(와일드카드는 명시적으로 지원됨).
+  2. **다중화 가설**(알림+투표 채널 2개를 한 소켓에 여는 구성 자체가 문제 아닌가) — **Node.js
+     직접 재현으로 기각.** 설치된 `@supabase/realtime-js`의 `Serializer`를 monkeypatch해
+     실 프레임을 관측하는 스크립트로 앱과 동일한 다중화 구성(같은 클라이언트에 알림 채널 +
+     투표 채널)을 그대로 열고 REST로 투표를 쐈더니 **kind=4(기대값과 정확히 일치)로 정상
+     디코드되고 `channel.on` 콜백이 투표 커밋 180ms 뒤 정상 호출됐다.** 같은 라이브러리
+     버전·같은 다중화 구성인데 Node에서는 되고 실 브라우저(§4.4, 4회 재현)에서는 안 된다.
+  3. **`binaryType`이 브라우저 기본값(`"blob"`)이라 바이너리 프레임이 `Blob`으로 와서
+     `_isArrayBuffer()`에 안 걸리는 것 아닌가** — 소스로 기각.
+     `node_modules/@supabase/phoenix/assets/js/phoenix/socket.js:83,392`가 연결 생성 시
+     `this.binaryType = opts.binaryType || "arraybuffer"`를 **명시적으로 설정한다.**
+  - **확정된 것**: DB는 항상 정상 발신 / 채널은 항상 `SUBSCRIBED` / 같은 라이브러리·같은
+    다중화 구성이 **Node.js에서는 정상 동작**한다. **미확정으로 남는 것**: Node와 실
+    Chromium 브라우저 사이의 무엇이 다른가 — `@supabase/ssr`의 `createBrowserClient`
+    (호출부는 `src/lib/data/supabase/client.ts` 1곳뿐임을 확인, 충돌하는 두 번째 호출은
+    없다) 자체의 어떤 옵션 차이, Turbopack 클라이언트 번들링(트리 셰이킹·realm 경계)이
+    `_binaryDecode`의 default-case 없는 `switch`문이나 `instanceof ArrayBuffer` 검사를
+    건드릴 가능성, 실 브라우저 네트워크 스택 차이는 **시험하지 않았다.**
+- **영향**: FR-042 AC2(3초 이내 집계 갱신)를 만족하지 못한다 — 화면을 열어 둔 사용자는
+  새로고침하거나 페이지를 재진입하기 전까지 다른 사람의 투표를 보지 못한다. 판정 로직
+  자체(NFR-036, `lib/rules`)는 서버에 그대로 있어 **데이터가 틀리게 보이지는 않는다** —
+  최신 상태로 안 바뀔 뿐이다(안전한 열화). **파급 범위(CREW 교차검증, 같은 날 정정)**:
+  "채팅·알림도 영향받을 수 있다"는 1차 서술이 너무 소극적이었다 — CREW가 코드를 직접
+  대조해 (1) DB 트리거 토픽과 클라이언트 토픽 빌더 문자열이 **완전히 일치**함을 재확인했고
+  (19일차식 불일치가 아니다), (2) `MessageRoomContainer.tsx:216`(채팅)·
+  `notification-channel.ts:38`(알림, `ToastHostContainer`/`use-notification-feed`가 이
+  래퍼를 쓴다) **둘 다 poll과 완전히 같은 `subscribeToRoomViaBroadcast`
+  (`src/lib/realtime/broadcast.ts`)를 호출**하고, (3) 셋 다 폴링이나 `router.refresh()`
+  기반 폴백이 전혀 없음을 grep으로 확인했다. 즉 "영향 **가능**"이 아니라 **"poll과 같은
+  방식으로 구조적으로 함께 죽어 있을 가능성이 높다"**로 정정한다 — poll만 재현했을 뿐
+  채팅·알림 자체를 이번에 직접 재현하지는 않았으므로 "확정"은 아니다. **다음 회차
+  최우선 순위로 채팅·알림 브라우저 실측을 올린다.**
+- **네 번째 후보 — `setAuth()` 호출 타이밍(팀장 제시, 같은 날) — 재현율 낮아 기각.**
+  `broadcast.ts`의 `getClient()`가 **채널이 하나도 없는 시점**에 `setAuth(token)`을 먼저
+  호출하고 그 후에야 `supabase.channel(roomId, …)`을 만든다 — `realtime-js`의 `_performAuth`
+  가 `this.channels.forEach(...)`로 **그 시점에 이미 존재하는 채널에만** 토큰을 반영하는
+  구조라, 채널이 없을 때 끝난 `setAuth()`는 그 채널에 반영되지 않을 수 있다는 이론. 1차
+  시행에서 정확히 이 순서로 재현돼(`broadcastReceived=NO`) 유력해 보였으나, **같은 순서를
+  6회 반복하자 실패는 1회뿐이었다(1/6, 나머지 5회 정상)** — 실 브라우저의 4/4 결정론적
+  실패를 설명하지 못해 기각한다. 1차 실패는 이 세션에서 처음 여는 크루 토픽에 대한 Realtime
+  테넌트 콜드 스타트(033·037 로그에서 첫 연결 ~1.2초 관측)와 우연히 겹쳤을 가능성이 높다.
+  **코드 수정을 하지 않았다** — 재현율 1/6인 가설로 코드를 바꾸는 것은 근거 없는 수정이다
+  (D-029가 "측정 근거 없는 예외 금지"로 요구하는 것과 같은 기준의 반대 적용). 상세 표는
+  `performance-043a.md` §4.6.
+- **후속(제안, 수정 안 함)**: 팀장 지시로 이번 회차는 여기까지 좁힌 상태로 멈췄다. 다음
+  단계는 실제 브라우저에서 같은 monkeypatch(또는 CDP `Network.webSocketFrameReceived`)로
+  프레임의 kind 바이트를 직접 읽어 Node 결과(kind=4, 정상)와 비교하는 것 — 브라우저에서
+  kind 값 자체가 다르게 온다면 서버가 클라이언트 종류를 구분해 다르게 인코딩한다는 뜻이고,
+  kind는 같은데 디코드/디스패치가 실패한다면 Turbopack 번들링 문제 쪽으로 좁혀진다. `setAuth`
+  타이밍은 낮은 확률 요인으로만 남긴다(기각됐으나 완전 배제는 아님 — 채널을 `setAuth` 대기
+  전에 먼저 만드는 재정렬은 부작용 없는 저비용 예방 조치로는 추천하되 "해소 수정"으로
+  표시하지 않는다). D-029 대상이 아니다(렌더링 전략이 아니라 실시간 전송 계층 결함) — 043B
+  또는 실시간 담당(BOARD 겸임) 다음 회차 후보로 남긴다.
+- **근거**: `docs/decisions/performance-043a.md` §4(재현 절차·원시 타이밍·§4.5 Node 대조군·
+  §4.6 setAuth 타이밍 재현율 표 포함).
+
+### I-107 · CRITICAL — I-106 수정을 완전히 우회하는 잔여 경로: `crew_memberships`의 self-service `invited→active` 직접 PATCH가 승인·수락 트리거를 아예 거치지 않아 강퇴된 임원이 그대로 복귀했다 — 팀장이 SQL로 좁힌 벡터를 실 REST로 재현·확정
+
+- **상태**: 해결됨(23일차, 2026-07-29) — 마이그레이션
+  `20260729100244_major_fix_i107_membership_self_transition_role_normalization`
+- **영역**: 데이터 / 보안 / 크루·멤버십 (I-106과 같은 결함군, UPDATE 축)
+- **제보**: 팀장(I-106 자기반증 지시 중 `crew_memberships_guard_self_transition`의 self
+  분기를 SQL로 직접 대조해 벡터를 좁힘) → CREW가 실 REST로 재현·확정·수정
+
+#### 경위
+
+I-106(D-067)은 승인·수락의 **완결 지점** 두 곳(`join_requests_sync_membership_on_decision`·
+`invitations_sync_membership_on_response`)에 `role='member'` 정규화를 추가했다. 그런데
+`crew_memberships_guard_self_transition`의 기존 설계 주석이 이미 명시하고 있었다 — **"초대
+수락은 invitee가 `invitations`를 거치지 않고 자기 `crew_memberships` 행을 직접
+`invited`→`active`로 옮겨도 된다."** 이 대체 경로는 `invitations_sync_membership_on_response`
+를 전혀 통과하지 않으므로, I-106의 완결 지점 수정이 있어도 그대로 뚫려 있었다.
+
+#### 실측 재현(실 REST, `chopin0625@gmail.com`=A(오너)·`0625chopin@gmail.com`=B, 신규 테스트
+크루 — 시드 데이터 미오염)
+
+1. A가 B를 초대 → B가 **정상적으로 `invitations` UPDATE로 수락** → I-106 수정 확인대로
+   role=member로 정상 정규화.
+2. A가 B를 staff 임명(FR-024) → A가 B를 강퇴(`active`→`removed`, role=staff 그대로 보존).
+3. A가 B를 재초대 — `invitations_provision_membership`의 `ON CONFLICT DO UPDATE`가
+   `status`만 `invited`로 바꾸고 `role`은 안 건드려 `role=staff` 그대로 유지(기존에 이미
+   확인한 사실).
+4. **B가 `invitations` 테이블을 전혀 건드리지 않고 `crew_memberships`를 직접
+   `PATCH {status:"active"}`** → **200, `role=staff, status=active`로 확정 — I-106 수정을
+   완전히 우회해 강퇴됐던 임원 권한이 되살아났다.**
+
+같은 축을 `declined`(초대 거절 후 재신청)·`rejected`(가입 신청 반려/철회 후 재신청) 경로에서도
+확인했다 — 셋 다 `crew_memberships_guard_self_transition`의 같은 self 분기
+(`{declined,rejected,left}→requested`)를 타므로 동일하게 role이 보존됐다.
+
+#### 심각도 — CRITICAL
+
+I-106보다 심각하다 — I-106은 "오너가 평범한 가입 신청으로 착각하고 승인"이라는 최소한의
+오너 행위 하나를 거쳤지만, 이 경로는 **오너가 초대를 보낸 뒤로는 오너의 어떤 추가 행위도
+없이** 강퇴자 본인의 self-PATCH 하나만으로 완결된다.
+
+#### 수정 — 진입점 자체를 이중으로 막는다(완결 지점 수정만으로는 불충분함이 실측으로 증명됨)
+
+`crew_memberships_guard_self_transition`에서 self-service `invited→active`·
+`{declined,rejected,left}→requested` 전이 시 `new.role`을 무조건 `'member'`로 덮어쓰도록
+`CREATE OR REPLACE`했다. 이제 완결 지점(I-106의 두 sync 트리거)과 진입점(이 함수) 양쪽이
+같은 불변식을 이중으로 강제한다 — 한쪽에 구멍이 생겨도 다른 쪽이 막는다.
+
+**FR-027 E3(오너의 강퇴 해제, `removed`→`active`)는 의도적으로 건드리지 않았다** — 이 전이는
+"남의 행" 분기(officer-managed)에 있고, 오너가 **특정 대상을 지목해 명시적으로 되돌리는**
+행위라 D-002가 우려하는 "오너가 모르고 승인" 상황이 아니다(익명 신청 큐 승인이 아니라 멤버
+관리 화면에서 특정 사용자를 골라 강퇴를 해제하는 행위). 실측: 강퇴 상태에서 오너가
+`removed→active`로 되돌리면 role=staff가 그대로 복원됨을 확인 — **이는 의도된 동작으로
+남긴다**(오너가 알고 하는 행위이므로).
+
+#### 회귀 검증(실측)
+
+공격 재현 재실행 → **role=member, status=active**로 확정(더 이상 staff 부활 없음).
+`declined`·`rejected` 경로도 동일하게 재신청 시점에 role=member로 정규화됨을 확인. 정상
+최초 가입(플레인 멤버의 탈퇴→재신청→승인)은 회귀 없이 그대로 진행. FR-027 E3(오너의 강퇴
+해제)는 여전히 이전 role을 복원함을 확인(의도된 동작, 위 참고). `get_advisors(security)`
+신규 WARN 0건.
+
+#### I-091 표가 놓친 축(팀장 지시로 명시)
+
+I-091의 전수 표는 "self-service UPDATE 분기가 **새 컬럼값을 제한하는가**"를 물었다. 이
+결함군(I-106·I-107)은 그 질문 자체가 놓치는 형태다 — `crew_memberships`의 self 분기는
+`role`을 "제한"한다(정확히는 "바꿀 수 없다"는 예외로 막는다). 그런데 **제한이 곧 보존**이라
+통과 판정을 받았다 — role을 못 바꾸게 막는 것과 role을 안전한 값으로 되돌리는 것은 다른
+요구인데, "컬럼값을 제한하는가"라는 질문은 이 차이를 구분하지 못한다. 과거에 정당하게
+부여됐던 값이 상태 전이를 오가며 그대로 "보존"되는 것 자체가 결함일 수 있다는 축은 I-091
+표에 없었다.
+
+#### 산출물
+
+마이그레이션 `20260729100244_major_fix_i107_membership_self_transition_role_normalization`.
+결정 `docs/prioritization-and-risks.md` D-068. 근거·전문:
+`docs/decisions/insert-axis-audit-102-103.md` §10.
+
+### I-108 · MINOR — `chat_room_reads.last_read_at`이 자기 INSERT/UPDATE 시 검사 없이 임의 값(미래 포함)으로 위조 가능하다 — I-102·I-103 교차검증 중 발견, 자기 한정 영향으로 보류
+
+- **상태**: 열림 — 저위험, 자기 한정 영향으로 판단해 **고치지 않는다**(팀장 판정, `reports_
+  insert_self`와 같은 급으로 기록만 남긴다)
+- **영역**: 데이터 / 채팅 · 알림 (FR-055, D-062)
+- **제보**: DESIGN(2026-07-29, 23일차 — CREW의 I-102·I-103 교차검증 중, "23건 분류 표의
+  '안전' 판정 자체를 의심하라"는 지시에 따라 재검토하다 발견)
+- **내용**: `chat_room_reads_insert_self_member`(`with_check`: `profile_id=self` ∧ 활성 멤버)는
+  `pg_policies` 23건 표에서 "PK(room_id,profile_id)가 최대 1행을 자연 강제하므로 안전"으로
+  분류돼 있었다. 이 분류는 **"몇 행이 생기는가"만 확인했지 "그 1행의 값이 무엇인가"는 확인하지
+  않았다** — `last_read_at` 컬럼은 `with_check`가 전혀 건드리지 않고, 이 테이블에는 UPDATE
+  가드 트리거도 서버 측 기본값(`now()` 등)도 없다(직접 SQL로 확인: `information_schema.
+  triggers`에 `chat_room_reads` 관련 행 0개, `last_read_at` `column_default` null).
+  **클라이언트가 INSERT·UPDATE 양쪽에서 `last_read_at`을 임의 값(미래 포함)으로 넣을 수 있다.**
+- **영향(추정, 자기 한정)**: `last_read_at`을 미래로 위조하면 FR-055(읽지 않은 메시지 표시,
+  D-062)의 **자기 자신의** 안읽음 배지를 항상 0으로 보이게 할 수 있다 — 다른 사용자의 배지나
+  메시지 가시성에는 영향이 없다(테이블 전체가 `profile_id=self` 행만 다룬다). `reports_
+  insert_self`(status 미검사)와 정확히 같은 성격 — "자기 자신의 부가 정보를 자기가 왜곡"이며
+  캐스케이드가 없다.
+- **후속(제안, 수정 안 함)**: BEFORE INSERT/UPDATE 트리거로 `last_read_at`을 항상 `now()`로
+  덮어쓰게 하면(D-054/D-055가 이미 확립한 "클라이언트가 뭘 보내든 무시하고 재계산" 패턴)
+  해소된다 — 다음 채팅·알림 관련 회차의 후보로 남긴다.
+- **근거**: `docs/decisions/insert-axis-audit-102-103.md`(원 전수 표), 이번 교차검증 SQL
+  실측(직접 조회, 문서화하지 않은 별도 산출물 없음 — 이 항목이 유일한 기록).
+
+### I-109 · MAJOR — FR-027 E3(강퇴 해제)가 role을 정규화하지 않아 I-106·I-107과 같은 모양으로 과거 staff 권한을 조용히 복원했다 — DESIGN이 CREW의 "의도된 예외" 판정에 반대, 팀장이 원문 대조로 확정
+
+- **상태**: 해결됨(23일차, 2026-07-29) — 마이그레이션
+  `20260729111112_major_fix_i109_removed_reinstate_role_normalization`
+- **영역**: 데이터 / 보안 / 크루·멤버십 (I-106·I-107과 같은 결함군)
+- **제보**: DESIGN(I-102·I-103 교차검증 중 CREW의 FR-027 E3 "의도된 예외" 판정에 반대) →
+  팀장이 요구사항 원문·D-002·FR-024 사전조건·호출부 존재 여부를 직접 대조해 DESIGN 손을
+  들어줌 → CREW가 실 REST로 재현·수정
+
+#### 경위
+
+CREW가 §10(`insert-axis-audit-102-103.md`)에서 "FR-027 E3(강퇴 해제)는 오너가 특정 대상을
+지목하는 명시적 행위이므로 D-002가 우려하는 상황이 아니다"라고 의도된 예외로 남겼던 판정을
+DESIGN이 반박했고, 팀장이 원문으로 확인해 DESIGN이 맞다고 판정했다:
+
+1. FR-027 E3 원문(`requirements.md:599` 부근)은 "강퇴 해제 → 오너만 가능"이 전부다 — **role
+   복원을 요구하는 문장이 없다.** "임원으로 되살린다"는 요구사항이 아니라 현행 구현의
+   부수효과였다.
+2. D-002는 "role은 개설·FR-024·FR-025로만 부여된다"고 못박는다 — 강퇴 해제는 그 셋 중
+   어디에도 속하지 않는다.
+3. FR-024 자체가 "대상은 active 멤버"를 사전조건으로 건다(가드 코드 확인) — 오너가 강퇴자를
+   다시 임원으로 만들려면 원래 ①member로 복귀 ②FR-024로 임명 두 단계여야 하는데, 지금
+   구조는 그 둘을 강퇴 해제 클릭 한 번으로 뭉친다. **I-106·I-107에서 막 닫은 패턴("평범해
+   보이는 액션 하나로 과거 role이 조용히 부활")과 구조적으로 동일하다.**
+4. DESIGN이 지적한 "UI가 없어서 검증 불가"도 유효했다 — `removed`/`reinstate` 전수 검색
+   결과 이 전이를 호출하는 Server Action·UI가 **0건**이다. "오너가 명시적으로 지목하는
+   행위이므로 안전하다"는 방어 논리는 그 명시성을 보여줄 화면이 존재해야 성립하는데, 지금
+   그 화면이 없다.
+
+#### 수정
+
+`crew_memberships_guard_self_transition`의 "남의 행" 분기(officer-managed,
+`removed→active`)에도 I-106·I-107과 대칭으로 `role='member'` 정규화를 추가했다. staff 복원이
+필요하면 오너가 FR-024를 별도로(대상이 다시 active가 된 뒤) 눌러야 한다.
+
+#### 실측 재현·회귀(실 REST, 신규 테스트 크루)
+
+staff 임명→강퇴→오너 해제(`removed→active`) → 수정 전 role=staff 복원 확인 → 수정 후
+**role=member로 정규화 확정**. 회귀: 해제 직후 오너가 FR-024로 다시 staff 임명(2단계 흐름)
+→ 정상 200, role=staff 재확정 — **정규화가 임원 복원을 불가능하게 만든 것이 아니라 1단계를
+2단계로 되돌린 것뿐임을 실측으로 확인**(단순 회귀가 아니라 "기능을 죽였다"는 반론까지
+미리 막았다). DESIGN이 독립적으로 6개 시나리오(막아야 할 벡터 2건 차단, 정당 경로 4건 —
+크루 개설 부트스트랩·초대 수락·플레인 재신청·오너 이양 — 생존, `role='member'` 강제가
+신뢰된 중첩 호출을 건드리지 않음)를 실 REST로 재검증해 전 항목 PASS 받았다. `get_advisors
+(security)` 신규 WARN 0건.
+
+#### 산출물
+
+- 마이그레이션: `20260729111112_major_fix_i109_removed_reinstate_role_normalization`.
+- 근거: `docs/decisions/insert-axis-audit-102-103.md` §11.2.
+- 관련: **I-110**(같은 발견 과정에서 나온 별개 이슈 — 규칙 모듈·요구사항·DB 삼자 불일치,
+  부분 해결).
+
+### I-110 · MAJOR — `crew-membership-transition.ts`(NFR-036 단일 소스)가 요구사항 §2.4 다이어그램만 따라가 FR-020·FR-022·FR-027 E3가 실제로 허용하는 전이 3종을 누락하고 있었다 — 규칙 모듈은 고쳤으나 요구사항 문서 정정은 다음 회차 이월
+
+- **상태**: **부분 해결**(23일차, 2026-07-29) — `src/lib/rules/crew-membership-transition.ts`
+  정정 완료, **`requirements.md` §2.4 다이어그램 정정은 다음 회차로 이월**(CORE가 같은 파일을
+  FR-063 정정(D-070)으로 동시에 만지고 있어 충돌을 피하려 팀장이 이번 회차 범위 밖으로
+  지시)
+- **영역**: 규칙 모듈(NFR-036) / 요구사항 문서 / 데이터(DB와의 대조)
+- **제보**: I-109 조사 중 팀장이 발견(DESIGN의 FR-027 E3 지적을 확인하러 원문을 다시 읽다가
+  §2.4 다이어그램 자체의 모순을 찾음) → CREW가 규칙 모듈 수정 → **DESIGN이 최종 대조(DB→
+  모듈 방향)에서 세 번째 누락(재초대)을 추가 발견** → CREW가 반영
+- **I-109와 별개 이슈로 등재하는 이유**: I-109(role 미정규화)는 이번 회차에 완전히 해결됐지만,
+  이건 **모듈은 고쳤어도 요구사항 문서가 여전히 DB·FR과 모순된 채로 남아 있어 부분 해결이다**
+  — 두 건을 한 이슈로 묶으면 I-109가 닫혔다는 이유로 전체가 "해결됨"으로 표시되어 이 이월분
+  (요구사항 문서 정정)이 닻을 잃는다(팀장 지시로 분리).
+
+#### 경위
+
+팀장이 `requirements.md:160-175`(§2.4 상태 다이어그램 원문)을 다시 읽어 다음을 확인했다:
+
+```
+declined --> [*]
+rejected --> [*]
+left --> [*]
+removed --> [*]
+```
+
+**네 종결 상태 전부 나가는 전이가 없다고 그려져 있다.** 그런데 DB는 이미 정당하게 세 종류를
+허용한다:
+
+- `{declined,rejected,left}→requested`(FR-022 자진 재신청)
+- `removed→active`(FR-027 E3, 오너 전용)
+- **`{declined,rejected,left,removed}→invited`(FR-020 재초대)** — DESIGN이 팀장 지시("DB→
+  모듈 방향으로도 대조하라")에 따라 `invitations_provision_membership`의 `ON CONFLICT ...
+  WHERE status IN ('declined','rejected','left','removed')`가 **네 상태 전부에서 재초대를
+  허용**함을 찾았다. `src/lib/rules/invite-eligibility.ts`가 이미 "FR-020은 FR-022 E3 같은
+  재초대 제한을 두지 않는다"고 의도된 동작으로 문서화해 뒀다 — 보안 결함이 아니라 모델
+  불완전성이다(이 전이는 status만 `invited`로 바꾸고, 그다음 `invited→active`에서 I-107이
+  role을 이미 `member`로 정규화한다). `reinstate`(오너가 강퇴자를 되살리는 제3자 행위)를
+  이미 모듈에 반영한 선례가 있어, 같은 성격의 제3자 행위인 재초대를 빼두면 모듈이 "일부
+  제3자 행위는 담고 일부는 안 담는" 애매한 경계에 서게 된다는 것이 추가 이유.
+
+**요구사항 문서가 자기 자신과 모순된다** — §2.4 다이어그램은 4개를 종결로 그려 놓고,
+FR-020·FR-022·FR-027 E3는 그 상태에서 나가는 경로를 명시한다. 그리고 **"§2.4의 단일
+소스"라고 스스로 선언한 `crew-membership-transition.ts`가 다이어그램 쪽을 따라가 DB·FR과
+어긋나 있었다.**
+
+이번 회차가 반복 확인한 형태의 또 다른 판이다 — 지금까지(I-101~I-109)는 "앱/규칙은 막는데
+DB가 강제 안 함"이었다면, 이건 **"규칙 모듈은 종결이라 말하고 DB는 나갈 수 있다고 말한다"**
+— 방향이 반대인 같은 종류의 불일치다. `crew-membership-transition.ts`는 NFR-036에 따라
+판정의 단일 소스여야 하는 모듈이라 이 어긋남이 남으면 그 모듈을 믿고 짠 코드가 틀린 전제
+위에 선다.
+
+#### 수정(모듈 쪽 — 완료)
+
+`TRANSITIONS`에 DB가 실제로 허용하는 전이 3종을 반영하고 각각 FR 근거를 주석으로 달았다:
+`reapply`(declined/rejected/left→requested, FR-022), `reinstate`(removed→active, FR-027
+E3), **`reinvite`(declined/rejected/left/removed→invited, FR-020)**. `CrewMembershipEvent`
+유니온에 세 이벤트를 추가했다(저장소 전체에서 이 타입의 다른 호출부는 0건, grep 확인).
+
+**`isTerminalMembershipStatus`는 삭제했다** — 최초 판단("호출부 0건이라 무해하니 독스트링만
+정정하고 남긴다")을 DESIGN이 반대했고 팀장도 DESIGN 쪽에 섰다: 이 함수는 이제 모든 상태에
+대해 `false`를 반환하는데("종결 상태" 개념 자체가 DB 현실과 안 맞게 됨), 이름이 약속하는
+의미("이 상태는 종결인가")와 실제 동작(항상 `false`)이 정반대라 남겨 두면 다음 개발자가
+이름만 보고 잘못 쓸 위험이 삭제 이익보다 크다고 판단했다 — 개념이 사라졌으면 그 개념의
+함수도 함께 지운다. 삭제 사유는 파일 상단 docstring에 남겼다. `npx tsc --noEmit`·`npx eslint`
+둘 다 이 파일 관련 에러 0건(호출부 0건도 재확인).
+
+#### 이월(요구사항 문서 쪽 — 미해결)
+
+**`requirements.md` §2.4 다이어그램의 모순은 이번에 고치지 않는다** — CORE가 같은 파일을
+FR-063 정정(D-070)으로 동시에 고치고 있어, 두 사람이 같은 파일을 동시에 고치면 이번 회차에
+이미 세 번 난 번호 충돌이 네 번째가 된다(팀장 지시). **다음 회차가 CORE의 FR-063 수정과
+별도로 이 다이어그램(declined/rejected/left/removed의 종결 표기)을 고쳐야 한다** — `{declined,
+rejected,left}→requested`(FR-022)·`removed→active`(FR-027 E3) 두 화살표를 추가하면 된다.
+
+#### 재검증(DESIGN, 예정)
+
+CREW가 고친 `TRANSITIONS` 표를 DESIGN이 DB(`crew_memberships_guard_self_transition` 등)가
+실제로 허용하는 전이와 대조해 재검증한다 — 모듈만 고치고 DB와 또 어긋나면 같은 결함을 방향만
+바꿔 재생산하는 것이라, 이 대조가 이번 건의 마지막 관문이다.
+
+#### 산출물
+
+- 코드: `src/lib/rules/crew-membership-transition.ts`(`TRANSITIONS`·`CrewMembershipEvent`·
+  독스트링 정정, `isTerminalMembershipStatus` 삭제).
+- 결정: `docs/prioritization-and-risks.md` D-071.
+- 근거: `docs/decisions/insert-axis-audit-102-103.md` §11.3~§11.4.
+- DESIGN 최종 재검증: `TRANSITIONS`를 DB가 실제 허용하는 전이와 대조 — 재초대 누락 1건
+  발견(위 경위 참고, 반영 완료) 외 신규 지적 없음.
+
+#### 남은 것
+
+- `requirements.md` §2.4 다이어그램은 여전히 DB·FR과 모순된 상태로 남아 있다 — 다음 회차가
+  CORE의 FR-063 수정과 별도로 이 다이어그램을 고쳐야 한다(이 이슈가 "부분 해결"로 열려
+  있는 이유 그 자체).

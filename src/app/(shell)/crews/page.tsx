@@ -29,7 +29,7 @@ export default async function CrewExplorePage({
   const { q, category } = await searchParams;
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6">
+    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4">
       <h1 className="font-heading text-lg font-medium text-foreground">{strings.crew.explore.title}</h1>
       <CrewSearchBar initialQuery={q ?? ""} initialCategory={category ?? null} />
       <Suspense key={`${q ?? ""}:${category ?? ""}`} fallback={<CrewGridSkeleton />}>

@@ -18,7 +18,7 @@ export default async function CrewChatPage({
 
   return (
     <main className="mx-auto flex w-full max-w-2xl min-h-0 flex-1 flex-col">
-      <h1 className="border-b border-border px-4 py-3 font-heading text-lg font-medium text-foreground sm:px-6">
+      <h1 className="border-b border-border px-4 py-3 font-heading text-lg font-medium text-foreground">
         {strings.chat.room.title}
       </h1>
       <Suspense fallback={<MessageListSkeleton />}>

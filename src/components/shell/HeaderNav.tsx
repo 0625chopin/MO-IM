@@ -51,8 +51,12 @@ function getSessionErrorBannerMessage(
  * 전역 헤더 내비게이션(PRD §5 "헤더 — 전역 공통"). 표현 컴포넌트 — 세션은 props로만 받는다
  * (D-030 ①). 인증 상태 판정·조회는 `src/app/layout.tsx`가 `getAuthSession()`으로 수행한다.
  *
- * 데스크톱(md 이상)에서만 링크 목록을 인라인으로 보여준다. 360px 뷰포트(NFR-026)에서는 로고만
- * 남기고 나머지는 `MobileTabBar`가 맡는다 — 같은 항목을 두 군데 중복 렌더링하지 않기 위해서다.
+ * **`md:flex`로 켜지는 인라인 링크는 현재 항상 꺼져 있다(I-099·D-066, 23일차)** — 이 파일이
+ * 렌더하는 `primaryNav`/`accountNav`(아래 `<nav>` 두 블록)는 데스크톱(md 이상)에서만 보이도록
+ * 짰지만, `AppShell`이 앱을 항상 430px 모바일 프레임에 가두므로(D-066, 태블릿 폭으로 넓히는
+ * 대안은 기각됨) 그 `md:`가 요구하는 48rem에 프레임이 영원히 닿지 않는다. 로고 하나만 남기고
+ * 나머지 1차 내비게이션은 **항상** `MobileTabBar`가 맡는다 — 360/768/1280px 세 폭 모두 같다.
+ * 이 두 `<nav>`를 지우지 않고 코드에 남겨 둔 이유는 각 블록 바로 위 주석에 있다.
  *
  * `usePathname`(클라이언트 전용 훅)을 쓰므로 `'use client'`가 필요하다. 이건 `lib/data`·
  * `lib/realtime` 같은 도메인 데이터 조회가 아니라 순수 내비게이션 UI 상태라 D-030 ①이 금지하는
@@ -127,6 +131,13 @@ export function HeaderNav({
           {strings.common.appName}
         </Link>
 
+        {/* I-099·D-066(23일차): `md:flex`는 프레임이 430px에 하드캡돼 있어 항상 꺼진 상태다
+            (위 컴포넌트 docstring). 지우지 않고 남긴 이유 — ① `MobileTabBar`가 이미 같은
+            항목을 커버해 제거해도 기능 손실이 없지만, ② `getPrimaryNavItems`를 두 곳(여기·
+            `MobileTabBar`)이 공유하는 구조를 지우면 "탭바 전용"으로 다시 좁혀야 해 되돌리기
+            비용이 이쪽이 더 크고, ③ `nav-items.ts`가 이미 프레임 정책과 무관한 순수 데이터라
+            이 블록을 남겨 둬도 유지비가 사실상 0이다. 프레임 정책이 다시 바뀌면(태블릿 폭
+            확장 등, D-066이 지금은 기각한 안) 이 블록이 코드 변경 없이 그대로 살아난다. */}
         <nav
           aria-label={strings.common.a11y.primaryNav}
           className="hidden flex-1 items-center gap-1 md:flex"
@@ -140,6 +151,9 @@ export function HeaderNav({
           )}
         </nav>
 
+        {/* I-099·D-066(23일차): 위 primaryNav와 같은 이유로 `md:flex`가 항상 꺼져 있다 —
+            계정 진입점은 `MobileTabBar`(로그인 사용자는 "계정 설정" 1항목)와 `/settings`가
+            실제 경로다. 같은 이유로 지우지 않고 남긴다. */}
         <nav
           aria-label={strings.common.a11y.accountNav}
           className="hidden items-center gap-1 md:flex"
@@ -148,10 +162,12 @@ export function HeaderNav({
             <NavLink key={item.key} item={item} active={pathname === item.href} />
           ))}
           {/* FR-002 로그아웃(Task 030) — 세션 폐기는 Server Action 하나로 충분해 별도
-              nav-items.ts 항목(링크)이 아니라 폼 버튼으로 둔다. **이 자리는 현재 프레임 폭
-              (430px)에서 켜지지 않는다** — 실제로 보이는 진입점은 `/settings`의 로그아웃
-              섹션이다(`LogoutButton` docstring). 손으로 짠 `<button>`을 그 공용 컴포넌트로
-              교체해, 프레임이 넓어져 이 내비가 다시 켜질 때 두 자리의 동작이 어긋나지 않게 한다.
+              nav-items.ts 항목(링크)이 아니라 폼 버튼으로 둔다. **이 자리는 프레임이 항상
+              430px에 하드캡돼 있어(D-066, I-099) 켜지지 않는다** — 실제로 보이는 유일한
+              진입점은 `/settings`의 로그아웃 섹션이다(`LogoutButton` docstring). 손으로 짠
+              `<button>`을 그 공용 컴포넌트로 교체해 둔 것은, 프레임 정책이 훗날 다시 바뀌어
+              이 내비가 켜지더라도 두 자리의 동작이 어긋나지 않게 하기 위해서다(D-066이 지금은
+              그 변경을 기각했다 — 당장 켜질 계획은 없다).
               `hover:bg-transparent`는 옆 `NavLink`들이 배경 없이 글자색만 바꾸는 것과 톤을
               맞추기 위해 ghost variant의 배경 hover를 끄는 것이다. */}
           {isAuthenticated(session) && (

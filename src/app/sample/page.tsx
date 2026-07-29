@@ -11,6 +11,13 @@ import { ShowcaseSectionBlock } from "@/components/sample/ShowcaseSectionBlock";
  * 추가한다. 사용법·예시는 `src/components/sample/README.md` 참고. 테스트 러너가 없는 동안
  * 이 페이지가 유일한 회귀 확인 지점이다(R-002, CON-09).
  *
+ * **폭이 `max-w-4xl`(896px)이 아니라 `max-w-[90rem]`(1440px)인 이유(I-098, 23일차)**: 이
+ * `<main>`은 `sample/layout.tsx`가 `<body>`에 준 `@container/appframe`의 자손이라, 이 페이지
+ * 자신의 폭이 `sm:`(40rem)뿐 아니라 `lg:`(64rem=1024px) 재배치까지 실제로 켤 수 있어야 한다
+ * (`foundation.tsx`의 "시맨틱 색" 그리드가 `lg:grid-cols-5`를 쓴다). 896px에 묶여 있으면 실제
+ * 브라우저가 아무리 넓어도 `lg:`가 영원히 안 켜진다 — 본문 프로즈(문단·설명)는 각자
+ * `max-w-2xl`을 따로 갖고 있어(줄 길이 보호) 이 폭 확장의 영향을 받지 않는다.
+ *
  * **문자열 경계(팀장 판정 완료, 2026-07-24)**: 아래 헤더 문구·앵커 내비 라벨은 `strings`
  * 모듈을 거치지 않는다 — `/sample`은 SC-01~22 제품 화면이 아니라 내부 개발 도구 페이지라
  * NFR-023(사용자 노출 문자열 분리) 적용 대상 밖이다. **단, 이 페이지가 렌더링하는 실제 제품
@@ -20,7 +27,7 @@ import { ShowcaseSectionBlock } from "@/components/sample/ShowcaseSectionBlock";
  */
 export default function SamplePage() {
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-12 px-4 py-8 sm:px-6">
+    <main className="mx-auto flex w-full max-w-[90rem] flex-col gap-12 px-4 py-8 sm:px-6">
       <header className="flex flex-col gap-3">
         <span className="text-[11px] font-medium tracking-[0.14em] text-muted-foreground">
           내부 개발 도구

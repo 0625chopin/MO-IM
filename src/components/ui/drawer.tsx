@@ -128,8 +128,19 @@ function DrawerContent({
             "data-nested-drawer-open:overflow-hidden data-nested-drawer-open:brightness-95",
             // Bleed.
             "after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--color-popover)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full",
-            // Sizing.
-            "[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
+            // Sizing. shadcn 기본값은 x축(좌우) 드로어 폭을 `sm:` 이상에서 `75%` → `24rem`
+            // 고정으로 좁혔다(`data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]`). I-099
+            // 전수 조사(CORE, 23일차)로 제거했었다 — 이 요소는 `DialogPortal`과 같은 이유로
+            // `appframe` 컨테이너의 DOM 자손이 아니라 `sm:`가 항상 꺼져 있었다(`DialogFooter`
+            // 주석 참고). **I-104 실측(CORE, 23일차) 후속** — 제거로 끝내지 않고 프레임 기준
+            // 값으로 다시 채웠다: `DayDetailPanel.tsx`가 실제로 `swipeDirection="right"`를 쓰고
+            // 있었고(768px 이상에서 `isDesktop` 분기), 폭을 그대로 두면(`75%`가 뷰포트 기준)
+            // 실측상 1280px에서 960px짜리 패널이 프레임(430px) 왼쪽 경계보다도 왼쪽으로 튀어나가
+            // 브라우저 오른쪽 끝까지 덮었다(D-066 위반, `docs/decisions/appframe-responsive-audit-099.md`
+            // §5 최종 갱신). `Dialog`의 `min(calc(100%-2rem),24rem)` 패턴을 그대로 따라 프레임
+            // 폭(`--container-app`)에서 좌측 3rem을 뺀 값으로 상한을 건다 — 3rem은 아래
+            // Direction 절의 inset이 이미 만드는 "프레임 왼쪽 한 뼘 보이기" 여백과 맞춘 값이다.
+            "[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=x]:[--drawer-content-width:min(calc(100%-2rem),calc(var(--container-app)-3rem))] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh]",
             // Stack.
             "[--bleed:3rem] [--peek:1rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]",
             // Transitions.
@@ -151,10 +162,17 @@ function DrawerContent({
             "data-[swipe-direction=down]:bottom-0 data-[swipe-direction=down]:origin-bottom data-[swipe-direction=down]:[--closed-transform:translate3d(0,calc(100%+var(--drawer-inset,0px)+2px),0)] data-[swipe-direction=down]:[--translate-y:calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y)-var(--stack-peek-offset)-(var(--stack-shrink)*var(--stack-height)))]",
             // Direction: up.
             "data-[swipe-direction=up]:top-0 data-[swipe-direction=up]:origin-top data-[swipe-direction=up]:[--closed-transform:translate3d(0,calc(-100%-var(--drawer-inset,0px)-2px),0)] data-[swipe-direction=up]:[--translate-y:calc(var(--drawer-snap-point-offset,0px)+var(--drawer-swipe-movement-y)+var(--stack-peek-offset)+(var(--stack-shrink)*var(--stack-height)))]",
-            // Direction: left.
-            "data-[swipe-direction=left]:left-0 data-[swipe-direction=left]:origin-left data-[swipe-direction=left]:[--closed-transform:translate3d(calc(-100%-var(--drawer-inset,0px)-2px),0,0)] data-[swipe-direction=left]:[--translate-x:calc(var(--drawer-swipe-movement-x)+var(--stack-peek-offset)+(var(--stack-shrink)*100%))]",
-            // Direction: right.
-            "data-[swipe-direction=right]:right-0 data-[swipe-direction=right]:origin-right data-[swipe-direction=right]:[--closed-transform:translate3d(calc(100%+var(--drawer-inset,0px)+2px),0,0)] data-[swipe-direction=right]:[--translate-x:calc(var(--drawer-swipe-movement-x)-var(--stack-peek-offset)-(var(--stack-shrink)*100%))]",
+            // Direction: left/right — **I-104 실측 수정(CORE, 23일차)**. shadcn 기본값
+            // `left-0`/`right-0`는 뷰포트 가장자리에 그대로 붙는다 — `DayDetailPanel.tsx`가
+            // 실제로 `swipeDirection="right"`(768px 이상 `isDesktop`)를 쓰는데, 이 기본값 그대로
+            // 실측(`.tmp-e2e/core-i104/i104-measure.mjs`)했더니 1280px에서 패널이 x=320~1280(폭
+            // 960px)에 떠서 프레임(x=425~855)을 왼쪽으로 105px, 오른쪽으로 425px 벗어났다 — 위
+            // y축(바텀시트) inset과 같은 `max(0px, calc((100%-var(--container-app))/2))`를 여기도
+            // 적용해 패널의 바깥쪽 가장자리가 뷰포트가 아니라 **프레임의 바깥쪽 가장자리**와
+            // 맞물리게 한다. 재실측 결과 768px·1280px 둘 다 패널 오른쪽(`right`)이 프레임 오른쪽과
+            // 정확히 일치했다(§5 갱신, `outsideFrame:false`).
+            "data-[swipe-direction=left]:left-[max(0px,calc((100%-var(--container-app))/2))] data-[swipe-direction=left]:origin-left data-[swipe-direction=left]:[--closed-transform:translate3d(calc(-100%-var(--drawer-inset,0px)-2px),0,0)] data-[swipe-direction=left]:[--translate-x:calc(var(--drawer-swipe-movement-x)+var(--stack-peek-offset)+(var(--stack-shrink)*100%))]",
+            "data-[swipe-direction=right]:right-[max(0px,calc((100%-var(--container-app))/2))] data-[swipe-direction=right]:origin-right data-[swipe-direction=right]:[--closed-transform:translate3d(calc(100%+var(--drawer-inset,0px)+2px),0,0)] data-[swipe-direction=right]:[--translate-x:calc(var(--drawer-swipe-movement-x)-var(--stack-peek-offset)-(var(--stack-shrink)*100%))]",
             className
           )}
           {...props}
@@ -178,8 +196,13 @@ function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="drawer-header"
+      // shadcn 기본값의 `md:gap-0.5 md:text-left`(넓은 화면에서 좌측 정렬)는 I-099 전수
+      // 조사(CORE, 23일차)로 제거했다 — `DrawerPortal`도 `DialogPortal`과 같이 `<body>`에
+      // 붙어 `appframe` 컨테이너의 DOM 자손이 아니므로 `md:`(컨테이너 쿼리로 재정의됨)가
+      // 조상을 못 찾아 항상 꺼져 있었다(`DialogFooter` 주석 참고, 같은 원인). 세로축(바텀
+      // 시트) 드로어는 계속 가운데 정렬로 렌더되던 실제 동작 그대로다.
       className={cn(
-        "flex shrink-0 flex-col gap-0.5 p-4 pb-0 group-data-[swipe-axis=y]/drawer-popup:text-center md:gap-0.5 md:text-left",
+        "flex shrink-0 flex-col gap-0.5 p-4 pb-0 group-data-[swipe-axis=y]/drawer-popup:text-center",
         className
       )}
       {...props}

@@ -40,6 +40,18 @@ const WIDTH_LABELS: Record<ViewportWidth, string> = {
  *
  * 앞으로 만드는 **도메인 컴포넌트는 컨테이너 쿼리로 짠다.** 그래야 이 토글이 실제 검증 도구가
  * 되고, 같은 컴포넌트를 좁은 슬롯과 넓은 본문에 함께 쓸 수 있다.
+ *
+ * **`@container/appframe`(named, I-098 이후 추가)** — 이 상자는 익명 `@container`일 뿐 아니라
+ * 이름을 `appframe`으로도 준다. `globals.css`가 Tailwind의 `sm:`/`md:`/`lg:`/`xl:`/`2xl:`을
+ * 전역으로 "이름이 `appframe`인 조상 컨테이너" 기준으로 재정의해 두었기 때문이다(named
+ * container query는 이름이 일치하는 **가장 가까운** 조상만 찾는다, `globals.css` 머리 주석).
+ * `/sample`이 `AppShell` 밖으로 나간 뒤(`sample/layout.tsx`)에도 이 상자 자신이 그 이름의
+ * 조상 역할을 대신해 주므로, `sm:`/`md:`/`lg:`로 짠 컴포넌트를 이 상자로 감싸 데모하면 위 폭
+ * 토글이 그 variant에도 그대로 반영된다 — 익명 `@sm:`/`@lg:` 쓰는 컴포넌트와 동시에 지원된다
+ * (이름 있는 조회든 없는 조회든 똑같이 이 상자를 조상으로 찾기 때문에 충돌하지 않는다).
+ * `AppShell`을 통째로 데모하는 항목(`shell.tsx`)만은 예외다 — `AppShell` 자신의 루트 `div`가
+ * 이미 `@container/appframe`을 선언하므로, 이 상자보다 그쪽이 항상 더 가까운 조상이 되어
+ * D-066이 원하는 "항상 430px" 동작이 그대로 유지된다.
  */
 export function PreviewFrame({
   height = 200,
@@ -95,7 +107,7 @@ export function PreviewFrame({
       <div
         style={style}
         className={cn(
-          "relative isolate overflow-hidden rounded-lg border border-border bg-background @container",
+          "relative isolate overflow-hidden rounded-lg border border-border bg-background @container/appframe",
           className,
         )}
       >

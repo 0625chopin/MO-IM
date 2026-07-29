@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
  *  "로딩" 패널이 함께 쓴다(`CrewMembersSkeleton`과 같은 패턴). */
 export function CrewSettingsSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-4 sm:p-6" aria-busy="true">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-4" aria-busy="true">
       <div className="flex flex-col gap-4">
         <Skeleton className="h-6 w-20" />
         <Skeleton className="h-10 w-full" />

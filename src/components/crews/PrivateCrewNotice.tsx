@@ -25,7 +25,7 @@ export interface PrivateCrewNoticeProps {
  */
 export function PrivateCrewNotice({ crewName }: PrivateCrewNoticeProps) {
   return (
-    <div className="mx-auto w-full max-w-2xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-2xl p-4">
       <h1 className="mb-4 font-heading text-lg font-medium text-foreground">{crewName}</h1>
       <Empty className="rounded-xl border border-border">
         <EmptyHeader>

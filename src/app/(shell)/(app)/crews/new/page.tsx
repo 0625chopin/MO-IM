@@ -11,7 +11,7 @@ export default function CrewCreatePage() {
   return (
     <main className="flex flex-1 flex-col">
       <PageHeader title={strings.crew.create.title} description={strings.crew.create.description} />
-      <div className="mx-auto w-full max-w-lg p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-lg p-4">
         <CrewCreateFormContainer />
       </div>
     </main>

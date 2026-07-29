@@ -10,7 +10,7 @@ import { Toaster } from "@/components/ui/toast";
 import { strings } from "@/lib/strings";
 
 import type { Metadata } from "next";
-import "./globals.css";
+import "../globals.css";
 
 /**
  * 본문·제목 서체. **개편 전까지 이 앱에는 한글 서체가 지정돼 있지 않았다** —
@@ -62,15 +62,30 @@ export const metadata: Metadata = {
 };
 
 /**
- * 루트 레이아웃 — Task 011의 구성 루트(D-030 ④). `getAuthSession()`으로 세션을 조회해
- * `AppShell`(표현 컴포넌트)에 props로 내려준다(D-030 ①). 실제 인증 스택이 들어와도
- * `getAuthSession()` 내부만 바뀌고 이 조립 방식은 그대로다.
+ * `(shell)` 그룹의 루트 레이아웃 — Task 011의 구성 루트(D-030 ④). `getAuthSession()`으로
+ * 세션을 조회해 `AppShell`(표현 컴포넌트)에 props로 내려준다(D-030 ①). 실제 인증 스택이
+ * 들어와도 `getAuthSession()` 내부만 바뀌고 이 조립 방식은 그대로다.
+ *
+ * **I-098(23일차)로 `src/app/layout.tsx`에서 이 자리(`src/app/(shell)/layout.tsx`)로
+ * 옮겨졌다.** 원래 이 파일 하나가 `/sample`을 포함한 앱의 모든 라우트를 감쌌는데, 그 결과
+ * `/sample`의 `PreviewFrame` 폭 토글이 이 파일이 만드는 `AppShell`의 430px 프레임 제약에
+ * 항상 갇혀 무력화됐다(`docs/ISSUES.md` I-098). Next.js 16의 "복수 루트 레이아웃"(route
+ * groups)만이 규약을 지키며 이 제약을 걷어내는 방법이라(중첩 `layout.tsx`는 조상이 이미
+ * 그린 JSX를 제거할 수 없다 — `node_modules/next/dist/docs/.../route-groups.md`), `AppShell`이
+ * 필요한 라우트 전부를 `(shell)/` 그룹으로 옮기고 `/sample`은 자신만의 루트 레이아웃
+ * (`sample/layout.tsx`, `AppShell` 없음)을 갖는 형제 트리로 분리했다. 조사·근거·전수 확인은
+ * `docs/decisions/appframe-responsive-audit-099.md` §4, 해소 실측은
+ * `docs/decisions/sample-frame-escape-098.md`.
+ *
+ * **다른 루트 레이아웃(`sample/layout.tsx`)과의 사이를 이동하면 풀 페이지 리로드가
+ * 강제된다**(Next.js 공식 caveat) — `/sample`은 내부 개발 도구 페이지라 제품 화면에서
+ * 여기로 가는 링크가 없으므로 낮은 비용으로 판단했다.
  *
  * `lang="ko"` — v0.1은 한국어 단독이고 로케일 경로 세그먼트를 두지 않는다(D-011). 이전 값
  * `lang="en"`은 `create-next-app` 스캐폴드 기본값이 그대로 남아 있던 것으로, 실제 콘텐츠
  * 언어와 불일치해 접근성 문제(스크린 리더 발음)였다 — 이번에 함께 고쳤다.
  */
-export default async function RootLayout({
+export default async function ShellRootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

@@ -42,7 +42,7 @@ export default async function AccountSettingsPage() {
         description={strings.account.settings.description}
       />
       <AccountSettingsContainer session={session} />
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pb-6 sm:px-6">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 pb-6">
         <NotificationPreferencesContainer session={session} />
         <BlockedUsersListContainer />
       </div>

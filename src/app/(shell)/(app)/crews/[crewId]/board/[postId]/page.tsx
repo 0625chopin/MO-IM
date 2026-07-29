@@ -33,7 +33,7 @@ export default async function CrewBoardPostPage({
   const { crewId, postId } = await params;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4 sm:p-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4">
       <Link
         href={getBoardListHref(crewId)}
         className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"

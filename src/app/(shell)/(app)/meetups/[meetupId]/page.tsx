@@ -21,7 +21,7 @@ export default async function MeetupDetailPage({
   const { meetupId } = await params;
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4 sm:p-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4">
       <Suspense fallback={<MeetupDetailSkeleton />}>
         <MeetupDetailContainer meetupId={meetupId} />
       </Suspense>

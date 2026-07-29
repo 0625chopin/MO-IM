@@ -39,7 +39,7 @@ export async function AccountSettingsContainer({
 
   if (!profile) {
     return (
-      <div className="mx-auto w-full max-w-lg p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-lg p-4">
         <ProfileCard
           handle=""
           displayName=""
@@ -56,7 +56,7 @@ export async function AccountSettingsContainer({
   const handleEligibility = canChangeHandle(profile.handleChangedAt, now);
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-8 p-4 sm:p-6">
+    <div className="mx-auto flex w-full max-w-lg flex-col gap-8 p-4">
       <ProfileCard
         handle={profile.handle}
         displayName={profile.displayName}

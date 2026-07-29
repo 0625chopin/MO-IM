@@ -39,17 +39,17 @@ export default async function LandingPage() {
   return (
     <main className="surface-warm flex flex-1 flex-col">
       {/* ── 히어로 ──────────────────────────────────────────────────────── */}
-      <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-6 pt-16 pb-14 text-center sm:pt-24 sm:pb-20">
+      <section className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-6 pt-16 pb-14 text-center">
         <span className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
           {strings.landing.hero.eyebrow}
         </span>
-        <h1 className="display text-4xl text-foreground sm:text-5xl">
+        <h1 className="display text-4xl text-foreground">
           {strings.landing.hero.headline}
         </h1>
-        <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+        <p className="max-w-xl text-base leading-relaxed text-muted-foreground">
           {strings.landing.hero.subhead}
         </p>
-        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+        <div className="mt-2 flex flex-col gap-3">
           <Button
             size="lg"
             nativeButton={false}
@@ -72,11 +72,11 @@ export default async function LandingPage() {
 
       {/* ── 확정성 스케일 시연(제품 시그니처) ───────────────────────────── */}
       <section className="mx-auto w-full max-w-4xl px-6 pb-20">
-        <div className="elevate flex flex-col gap-8 rounded-2xl border border-border bg-card p-6 sm:p-10">
+        <div className="elevate flex flex-col gap-8 rounded-2xl border border-border bg-card p-6">
           <h2 className="text-center text-lg font-semibold text-foreground">
             {strings.landing.steps.title}
           </h2>
-          <ol className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:gap-2">
+          <ol className="flex flex-col items-stretch gap-4">
             {strings.landing.steps.items.map((step, i) => (
               <li key={step.name} className="contents">
                 <div className="flex flex-1 flex-col items-center gap-3 text-center">
@@ -95,7 +95,7 @@ export default async function LandingPage() {
                 {i < strings.landing.steps.items.length - 1 && (
                   <ArrowRight
                     aria-hidden="true"
-                    className="mx-auto size-4 shrink-0 rotate-90 self-center text-muted-foreground/60 sm:mt-2 sm:rotate-0"
+                    className="mx-auto size-4 shrink-0 rotate-90 self-center text-muted-foreground/60"
                   />
                 )}
               </li>

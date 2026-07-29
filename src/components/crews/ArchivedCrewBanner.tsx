@@ -13,7 +13,7 @@ import { strings } from "@/lib/strings";
  */
 export function ArchivedCrewBanner() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pt-4 sm:px-6">
+    <div className="mx-auto w-full max-w-2xl px-4 pt-4">
       <Alert>
         <ArchiveIcon aria-hidden="true" />
         <AlertTitle>{strings.crew.archivedNotice.title}</AlertTitle>

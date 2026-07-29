@@ -22,7 +22,7 @@ export default async function CrewBoardPage({
   const page = Math.max(1, Number(pageParam) || 1);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4 sm:p-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 p-4">
       <h1 className="font-heading text-lg font-medium text-foreground">{strings.board.list.title}</h1>
       <Suspense fallback={<BoardListSkeleton />}>
         <BoardListContainer crewId={crewId} page={page} />

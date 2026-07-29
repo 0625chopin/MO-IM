@@ -18,19 +18,20 @@ import {
 } from "@/components/ui/drawer";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { strings, t } from "@/lib/strings";
 
-/** NFR-026 3종 뷰포트(360/768/1280)의 768px 경계선을 "데스크톱" 기준으로 쓴다. */
-const DESKTOP_MEDIA_QUERY = "(min-width: 768px)";
-
 /**
- * 날짜 상세 패널(FR-063) — Task 021B. 데스크톱은 오른쪽 사이드 패널, 모바일은 하단
- * 바텀시트로 뜬다(요구사항 문구 그대로). 하나의 `Drawer`(`ui/drawer.tsx`, Base UI)를
- * `swipeDirection`만 뷰포트에 따라 바꿔서 재사용한다 — `Dialog`(중앙 모달)+`Drawer` 두 갈래로
- * 나누는 shadcn 예시(`drawer-dialog`) 대신 이 방식을 택한 이유는 `drawer.tsx`가 이미 4방향
- * `swipeDirection`을 전부 지원해서다(리서치로 확인 — shadcn `sheet`/`dialog`는 Radix 기반이라
- * 이 저장소의 Base UI 래퍼와 원시 라이브러리가 달라 그대로 설치할 수 없었다).
+ * 날짜 상세 패널(FR-063) — Task 021B. **항상 프레임 안 하단 바텀시트로 뜬다(D-070, 23일차
+ * 정정).** 원래는 "데스크톱은 오른쪽 사이드 패널, 모바일은 바텀시트"였고(`useMediaQuery
+ * "(min-width: 768px)"`로 `Drawer`의 `swipeDirection`을 `down`↔`right`로 전환) 요구사항
+ * 원문(`requirements.md` FR-063 정상 흐름 ②) 문구를 그대로 구현한 것이었다. I-099(D-066,
+ * "앱은 항상 430px 모바일 프레임") 감사 중 I-104로 실측한 결과 그 데스크톱 경로가 실제로
+ * 프레임을 105~425px 벗어나고 있었고, BOARD가 그 원문 자체가 D-066과 상충한다는 것도
+ * 찾아냈다. 사용자 판단(D-070)이 그 원문 괄호를 비구속으로 확정하면서 `isDesktop` 분기
+ * 자체를 없앴다 — 이 저장소에 남아 있던 마지막 실 뷰포트 기준(`window.matchMedia`) 반응형
+ * 분기였다. `Drawer`(`ui/drawer.tsx`, Base UI)는 그대로 재사용하되 `swipeDirection="down"`
+ * 고정이다 — x축(좌우) 프레임 정합 CSS는 지우지 않고 공용 프리미티브에 남겨 뒀다(다른
+ * 소비자가 나중에 `left`/`right`를 쓸 때를 위해서다, D-070 참고).
  *
  * **표현 컴포넌트다(D-030 ①)** — `open`이 클릭된 날짜의 `iso`와 그 날의 `meetups`를 그대로
  * props로 받는다. `lib/data`를 import하지 않는다 — 호출자(`MonthCalendar.tsx`)가 이미
@@ -85,11 +86,10 @@ export function DayDetailPanel({
   meetups,
   status = "default",
 }: DayDetailPanelProps) {
-  const isDesktop = useMediaQuery(DESKTOP_MEDIA_QUERY);
   const title = t((s) => s.calendar.month.detail.title, { date: dateLabel });
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} swipeDirection={isDesktop ? "right" : "down"}>
+    <Drawer open={open} onOpenChange={onOpenChange} swipeDirection="down">
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle>{title}</DrawerTitle>
