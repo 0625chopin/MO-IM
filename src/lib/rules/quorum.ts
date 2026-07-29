@@ -25,10 +25,16 @@ export function computeQuorum(input: QuorumCheckInput): QuorumCheckResult {
  * 정족수 분모에 들어가는 "참여자 수"를 집계에서 뽑아낸다.
  *
  * D-003 — 기권은 명시적 3번째 선택지이며 **정족수에는 포함**하되(투표를 하긴 했으므로)
- * **가결 판정(찬성 > 반대)에서는 제외**한다. 그래서 정족수용 참여자 수는 기권까지
- * 포함한 `forCount + againstCount + abstainCount`이고, 가결 판정은 `poll-decision.ts`에서
+ * **가결 판정(찬성 > 반대)에서는 제외**한다. 가결 판정은 `poll-decision.ts`에서
  * `forCount`·`againstCount`만 비교한다 — 이 비대칭이 D-003의 핵심이라 두 함수로 분리했다.
+ *
+ * **`tally.participantCount`를 쓴다 — 세 필드를 다시 더하지 않는다(I-119, 24일차).**
+ * D-031(대상자 5명 미만 + 진행 중이면 선택지별 집계 숨김)이 적용된 `PollTally`는
+ * `forCount`·`againstCount`·`abstainCount`가 전부 0(숨김)이지만 `participantCount`는
+ * 항상 정확하다 — 세 필드를 합산했다면 숨김 상태의 모든 진행 중 투표에서 참여자 수가
+ * 실제 값과 무관하게 0으로 나왔을 것이다(실제로 그랬던 결함, `poll.types.ts`의
+ * `PollTally` docstring 참고).
  */
 export function countVotedForQuorum(tally: PollTally): number {
-  return tally.forCount + tally.againstCount + tally.abstainCount;
+  return tally.participantCount;
 }

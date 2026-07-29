@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 
 import type { ReactNode } from "react";
@@ -21,10 +21,16 @@ import type { ReactNode } from "react";
  * DEFINER, 클라이언트가 이 레이아웃을 우회해 RPC를 직접 호출해도 안전 — `docs/decisions/
  * admin-console-042b.md` §4 실측 확인). `AuthSession.isSystemAdmin`이 세션 발급 시점 스냅샷이라
  * stale할 수 있는 것과 대칭이다.
+ *
+ * **24일차(I-095) — `assertAuthenticatedSession`(throw) 대신 조기 반환을 쓴다.** 경위·대체
+ * 패턴 근거는 `@/components/shell/auth-session.ts` 모듈 docstring 참고.
  */
 export default async function AdminGateLayout({ children }: { children: ReactNode }) {
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기 브랜치다(I-095).
+    return null;
+  }
 
   if (!session.isSystemAdmin) {
     notFound();

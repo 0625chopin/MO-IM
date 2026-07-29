@@ -150,16 +150,28 @@ export async function listVotes(pollId: Id): Promise<PollVote[]> {
   return (data ?? []).map(toPollVote);
 }
 
-/** 무효화되지 않은 표의 선택지별 집계(FR-042) — `poll_vote_tally` RPC 경유(모듈 docstring 참고). */
+/**
+ * 무효화되지 않은 표의 선택지별 집계(FR-042) — `poll_vote_tally` RPC 경유(모듈 docstring 참고).
+ *
+ * **`row.participant_count`를 반드시 옮긴다 — `for_count`+`against_count`+`abstain_count`로
+ * 대신 계산하지 않는다(I-119, 24일차).** SQL 함수(`private.poll_vote_tally`)는 D-031
+ * 숨김이 걸리면 `for_count`·`against_count`·`abstain_count`를 `null`로 반환하지만
+ * `participant_count`는 숨김과 무관하게 `poll_votes`를 직접 센 정확한 값이다 — 이 함수가
+ * 원래 `participant_count`를 버리고 세 필드의 합으로 참여자 수를 재계산했던 것이 결함의
+ * 원인이었다(대상자 5명 미만인 모든 진행 중 투표에서 "참여 N명"이 항상 0으로 보임,
+ * FR-042 AC2 미충족으로 오인돼 I-105로 잘못 등재됐던 것 — 실측으로 재분류, 근거는
+ * `docs/decisions/performance-043b.md`).
+ */
 export async function getPollTally(pollId: Id): Promise<PollTally> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("poll_vote_tally", { p_poll_id: pollId });
   if (error) throw error;
   const row = data?.[0];
   if (!row) {
-    return { forCount: 0, againstCount: 0, abstainCount: 0 };
+    return { participantCount: 0, forCount: 0, againstCount: 0, abstainCount: 0 };
   }
   return {
+    participantCount: row.participant_count ?? 0,
     forCount: row.for_count ?? 0,
     againstCount: row.against_count ?? 0,
     abstainCount: row.abstain_count ?? 0,
@@ -206,6 +218,10 @@ export async function getPollTallyForDecision(pollId: Id): Promise<PollTally> {
     );
   }
   return {
+    // 판정 전용 경로 — D-022 분모 재정의에 쓰지 않는다는 원 docstring 그대로다(위 §176행).
+    // `participantCount`는 `PollTally` 타입이 요구하는 필드를 채우는 것뿐이고, 이 지점은
+    // `tally_hidden`이 이미 걸러진 뒤라(위 예외) 항상 실값과 일치한다.
+    participantCount: row.participant_count ?? 0,
     forCount: row.for_count ?? 0,
     againstCount: row.against_count ?? 0,
     abstainCount: row.abstain_count ?? 0,

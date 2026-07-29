@@ -25,6 +25,22 @@ import type { Id, ISODateTimeString } from "@/lib/types";
  *   꺼내 `lib/data` 호출에 넘길 수 있어야 한다(3일차 교차검증에서 DESIGN이 자체 발견, 팀장
  *   지시로 이번 회차에 처리). **판별 유니온이라 `loading`/`guest`/`error`에는 이 필드 자체가
  *   없다** — 컴파일 타임에 "미인증 상태에서 profileId를 읽으려는" 실수를 막는다.
+ *
+ * **(app) 경계 안에서 세션을 좁히는 방법(24일차, I-095 해소)**: 예전에는 이 모듈이 내보내던
+ * `assertAuthenticatedSession`(throw 기반 `asserts` 함수)을 썼다. Next 16이 레이아웃과 그
+ * 아래 페이지를 병렬로 렌더하는 탓에(`node_modules/next/dist/docs/01-app/01-getting-started/
+ * 06-fetching-data.md` "Parallel data fetching"), `(app)/layout.tsx`가 미인증 세션에서
+ * `<RedirectToLogin/>`을 반환하기로 결정해도 그 아래 페이지 컨테이너는 이미 독립적으로 자기
+ * 세션을 다시 조회해 이 함수를 호출하고 있었고, 그 병렬 브랜치가 매 게스트 요청마다 "레이아웃
+ * 가드가 깨졌다"는 **틀린** 예외를 서버 콘솔에 남겼다(22일차 조사 완료, 실제로 이 함수가 진짜
+ * 가드 붕괴를 잡아낸 사례는 0건이었다 — 상세: `docs/ISSUES.md` I-095). 그 브랜치의 반환값은
+ * 레이아웃이 어차피 버리므로(항상 이 경계 안에서만 호출된다는 것이 이 함수의 원래 계약이다)
+ * 무엇을 반환하든 화면·보안에는 영향이 없다 — 그래서 24일차에 9개 호출부 전부를
+ * `if (!isAuthenticated(session)) return null;` 조기 반환으로 옮기고 `assertAuthenticatedSession`
+ * 자체는 삭제했다(Next.js 공식 인증 가이드가 "Auth checks in leaf components"에서 정확히 이
+ * `return null` 패턴을 권장한다). **트레이드오프**: 이 지점에서 불변식이 정말로 깨지는 회귀가
+ * 생기면 이제 조용한 빈 화면으로 나타난다(예전엔 시끄러운 throw) — 실제 보안 경계는 애초에
+ * 이 함수가 아니라 서버·RLS이므로(NFR-012, D-030 ③) 받아들였다.
  */
 export type AuthSession =
   | { status: "loading" }
@@ -50,43 +66,6 @@ export function isAuthenticated(
   return session.status === "authenticated";
 }
 
-/**
- * `src/app/(app)/` 아래(D-030 ④, I-025) — 즉 `(app)/layout.tsx`가 이미 인증을 보장하는
- * 컨테이너·페이지에서만 쓴다. 그 경계 밖(예: 크루 게시판처럼 D-007에 따라 guest가 **실제로
- * 유효한 역할**인 라우트)에서는 이 함수를 쓰지 않는다 — 거기서는 `resolveBoardViewer`
- * (`src/components/board/resolve-board-viewer.ts`)처럼 guest를 오류가 아니라 정상 역할로
- * 받아 `checkPermission`의 매트릭스가 거부하게 한다. 두 패턴이 서로 다른 문제를 푸는 것이지
- * 경쟁하는 두 방식이 아니다 — `docs/CONVENTIONS.md` D-030 ④ 절 참고(6일차, CORE 재검증
- * E-1로 정리).
- *
- * **왜 `redirect` 대신 `throw`인가**: `(app)/layout.tsx`가 이미 리다이렉트를 끝냈으므로
- * 여기서 다시 리다이렉트하면 이중 가드다. 그런데도 이 함수가 필요한 이유는 순수히
- * **타입스크립트 내로잉**이다 — 레이아웃이 보장하는 불변식("이 지점에 도달했다면 인증된
- * 세션이다")을 컴파일러는 정적으로 모르므로, 실제 런타임 체크 하나가 있어야
- * `Extract<AuthSession, {status:"authenticated"}>`로 좁혀진다. 그 체크가 실패하는 경우
- * (정상 경로에서는 도달 불가)는 사용자 오류가 아니라 레이아웃 가드 자체가 깨졌다는 뜻이므로
- * `redirect`가 아니라 `throw`로 표현한다(D-030 ③ — 진짜 프로그래밍 오류는 예외로 던진다).
- * `as` 타입 단언을 쓰지 않는 이유도 같다 — 단언은 이 불변식이 실제로 깨져도 조용히 통과시켜
- * 버그를 숨기지만, `throw`는 런타임에 실제로 검사한다.
- *
- * **알려진 무해한 발화 지점(I-095, 22일차 CORE 조사)**: Next 16은 레이아웃과 그 아래 페이지를
- * **병렬로** 렌더한다(`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-
- * data.md` "Parallel data fetching"). `(app)/layout.tsx`가 미인증 세션에서 `{children}` 대신
- * `<RedirectToLogin/>`을 반환하기로 "결정"하는 시점과 무관하게, 그 아래 페이지 컨테이너는
- * 이미 병렬로 자기 세션을 다시 조회해 이 함수를 호출하고 있을 수 있다 — 그 병렬 브랜치에서는
- * 세션이 실제로 미인증이므로 이 함수가 그대로 예외를 던진다. 레이아웃이 최종적으로 그
- * 브랜치를 렌더하지 않기로 선택해 응답(HTTP 상태·화면)에는 영향이 없지만, 서버 콘솔에는
- * 이미 발생한 예외가 그대로 남는다 — **"레이아웃 가드가 깨졌다"는 이 메시지가 실제로는
- * 틀린 경보일 수 있다는 뜻**이다(가드 자체는 정상 동작 중이었다). 진짜 가드 붕괴와
- * 구분하려면 응답 상태·화면이 실제로 미인증 콘텐츠를 노출했는지를 함께 봐야 한다(그렇다면
- * 진짜 결함, 아니라면 이 병렬 렌더링 부작용). 상세 실측: `docs/ISSUES.md` I-095.
- */
-export function assertAuthenticatedSession(
-  session: AuthSession,
-): asserts session is Extract<AuthSession, { status: "authenticated" }> {
-  if (!isAuthenticated(session)) {
-    throw new Error(
-      "assertAuthenticatedSession: (app) 레이아웃의 인증 가드를 통과했는데 세션이 미인증 상태다 — 레이아웃 가드가 깨졌다는 뜻이다.",
-    );
-  }
-}
+// `assertAuthenticatedSession`(throw 기반 `asserts` 함수)은 24일차(I-095)에 여기서
+// 삭제했다 — 경위·대체 패턴은 위 `AuthSession` 모듈 docstring의 "(app) 경계 안에서 세션을
+// 좁히는 방법" 절 참고.

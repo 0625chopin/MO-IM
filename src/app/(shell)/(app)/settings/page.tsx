@@ -1,7 +1,7 @@
 import { BlockedUsersListContainer } from "@/components/moderation/BlockedUsersListContainer";
 import { NotificationPreferencesContainer } from "@/components/notifications/NotificationPreferencesContainer";
 import { AccountSettingsContainer } from "@/components/profile/AccountSettingsContainer";
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { strings } from "@/lib/strings";
@@ -26,14 +26,23 @@ import { strings } from "@/lib/strings";
  *
  * **인증 가드는 더 이상 여기 없다** — 6일차부터 `(app)/layout.tsx`가 이 라우트 그룹 전체의
  * 가드를 한 곳에서 맡는다(D-030 ④, I-025 해소). 이 페이지가 렌더된다는 것 자체가 그 레이아웃을
- * 이미 통과했다는 뜻이다. `assertAuthenticatedSession`(`@/components/shell/auth-session.ts`,
- * 6일차 CORE 재검증 E-1로 공용화)은 리다이렉트용이 아니라 `AccountSettingsContainer`가
- * 요구하는 **좁혀진(narrowed) 세션 타입**을 만들기 위해서만 필요하다 — 그 함수 docstring이
- * `throw`를 고른 이유를 설명한다.
+ * 이미 통과했다는 뜻이다. 아래 `isAuthenticated` 조기 반환은 리다이렉트용이 아니라
+ * `AccountSettingsContainer`가 요구하는 **좁혀진(narrowed) 세션 타입**을 만들기 위해서만
+ * 필요하다.
+ *
+ * **24일차(I-095) — `assertAuthenticatedSession`(throw) 대신 조기 반환을 쓴다.** Next 16이
+ * 레이아웃과 이 페이지를 병렬로 렌더해, 게스트가 이 라우트에 접근할 때마다 레이아웃이 이미
+ * `<RedirectToLogin/>`으로 대체할 브랜치에서 이 페이지가 독립적으로 예외를 던져 서버 콘솔에
+ * "가드가 깨졌다"는 틀린 로그를 남겼다 — 경위·대체 패턴 근거는
+ * `@/components/shell/auth-session.ts` 모듈 docstring 참고.
  */
 export default async function AccountSettingsPage() {
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기(RedirectToLogin)를 선택했을 병렬 렌더링의 폐기
+    // 브랜치다 — 이 반환값은 쓰이지 않는다(I-095).
+    return null;
+  }
 
   return (
     <main className="flex flex-1 flex-col">

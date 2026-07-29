@@ -87,8 +87,20 @@ export interface QuorumCheckResult {
 /**
  * 무효화되지 않은 표의 선택지별 집계. 기권은 정족수 분모에는 포함하되
  * 가결 판정(찬성 > 반대)에서는 제외한다(D-003).
+ *
+ * **`participantCount`(24일차, I-119) — `forCount+againstCount+abstainCount`의 합과
+ * 별개로 반드시 채운다.** D-031(대상자 5명 미만 + 진행 중이면 선택지별 집계 숨김)이
+ * 적용되면 `forCount`·`againstCount`·`abstainCount`는 0(원래 `null`)으로 오지만, 참여자
+ * "수"는 D-031이 가리는 대상이 아니다(`PollTally.tsx` 컴포넌트 docstring, `poll_vote_tally`
+ * SQL 함수의 `participant_count`가 숨김 여부와 무관하게 항상 정확한 이유). 이 필드가 없던
+ * 시절 `countVotedForQuorum`이 세 필드의 합으로 참여자 수를 대신 계산해, 대상자 5명 미만인
+ * 모든 진행 중 투표에서 "참여 N명"이 실제 투표 수와 무관하게 항상 0으로 보이는 결함이 있었다
+ * (I-119 — 실시간 브로드캐스트 결함으로 오인됐던 I-105를 24일차에 재현하다 발견. I-105는
+ * 원인 판정이 바뀌어 닫혔다 — "브로드캐스트가 안 온다"가 아니라 "브로드캐스트는 오는데
+ * 집계 값이 틀렸다"였다, `docs/ISSUES.md` I-105 정정 참고).
  */
 export interface PollTally {
+  participantCount: number;
   forCount: number;
   againstCount: number;
   abstainCount: number;
