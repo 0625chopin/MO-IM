@@ -13,7 +13,7 @@ import {
   ScheduleXCalendarView,
   type ScheduleXEventInput,
 } from "@/components/calendar/ScheduleXCalendarView";
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getPollById, listCrewsByProfile, listMeetupsByCrews } from "@/lib/data";
 import { resolveCrewColorCollision } from "@/lib/rules/crew-color-hash";
@@ -32,9 +32,13 @@ import type { Meetup } from "@/lib/types";
  * 그래야 헤더의 월 이동에 서버 왕복 없이 이벤트가 채워진다. Mock 데이터는 작아 이 창이
  * 저렴하고, 실데이터에서는 이 조회를 범위 기반 쿼리로 바꾸면 된다(뷰는 그대로).
  *
- * **fail-closed(6일차, CORE 재검증 E-2)**: `assertAuthenticatedSession`으로 guest 도달 시
+ * **fail-closed(6일차, CORE 재검증 E-2)**: `isAuthenticated` 조기 반환으로 guest 도달 시
  * 조용한 `profile-1` 대체(fail-open)를 막는다 — `(app)/layout.tsx`가 인증을 보장하지만 이
  * 컨테이너 자신도 같은 불변식을 강제한다.
+ *
+ * **24일차(I-095)** — 이 확인은 원래 throw 기반 `assertAuthenticatedSession`이었다. 조기
+ * 반환으로 바꿔도 fail-closed 성질은 그대로다(둘 다 미인증이면 아래 조회 로직에 도달하지
+ * 않는다) — 경위·대체 패턴 근거는 `@/components/shell/auth-session.ts` 모듈 docstring 참고.
  *
  * **크루 필터(FR-061 AC5·E5, D-014·R-017)**: 선택한 크루만 `listMeetupsByCrews`에 넘긴다 —
  * 격자 이벤트와 `DayDetailPanel` 상세가 같은 조회에서 파생돼 자동으로 일치한다. 필터 변경은
@@ -51,7 +55,10 @@ const WINDOW_MONTHS_AFTER = 12;
 
 export async function MonthCalendarContainer({ monthParam }: MonthCalendarContainerProps) {
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기 브랜치다(I-095).
+    return null;
+  }
   const profileId = session.profileId;
 
   const now = new Date();

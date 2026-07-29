@@ -41,7 +41,7 @@ function buildPoll(overrides: Partial<PollViewModel> = {}): PollViewModel {
     quorumRequired: 4,
     quorumMet: true,
     votedCount: 7,
-    tally: { forCount: 4, againstCount: 2, abstainCount: 1 },
+    tally: { participantCount: 7, forCount: 4, againstCount: 2, abstainCount: 1 },
     showDetailedTally: true,
     remainingMs: 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000, // 2일 3시간
     meetupId: null,
@@ -183,7 +183,7 @@ export const pollSection = defineSection({
       panels: {
         default: (
           <PollTally
-            tally={{ forCount: 6, againstCount: 2, abstainCount: 1 }}
+            tally={{ participantCount: 9, forCount: 6, againstCount: 2, abstainCount: 1 }}
             eligibleVoterCount={10}
             votedCount={9}
             quorumRequired={4}
@@ -193,7 +193,7 @@ export const pollSection = defineSection({
         ),
         empty: (
           <PollTally
-            tally={{ forCount: 0, againstCount: 0, abstainCount: 0 }}
+            tally={{ participantCount: 0, forCount: 0, againstCount: 0, abstainCount: 0 }}
             eligibleVoterCount={3}
             votedCount={0}
             quorumRequired={1}
@@ -203,7 +203,7 @@ export const pollSection = defineSection({
         ),
         error: (
           <PollTally
-            tally={{ forCount: 1, againstCount: 0, abstainCount: 0 }}
+            tally={{ participantCount: 1, forCount: 1, againstCount: 0, abstainCount: 0 }}
             eligibleVoterCount={10}
             votedCount={1}
             quorumRequired={4}
@@ -221,7 +221,7 @@ export const pollSection = defineSection({
           <PollResult
             status="closed_passed"
             outcome="passed"
-            tally={{ forCount: 6, againstCount: 2, abstainCount: 1 }}
+            tally={{ participantCount: 9, forCount: 6, againstCount: 2, abstainCount: 1 }}
             eligibleVoterCount={10}
             votedCount={9}
             quorumRequired={4}
@@ -233,7 +233,7 @@ export const pollSection = defineSection({
           <PollResult
             status="closed_invalid"
             outcome="invalid"
-            tally={{ forCount: 1, againstCount: 0, abstainCount: 1 }}
+            tally={{ participantCount: 2, forCount: 1, againstCount: 0, abstainCount: 1 }}
             eligibleVoterCount={10}
             votedCount={2}
             quorumRequired={4}
@@ -247,7 +247,7 @@ export const pollSection = defineSection({
               <PollResult
                 status="closed_rejected"
                 outcome="rejected"
-                tally={{ forCount: 3, againstCount: 3, abstainCount: 0 }}
+                tally={{ participantCount: 6, forCount: 3, againstCount: 3, abstainCount: 0 }}
                 eligibleVoterCount={10}
                 votedCount={6}
                 quorumRequired={4}
@@ -259,7 +259,7 @@ export const pollSection = defineSection({
               <PollResult
                 status="cancelled"
                 outcome={null}
-                tally={{ forCount: 2, againstCount: 1, abstainCount: 0 }}
+                tally={{ participantCount: 3, forCount: 2, againstCount: 1, abstainCount: 0 }}
                 eligibleVoterCount={10}
                 votedCount={3}
                 quorumRequired={4}
@@ -311,7 +311,7 @@ export const pollSection = defineSection({
               quorumRequired: 1,
               quorumMet: false,
               votedCount: 0,
-              tally: { forCount: 0, againstCount: 0, abstainCount: 0 },
+              tally: { participantCount: 0, forCount: 0, againstCount: 0, abstainCount: 0 },
               showDetailedTally: false,
               viewer: { canVote: true, ineligibleReason: null, myChoice: null },
             })}

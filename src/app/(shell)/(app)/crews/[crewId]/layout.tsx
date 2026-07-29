@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewById, getCrewMembership } from "@/lib/data";
 import { isActiveMembership } from "@/lib/rules/crew-membership-transition";
@@ -53,11 +53,19 @@ import type { ReactNode } from "react";
  * 정할 수 없고 "안내를 띄울지"만 정할 수 있다. RLS INSERT 정책(SQL 강제 경계)은 CORE 소관 —
  * 이 레이아웃·컨테이너의 UI 판정은 이번에도(D-039와 같은 원칙) UX 안내일 뿐이다.
  *
- * **I-059(게스트 접근 시 서버 콘솔 오진단 예외)와의 관계 — 이 변경은 그 경로를 건드리지
- * 않는다.** I-059는 `(app)/layout.tsx`가 `RedirectToLogin`(클라이언트 컴포넌트)으로 리다이렉트를
- * 대체하며 생긴 병렬 렌더 부작용이다. 이 레이아웃(크루원 게이트)의 차단 방식은 여전히 그대로인
- * `throw new Error(...)`(예외 기반, D-030 ③)이지 클라이언트 컴포넌트 리다이렉트가 아니다 —
- * 이번 변경은 통과한 뒤에 배너 하나를 추가로 렌더하는 것뿐이라 그 부작용 경로에 들어가지 않는다.
+ * **I-059(게스트 접근 시 서버 콘솔 오진단 예외)와의 관계(19일차 서술, 아래 24일차 갱신 참고) —
+ * 당시엔 이 변경이 그 경로를 건드리지 않았다.** I-059는 `(app)/layout.tsx`가 `RedirectToLogin`
+ * (클라이언트 컴포넌트)으로 리다이렉트를 대체하며 생긴 병렬 렌더 부작용이다. 19일차 당시 이
+ * 레이아웃(크루원 게이트)의 인증 확인은 `assertAuthenticatedSession`(throw 기반)이었고, 이번
+ * 변경(ArchivedCrewBanner)은 그 통과 이후에 배너 하나를 추가로 렌더하는 것뿐이라 그 부작용
+ * 경로에 들어가지 않았다.
+ *
+ * **24일차(I-095) 갱신 — 그 인증 확인 자체가 이제 바뀌었다.** 아래 진입부의
+ * `assertAuthenticatedSession(session)` 호출을 `if (!isAuthenticated(session)) return null;`
+ * 조기 반환으로 교체했다 — 경위·대체 패턴 근거는 `@/components/shell/auth-session.ts` 모듈
+ * docstring 참고. 이 레이아웃 특유의 크루원 게이트(`RouteErrorBoundary` 값 반환, 아래
+ * "20일차" 절)는 이미 throw를 쓰지 않고 있었으므로 이 갱신의 대상이 아니다 — 바뀐 것은
+ * 그 앞 단계인 "로그인했는가" 확인 하나뿐이다.
  *
  * **20일차(I-069 근본 해결, DESIGN) — 크루원 아님 판정은 더 이상 throw하지 않는다.** 프로덕션
  * 빌드에서 Next.js가 서버 컴포넌트 예외의 `cause`를 클라이언트로 넘기지 않아(공식 보안 동작,
@@ -93,7 +101,10 @@ export default async function CrewMemberGateLayout({
   const { crewId } = await params;
 
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기 브랜치다(I-095).
+    return null;
+  }
 
   const crew = await getCrewById(crewId);
   if (!crew) {

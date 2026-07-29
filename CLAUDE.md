@@ -11,9 +11,15 @@ npm run dev      # 개발 서버(Turbopack), http://localhost:3000
 npm run build    # 프로덕션 빌드
 npm start        # 빌드 결과물 서빙
 npm run lint     # ESLint(flat config). `next lint`가 아니라 순수 `eslint` 실행
+npm test         # vitest run(1회 실행, watch 없음)
 ```
 
-테스트 러너·포매터·CI는 아직 설정되어 있지 않다. 타입 검사는 빌드 과정에서 이루어지며, 단독으로 확인하려면 `npx tsc --noEmit`을 쓴다.
+**테스트 러너는 `vitest`를 최소 스펙으로 도입했다(D-052 → D-072, 24일차).** 범위는
+`src/lib/rules/quorum.ts`·`poll-decision.ts`·`poll-eligibility.ts` 3개 순수 함수 모듈뿐이다
+— 컴포넌트·데이터 접근 레이어·Server Action 등 나머지는 여전히 자동 테스트가 없다(R-002
+부분 완화, 전면 커버리지가 아니다). 설정은 `vitest.config.ts`(`@/*` 별칭 연결만, 그 밖은
+기본값). CI 연동은 별개 결정으로 분리했고 아직 없다 — 포매터도 아직 설정되어 있지 않다.
+타입 검사는 빌드 과정에서 이루어지며, 단독으로 확인하려면 `npx tsc --noEmit`을 쓴다.
 
 ## 스택과 현재 상태
 

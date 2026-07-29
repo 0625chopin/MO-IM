@@ -4,7 +4,7 @@ import { getBoardWriteHref, getPostDetailHref } from "@/components/board/board-l
 import { formatDayLabelKo, todayIsoUtc } from "@/components/calendar/date-grid";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import { MeetupDetail } from "@/components/meetup/MeetupDetail";
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import {
   getCrewById,
@@ -61,7 +61,11 @@ export interface MeetupDetailContainerProps {
 
 export async function MeetupDetailContainer({ meetupId }: MeetupDetailContainerProps) {
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기 브랜치다(I-095, 24일차
+    // — 이전엔 throw 기반 assertAuthenticatedSession이었다).
+    return null;
+  }
 
   const meetup = await getMeetupById(meetupId);
   if (!meetup) {

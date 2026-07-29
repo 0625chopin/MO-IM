@@ -159,6 +159,18 @@
 
 **Crew 멤버십 상태**
 
+> **24일차 정정(I-110)**: 아래 다이어그램은 원래 `declined`·`rejected`·`left`·`removed`
+> 네 상태를 종결(그 뒤로 나가는 전이 없음)로 그렸으나, 이는 FR-020(재초대)·FR-022(자진
+> 재신청)·FR-027 E3(강퇴 해제)와 자기모순이었다 — 세 FR 모두 이 상태들에서 **나가는
+> 전이**를 명시하고, DB(`crew_memberships_extend_self_service_join_request_transitions`·
+> `crew_memberships_guard_self_transition`·`invitations_provision_membership`)도 이미
+> 이를 허용하고 있었다(23일차 I-109 조사 중 발견, D-071). "2.4절의 단일 소스"인
+> `src/lib/rules/crew-membership-transition.ts`는 23일차에 이미 DB 현실에 맞춰 정정됐다
+> (그 모듈의 `isTerminalMembershipStatus`도 이제 모든 상태가 최소 하나의 outgoing
+> 이벤트를 가지므로 삭제됐다) — 이 다이어그램을 그 모듈과 다시 맞춘다. **`removed`는
+> 자진 재신청(FR-022) 대상에서는 여전히 제외된다**(FR-022 E3/FR-027 AC2) — 강퇴자는
+> 아래 "오너의 강퇴 해제" 또는 "재초대" 전이로만 돌아올 수 있다.
+
 ```mermaid
 stateDiagram-v2
     [*] --> invited: 오너/임원이 초대 (FR-020)
@@ -169,10 +181,14 @@ stateDiagram-v2
     requested --> rejected: 오너/임원 반려 (FR-023)
     active --> left: 본인 탈퇴 (FR-026)
     active --> removed: 강퇴 (FR-027)
-    declined --> [*]
-    rejected --> [*]
-    left --> [*]
-    removed --> [*]
+    declined --> requested: 본인 자진 재신청 (FR-022)
+    rejected --> requested: 본인 자진 재신청 (FR-022)
+    left --> requested: 본인 자진 재신청 (FR-022)
+    removed --> active: 오너의 강퇴 해제 (FR-027 E3)
+    declined --> invited: 오너/임원 재초대 (FR-020)
+    rejected --> invited: 오너/임원 재초대 (FR-020)
+    left --> invited: 오너/임원 재초대 (FR-020)
+    removed --> invited: 오너/임원 재초대 (FR-020)
 ```
 
 **Poll(투표) 상태**

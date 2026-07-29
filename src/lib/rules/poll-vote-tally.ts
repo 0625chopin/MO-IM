@@ -20,7 +20,10 @@ export function computeVoteTally(votes: readonly PollVote[]): PollTally {
     else abstainCount += 1; // "abstain"
   }
 
-  return { forCount, againstCount, abstainCount };
+  // 이 함수는 D-031 숨김 개념이 없다(호출자가 이미 무효화되지 않은 실표만 넘긴다) — 그래서
+  // participantCount는 항상 세 필드의 합과 같다. Supabase 실데이터 경로(`getPollTally`)만
+  // RPC의 숨김된 0과 별개인 `participant_count`를 그대로 옮겨 쓴다(I-119).
+  return { participantCount: forCount + againstCount + abstainCount, forCount, againstCount, abstainCount };
 }
 
 /**

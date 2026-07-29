@@ -108,10 +108,15 @@ export async function listVotes(pollId: Id): Promise<PollVote[]> {
   return store.pollVotes.filter((v) => v.pollId === pollId);
 }
 
-/** 무효화되지 않은 표의 선택지별 집계(FR-042). 판정 자체는 호출자가 `lib/rules`로 한다. */
+/**
+ * 무효화되지 않은 표의 선택지별 집계(FR-042). 판정 자체는 호출자가 `lib/rules`로 한다.
+ * Mock은 D-031 숨김을 흉내 내지 않는다(실데이터 `getPollTally`만 RPC 숨김을 반영) — 그래서
+ * `participantCount`는 항상 세 필드의 합과 같다(I-119).
+ */
 export async function getPollTally(pollId: Id): Promise<PollTally> {
   const votes = store.pollVotes.filter((v) => v.pollId === pollId && !v.invalidated);
   return {
+    participantCount: votes.length,
     forCount: votes.filter((v) => v.choice === "for").length,
     againstCount: votes.filter((v) => v.choice === "against").length,
     abstainCount: votes.filter((v) => v.choice === "abstain").length,

@@ -4,7 +4,7 @@ import { CrewInfoForm } from "@/components/crews/CrewInfoForm";
 import { CrewVisibilityForm } from "@/components/crews/CrewVisibilityForm";
 import { DisbandCrewForm } from "@/components/crews/DisbandCrewForm";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewById, getCrewMembership } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
@@ -37,10 +37,18 @@ import type { Id } from "@/lib/types";
  * 19일차 영향 범위 인벤토리). 지금은 `<RouteErrorBoundary kind="forbidden" />`를 값으로
  * 직접 반환한다 — `CrewSettingsPage`가 이미 `<main>`을 소유하므로 여기서 새로 열지 않는다.
  * HTTP 응답은 500 대신 200이 된다(트레이드오프는 `docs/decisions/domain-error-channel-069.md`).
+ *
+ * **24일차(I-095)** — 로그인 여부 확인을 throw 기반 `assertAuthenticatedSession`에서
+ * `isAuthenticated` 조기 반환으로 교체했다(위 20일차 절이 다루는 "임원 미만" 거부와는 다른
+ * 지점이다 — 그건 이미 값 반환이었다). 경위·대체 패턴 근거는
+ * `@/components/shell/auth-session.ts` 모듈 docstring 참고.
  */
 export async function CrewSettingsContainer({ crewId }: { crewId: Id }) {
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기 브랜치다(I-095).
+    return null;
+  }
 
   const crew = await getCrewById(crewId);
   if (!crew) {

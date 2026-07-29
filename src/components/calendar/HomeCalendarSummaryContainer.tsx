@@ -2,7 +2,7 @@ import { getPostDetailHref } from "@/components/board/board-links";
 import type { UpcomingMeetupSummary } from "@/components/calendar/calendar-types";
 import { formatShortDayLabelKo, todayIsoUtc } from "@/components/calendar/date-grid";
 import { HomeCalendarSummary } from "@/components/calendar/HomeCalendarSummary";
-import { assertAuthenticatedSession } from "@/components/shell/auth-session";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getPollById, listCrewsByProfile, listMeetupsByCrews } from "@/lib/data";
 
@@ -20,8 +20,11 @@ const FAR_FUTURE_DATE = "9999-12-31";
 /**
  * 홈 대시보드 캘린더 요약 컨테이너(D-030 ①) — Task 021B. `HomeCalendarSummary`(표현)에
  * "다가오는 모임" 목록을 조회해 넘긴다. `MonthCalendarContainer`와 같은 fail-closed
- * 패턴(`assertAuthenticatedSession`)을 쓴다 — 이 컨테이너도 `(app)/home`(인증 경계 안)에서만
- * 호출된다는 전제다.
+ * 패턴(`isAuthenticated` 조기 반환, 24일차 이전엔 `assertAuthenticatedSession`)을 쓴다 —
+ * 이 컨테이너도 `(app)/home`(인증 경계 안)에서만 호출된다는 전제다.
+ *
+ * **24일차(I-095)** — throw 기반이었던 인증 확인을 조기 반환으로 교체했다. 경위·대체 패턴
+ * 근거는 `@/components/shell/auth-session.ts` 모듈 docstring 참고.
  *
  * **크루 필터를 적용하지 않는다**: `/calendar`의 크루 필터(FR-061)는 그 페이지에 저장된
  * 선호도이고, 홈 대시보드는 소속 전체 크루의 일정을 보여주는 게 자연스럽다고 판단했다 —
@@ -29,7 +32,10 @@ const FAR_FUTURE_DATE = "9999-12-31";
  */
 export async function HomeCalendarSummaryContainer() {
   const session = await getAuthSession();
-  assertAuthenticatedSession(session);
+  if (!isAuthenticated(session)) {
+    // (app) 레이아웃이 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기 브랜치다(I-095).
+    return null;
+  }
 
   const todayIso = todayIsoUtc(new Date());
 
