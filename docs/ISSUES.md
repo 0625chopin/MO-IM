@@ -300,10 +300,14 @@
 
 ### I-030 · 초대(Invitation) 만료 시 짝을 이루는 CrewMembership 행의 다음 상태가 정의돼 있지 않다
 
-- **상태**: **진행중(24일차, 2026-07-30, CREW 실측)** — 팀장 배정으로 실 DB 동작을 실측하고
-  설계 후보 3종(A/B/C)을 정리했다. **최종 결정은 CREW가 하지 않는다** — 팀장이 판단하거나
-  사용자에게 올린다(팀장 지시). 실측 중 발견한 **별개의 보안 우회는 즉시 수정 완료**했다
-  (아래 참고). 전문: `docs/decisions/invitation-expiry-i030.md`.
+- **상태**: **해결됨 — 결정 완료(24일차, 2026-07-29, 사용자 결정 → D-073)**. CREW가 팀장
+  배정으로 실 DB 동작을 실측하고 설계 후보 3종(A/B/C)을 정리했고, **DESIGN이 교차검증에서
+  네 번째 축(조회 쿼리 필터링)을 추가**했다. 팀장이 이를 사용자에게 올려 **네 번째 축으로
+  확정**됐다 — `crew_memberships`의 `invited` 행은 그대로 두고 `listInvitationsForProfile`
+  쿼리에 `expires_at > now()`를 넣는다. **상태 전이는 도입하지 않는다.** 근거·한계 2건은
+  **D-073**에 있다. **구현은 다음 회차 CREW 배정**(24일차엔 팀원 종료 후 결정이 나왔다).
+  실측 중 발견한 **별개의 보안 우회(I-114)는 즉시 수정 완료**했다(아래 참고).
+  전문: `docs/decisions/invitation-expiry-i030.md`.
 - **영역**: 데이터 / 요구사항
 - **제보**: CREW (2026-07-24, Task 010 Mock 시드 생성)
 - **내용**: `requirements.md` 2.4절 "Crew 멤버십 상태" 다이어그램은 `invited`에서 나가는 화살표를 `accept_invitation`(→ active)·`decline_invitation`(→ declined) 둘로만 정의한다(`src/lib/rules/crew-membership-transition.ts`의 `TRANSITIONS.invited`도 이 둘뿐이다). 그런데 `Invitation`에는 `expiresAt`(발급 후 14일)이 있고 `InvitationStatus`에 `"expired"` 값도 있다 — 즉 **Invitation은 스스로 만료를 표현할 수 있는데, 그 시점에 이미 만들어져 있는 `invited` 상태 `CrewMembership` 행이 어떻게 되는지는 다이어그램에 없다.**
