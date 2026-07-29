@@ -5,6 +5,50 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ══════════════════════════════════════════════════════════════════════════
+   모바일 프레임 — 반응형 variant를 뷰포트가 아니라 앱 프레임 기준으로 옮긴다
+
+   이 제품은 넓은 화면에서도 **모바일 폭 프레임 하나를 화면 중앙에 놓는** 형태로
+   보여준다(`AppShell`이 `@container/appframe`으로 그 프레임을 만든다). 그런데
+   Tailwind의 `sm:`/`md:`/`lg:`는 **뷰포트** 기준이라, 프레임이 430px여도 브라우저가
+   1920px이면 데스크톱 규칙이 켜진다 — 430px 안에 데스크톱 레이아웃이 들어가 깨진다.
+
+   그래서 내장 브레이크포인트 variant를 **같은 이름·같은 임계값 그대로** 프레임
+   컨테이너 쿼리로 재정의한다. 앱 코드(89곳)의 `sm:`/`md:`/`lg:`는 한 글자도 고치지
+   않고 기준면만 뷰포트 → 프레임으로 바뀐다. 실제 모바일 기기(360~430px)에서 이
+   variant들이 꺼지는 것과 데스크톱 프레임 안에서 꺼지는 것이 정확히 같아진다.
+
+   임계값을 `--breakpoint-*`와 같은 값으로 맞춰 둔 것도 의도적이다. 프레임 폭
+   (`--container-app`)을 나중에 태블릿 폭으로 넓히면 그때 `sm:`부터 자동으로 켜진다.
+
+   **한계**: `max-sm:` 같은 역방향 variant와 `min-[…]`/`max-[…]` 임의값은 별도
+   variant라 여기서 덮이지 않는다(현재 코드에 사용처 없음 — 새로 쓸 때는 `@max-sm:`
+   같은 컨테이너 쿼리 variant를 직접 쓴다). `@container` 이름을 `appframe`으로 준
+   것은 `/sample`의 `PreviewFrame`이 쓰는 **익명** `@container`와 섞이지 않기
+   위해서다 — 이름 있는 조회는 이름이 일치하는 조상만 찾는다.
+   ══════════════════════════════════════════════════════════════════════════ */
+/* 앱 프레임의 최대 폭. `max-w-app` 유틸리티와 `var(--container-app)` 양쪽으로 쓴다 — 그래서
+   값을 인라인해 버리는 `@theme inline`이 아니라 **일반 `@theme`** 블록에 둔다(inline이면
+   `:root`에 커스텀 프로퍼티가 출력되지 않아 `calc()` 안에서 참조할 수 없다).
+
+   430px은 현행 대화면 스마트폰(iPhone 15 Pro Max 430pt, Pixel 9 Pro XL 412dp) 폭이다. 아래
+   `@custom-variant` 블록이 반응형 variant를 이 프레임 기준으로 돌려 놨으므로 **이 값 하나가 앱
+   전체의 레이아웃 기준면**이며, 넓히면 `sm:`(40rem)부터 차례로 켜진다.
+
+   프레임 본체(`AppShell`)뿐 아니라 **`position: fixed`로 프레임 밖에 놓이는 것들**이 폭을 도로
+   맞추는 데도 쓴다 — 하단 탭바, 다이얼로그 백드롭, 드로어. fixed의 containing block은 프레임이
+   아니라 뷰포트여서(컨테이너 쿼리를 걸어도 바뀌지 않는다 — 실측 근거는 `MobileTabBar` 주석)
+   각자 이 토큰으로 폭과 중심선을 되찾아야 한다. */
+@theme {
+  --container-app: 26.875rem;
+}
+
+@custom-variant sm (@container appframe (min-width: 40rem));
+@custom-variant md (@container appframe (min-width: 48rem));
+@custom-variant lg (@container appframe (min-width: 64rem));
+@custom-variant xl (@container appframe (min-width: 80rem));
+@custom-variant 2xl (@container appframe (min-width: 96rem));
+
+/* ══════════════════════════════════════════════════════════════════════════
    mo_im 디자인 언어 — "잉크와 확정성"
 
    전체 근거·수치는 `docs/design/design-language.md`. 요약하면 규칙은 둘이다.
@@ -31,6 +75,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* 프레임 **바깥** 여백면. 프레임 안은 `--background`(무채·불변 — 위 ② 참고,
+     크루 팔레트 대비 검증의 기준면)를 그대로 써야 하므로, 대화면에서 프레임 좌우로
+     남는 면에만 이 색을 깐다. 라이트는 한 단계 어둡게(흰 종이가 얹힌 책상),
+     다크는 한 단계 더 어둡게(어두운 면 위에 뜬 화면) — 어느 쪽이든 프레임이
+     "놓인 것"으로 읽히게 하되, 크루색은 이 면에 놓이지 않으므로 대비 검증 대상이
+     아니다. */
+  --color-canvas: var(--canvas);
 
   /* 한국어가 제품 언어다(D-011). Geist에는 한글 글리프가 없어 개편 전까지 모든
      한글이 OS 폴백(맑은 고딕/Apple SD Gothic)으로 렌더됐고, 자간·굵기가 기기마다
@@ -208,6 +260,10 @@
 :root {
   /* 무채·불변 — 위 ② 참고. 크루 팔레트 대비 검증의 기준면이다. */
   --background: oklch(1 0 0);
+  /* 프레임 바깥 여백면(`@theme`의 `--color-canvas` 주석 참고). 흰 프레임보다 한
+     단계 어두운 따뜻한 모래 톤 — 잉크 뉴트럴과 같은 색조대(H≈84)에 C=0.005로 묶어
+     크루색과 경합하지 않는다(원칙 ①). */
+  --canvas: oklch(0.955 0.005 84);
   /* 흰색 유지 — 크루 칩이 놓여도 되는 두 표면 중 하나다. */
   --card: oklch(1 0 0);
   --popover: oklch(1 0 0);
@@ -309,6 +365,9 @@
        최저 3.22, 배경 위 최저 3.52)가 그대로 유지된다. `--background`는 무채 유지(크루 대비 기준),
        `--destructive`는 붉은색 예외라 색조를 돌리지 않는다. */
     --background: oklch(0.145 0 0);
+    /* 프레임 바깥 여백면 — 다크에서는 프레임보다 **더 어둡게** 둬 프레임이 얹혀
+       떠 보이게 한다(라이트와 방향이 반대인 이유는 `:root`의 같은 토큰 주석 참고). */
+    --canvas: oklch(0.105 0 0);
     --card: oklch(0.2 0.01 74);
     --popover: oklch(0.2 0.01 74);
     --foreground: oklch(0.975 0.004 90);
@@ -353,6 +412,7 @@
   /* 위 `@media` 폴백과 값이 완전히 같다(색조까지). 한쪽만 고치면 OS 다크와 명시 토글이 다른
      화면을 그린다 — 값 변경 시 두 블록을 함께 고친다. */
   --background: oklch(0.145 0 0);
+  --canvas: oklch(0.105 0 0);
   --card: oklch(0.2 0.01 74);
   --popover: oklch(0.2 0.01 74);
   --foreground: oklch(0.975 0.004 90);
@@ -399,8 +459,11 @@
     word-break: keep-all;
     overflow-wrap: break-word;
   }
+  /* 프레임 바깥 여백면이다 — 프레임 안(`AppShell`)이 `bg-background`를 다시 깐다.
+     `bg-background`가 아니라 `bg-canvas`인 이유는 위 `--canvas` 주석 참고. 프레임보다
+     좁은 화면(실제 모바일)에서는 프레임이 폭을 꽉 채워 이 면이 보이지 않는다. */
   body {
-    @apply bg-background text-foreground;
+    @apply bg-canvas text-foreground;
     line-height: var(--leading-body);
   }
   /* 제목은 별도 서체를 더하지 않고 굵기·트래킹으로만 세운다(위 `--font-heading`

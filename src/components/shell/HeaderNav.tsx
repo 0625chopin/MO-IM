@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { logoutAction } from "@/lib/actions/logout";
 import { strings, t } from "@/lib/strings";
 import { cn } from "@/lib/utils";
 
@@ -148,16 +148,18 @@ export function HeaderNav({
             <NavLink key={item.key} item={item} active={pathname === item.href} />
           ))}
           {/* FR-002 로그아웃(Task 030) — 세션 폐기는 Server Action 하나로 충분해 별도
-              nav-items.ts 항목(링크)이 아니라 폼 버튼으로 둔다. */}
+              nav-items.ts 항목(링크)이 아니라 폼 버튼으로 둔다. **이 자리는 현재 프레임 폭
+              (430px)에서 켜지지 않는다** — 실제로 보이는 진입점은 `/settings`의 로그아웃
+              섹션이다(`LogoutButton` docstring). 손으로 짠 `<button>`을 그 공용 컴포넌트로
+              교체해, 프레임이 넓어져 이 내비가 다시 켜질 때 두 자리의 동작이 어긋나지 않게 한다.
+              `hover:bg-transparent`는 옆 `NavLink`들이 배경 없이 글자색만 바꾸는 것과 톤을
+              맞추기 위해 ghost variant의 배경 hover를 끄는 것이다. */}
           {isAuthenticated(session) && (
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {strings.auth.logout}
-              </button>
-            </form>
+            <LogoutButton
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+            />
           )}
         </nav>
 

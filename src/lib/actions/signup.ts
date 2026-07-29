@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { checkHandleAvailabilityAction } from "@/lib/actions/check-handle-availability";
 import { signUpWithPassword } from "@/lib/auth";
 import { createProfile } from "@/lib/data";
-import { isValidEmailFormat, validatePasswordFormat } from "@/lib/rules/auth-credentials";
+import { isValidEmailFormat, passwordsMatch, validatePasswordFormat } from "@/lib/rules/auth-credentials";
 import { validateDisplayName } from "@/lib/rules/display-name-validation";
 import { strings } from "@/lib/strings";
 
@@ -63,6 +63,9 @@ import { strings } from "@/lib/strings";
 export interface SignupFieldErrors {
   email?: string;
   password?: string;
+  /** 21일차 — 비밀번호 확인란 불일치. `password`와 별도 키인 이유는 오류를 그 입력란 아래에
+   *  붙여야 사용자가 어디를 고칠지 알기 때문이다. */
+  passwordConfirm?: string;
   handle?: string;
   displayName?: string;
   terms?: string;
@@ -89,6 +92,9 @@ export async function signupAction(
 ): Promise<SignupFormState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  // 비밀번호는 앞뒤 공백도 유의미한 문자라 `trim()`하지 않는다 — `password`와 같은 기준으로
+  // 읽어야 `passwordsMatch`의 비교가 실제 저장될 값과 일치한다.
+  const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
   const handle = String(formData.get("handle") ?? "").trim();
   const displayName = String(formData.get("displayName") ?? "").trim();
   const agreedToTerms = formData.get("agreedToTerms") === "on";
@@ -101,6 +107,13 @@ export async function signupAction(
 
   if (!validatePasswordFormat(password).valid) {
     fieldErrors.password = strings.auth.signup.errors.passwordTooShort;
+  }
+
+  // 클라이언트가 이미 blur 시점에 같은 판정을 하지만 그 결과를 신뢰하지 않는다(이 파일이 따르는
+  // Next.js "Validate inputs" 원칙 — `SignupForm` docstring 참고). 형식 위반과 독립적으로
+  // 검사해 "8자 미만"과 "확인란 불일치"가 동시에 있으면 둘 다 각자의 입력란에 보인다.
+  if (!passwordsMatch(password, passwordConfirm)) {
+    fieldErrors.passwordConfirm = strings.auth.signup.errors.passwordMismatch;
   }
 
   const displayNameCheck = validateDisplayName(displayName);

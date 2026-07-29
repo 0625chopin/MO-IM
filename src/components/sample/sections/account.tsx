@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, Loader2Icon } from "lucide-react";
+import { AlertTriangleIcon, Loader2Icon, LogOutIcon } from "lucide-react";
 
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { UserSearchField } from "@/components/profile/UserSearchField";
@@ -73,7 +73,7 @@ export const accountSection = defineSection({
   label: "계정",
   title: "계정 설정 · 사용자 검색",
   description:
-    "FR-004·006(D-005, R-012). 실제 라우트는 /settings — 프로필 편집 폼은 정적 프리뷰(실제 인터랙션은 /settings에서 확인), 사용자 검색은 실제 컴포넌트를 그대로 등록했습니다. 검색 '오류'(429) 패널은 NFR-016(레이트 리밋, Task 038부터 실제 카운팅)이 게스트 세션인 /sample에서는 재현되지 않아 정적으로 보여주는 상태입니다.",
+    "FR-002·004·006(D-005, R-012). 실제 라우트는 /settings — 프로필 편집 폼은 정적 프리뷰(실제 인터랙션은 /settings에서 확인), 사용자 검색은 실제 컴포넌트를 그대로 등록했습니다. 검색 '오류'(429) 패널은 NFR-016(레이트 리밋, Task 038부터 실제 카운팅)이 게스트 세션인 /sample에서는 재현되지 않아 정적으로 보여주는 상태입니다.",
   items: [
     {
       name: "ProfileCard",
@@ -290,6 +290,42 @@ export const accountSection = defineSection({
                 <AlertTriangleIcon aria-hidden="true" />
                 <AlertDescription>{strings.account.search.rateLimited}</AlertDescription>
               </Alert>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "LogoutButton",
+      note: "FR-002 로그아웃. 실제 라우트는 /settings의 로그아웃 섹션 — 여기서는 정적 프리뷰만 둡니다(실제 컴포넌트를 렌더하면 쇼케이스를 훑다 잘못 눌렀을 때 세션이 끊깁니다). '오류' 패널이 없는 것은 의도입니다: logoutAction은 세션 폐기 후 redirect로 끝나 돌아올 오류 상태가 없고, 폐기 자체가 실패하면 전역 error 경계가 받습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={180}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <div className="flex flex-col gap-3 border-t border-border pt-6">
+                <div>
+                  <h2 className="text-sm font-medium text-foreground">
+                    {strings.account.settings.logout.heading}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {strings.account.settings.logout.description}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" className="w-fit">
+                  <LogOutIcon aria-hidden="true" />
+                  {strings.auth.logout}
+                </Button>
+              </div>
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={140}>
+            <div className="mx-auto w-full max-w-sm p-4">
+              <Button type="button" variant="outline" disabled className="w-fit">
+                <Loader2Icon aria-hidden="true" className="animate-spin" />
+                {strings.auth.logoutPending}
+              </Button>
             </div>
           </PreviewFrame>
         ),

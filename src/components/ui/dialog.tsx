@@ -32,8 +32,12 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
+      // 어두워지는 범위는 화면 전체가 아니라 **앱 프레임**이다. 이 앱은 넓은 화면에서 모바일 폭
+      // 프레임을 중앙에 놓으므로(`AppShell`), 프레임 밖 여백면까지 덮으면 "앱 위에 뜬 모달"이
+      // 아니라 "브라우저 전체를 가리는 모달"로 읽힌다. Portal이 `<body>`에 붙어 fixed 기준이
+      // 뷰포트라, 프레임과 같은 폭·중심선을 직접 맞춰 준다(`MobileTabBar`와 같은 방식·근거).
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-y-0 left-1/2 isolate z-50 w-full max-w-app -translate-x-1/2 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className
       )}
       {...props}
@@ -54,8 +58,15 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
+        // 폭 상한이 `max-w-[calc(100%-2rem)] sm:max-w-sm`에서 `min(...)` 한 줄로 바뀌었다.
+        // 이유는 두 클래스가 모바일 프레임 도입 이후 **둘 다 제 역할을 못 하기 때문**이다:
+        // `100%`는 Portal이 붙은 `<body>` 기준이라 1440px 화면에서 1408px까지 벌어지고,
+        // `sm:`은 `appframe` 컨테이너 쿼리로 재정의돼 있어(`globals.css`) 프레임 밖인 여기서는
+        // 조상을 못 찾아 한 번도 켜지지 않는다. `min()`은 그 둘의 의도(모바일에서는 좌우 1rem씩
+        // 여백, 그 이상에서는 24rem 고정)를 브레이크포인트 없이 그대로 표현한다.
+        // 좌우 중앙 정렬은 그대로 둔다 — 프레임도 `mx-auto`라 중심선이 이미 일치한다.
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[min(calc(100%-2rem),24rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           className
         )}
         {...props}
