@@ -23,6 +23,7 @@ const NOTIFICATION_MESSAGE_BY_TYPE: Record<NotificationType, string> = {
   post_commented: strings.notification.messages.postCommented,
   ownership_transferred: strings.notification.messages.ownershipTransferred,
   crew_disbanded: strings.notification.messages.crewDisbanded,
+  poll_withdrawn: strings.notification.messages.pollWithdrawn,
 };
 
 export function getNotificationMessage(type: NotificationType): string {

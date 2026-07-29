@@ -26,6 +26,11 @@ export interface CrewCardProps {
  * `private` 크루가 카드로 나타나는 경우는 항상 `isMember === true`다 — `listCrews`가 데이터
  * 접근 단계에서 비소속자에게 `private` 크루를 아예 반환하지 않기 때문이다(D-017·D-028,
  * `fetch-crew-cards.ts` 참고).
+ *
+ * **FR-055 AC1(Task 044) — 읽지 않은 메시지 배지.** "가입됨" 배지와 같은 자리(헤더 배지 줄)에
+ * 이어 붙인다 — 이 카드가 이미 그 화면의 유일한 "크루 목록"이라 AC1 "크루 목록 조회" 요구를
+ * 만족하는 지점이다(`unreadMessageCount`는 `isMember`가 아니면 항상 0이므로 별도 조건 없이
+ * `crew.unreadMessageCount > 0`만 본다).
  */
 export function CrewCard({ crew }: CrewCardProps) {
   return (
@@ -42,6 +47,14 @@ export function CrewCard({ crew }: CrewCardProps) {
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline">{crew.category}</Badge>
             {crew.isMember && <Badge variant="secondary">{strings.crew.explore.memberBadge}</Badge>}
+            {crew.unreadMessageCount > 0 && (
+              <Badge
+                variant="default"
+                aria-label={t((s) => s.chat.unread.badgeLabel, { count: crew.unreadMessageCount })}
+              >
+                {crew.unreadMessageCount > 99 ? "99+" : crew.unreadMessageCount}
+              </Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">

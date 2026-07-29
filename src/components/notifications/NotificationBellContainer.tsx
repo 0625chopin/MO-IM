@@ -22,7 +22,7 @@ export function NotificationBellContainer({
   initialNotifications,
   initialUnreadCount,
 }: NotificationBellContainerProps) {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotificationFeed(
+  const { notifications, unreadCount, markRead, markAllRead, recordImpressions } = useNotificationFeed(
     profileId,
     initialNotifications,
     initialUnreadCount,
@@ -34,6 +34,7 @@ export function NotificationBellContainer({
       notifications={notifications.slice(0, 5)}
       onSelect={markRead}
       onMarkAllRead={unreadCount > 0 ? markAllRead : undefined}
+      onImpression={recordImpressions}
     />
   );
 }

@@ -340,6 +340,7 @@ function createSeed() {
       message: "같이 뛰고 싶어요!",
       status: "pending",
       decidedBy: null,
+      decidedAt: null,
     },
   ];
 

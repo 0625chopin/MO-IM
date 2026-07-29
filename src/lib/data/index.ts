@@ -51,7 +51,13 @@ export * from "./supabase/invitation";
 export * from "./supabase/join-request";
 export * from "./supabase/meetup";
 export * from "./supabase/notification";
+// Task 044(22일차 CORE, FR-072) 추가 — `NotificationPreference`는 Task 006·028에서 선반영됐을
+// 뿐 읽기·쓰기 둘 다 이번이 처음이다(`comment.ts`·Task 041과 같은 사정).
+export * from "./supabase/notification-preference";
 export * from "./supabase/poll";
+// Task 045(22일차 DESIGN, NFR-030) 추가 — KPI-3·5 원천 이벤트(검색·알림 노출·알림 클릭)
+// self-service 기록. 감사 로그(`lib/audit/`)와 다른 이유는 `product-event.ts` docstring 참고.
+export * from "./supabase/product-event";
 export * from "./supabase/profile";
 // 21일차(I-074 major) — `getProfileByHandle`만 격리된 파일로 옮겼다(profile.ts 모듈
 // docstring·profile-handle-oracle.ts 참고). 배럴 재노출 이름은 그대로라 호출부는 안 바뀐다.

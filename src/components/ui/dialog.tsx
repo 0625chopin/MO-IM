@@ -114,8 +114,16 @@ function DialogFooter({
   return (
     <div
       data-slot="dialog-footer"
+      // shadcn 기본값은 `sm:flex-row sm:justify-end`였다(넓은 화면에서 버튼을 가로로 정렬).
+      // I-099 전수 조사(CORE, 23일차)로 제거했다 — `DialogPortal`이 `<body>`에 붙어(위
+      // `DialogContent`의 `min()` 주석 참고) 이 요소는 `appframe` 컨테이너의 **DOM 자손조차
+      // 아니다.** `globals.css`가 재정의한 `sm:`은 `@container appframe (…)`을 찾는데 조상에
+      // 그 이름의 컨테이너가 아예 없으니, 프레임 폭과 무관하게 항상 꺼진 상태였다(프레임을
+      // 넓혀도 살아나지 않는 다른 종류의 죽은 코드 — `AppShell`류의 "프레임이 좁아서" 죽은
+      // 코드와 원인이 다르다). 항상 세로 스택(`flex-col-reverse`)으로만 렌더되던 실제 동작은
+      // 그대로 유지된다(시각적 변화 없음).
       className={cn(
-        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4",
         className
       )}
       {...props}

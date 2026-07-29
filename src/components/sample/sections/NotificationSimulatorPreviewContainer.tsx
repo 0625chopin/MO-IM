@@ -19,6 +19,8 @@ const DEMO_TYPES: { type: NotificationType; label: string }[] = [
   { type: "join_request_received", label: "가입 신청 접수" },
   { type: "invitation_received", label: "초대 수신" },
   { type: "meetup_created", label: "모임 생성" },
+  // FR-046(Task 044) — 제안 철회.
+  { type: "poll_withdrawn", label: "제안 철회" },
 ];
 
 /**

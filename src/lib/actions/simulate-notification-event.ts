@@ -40,6 +40,8 @@ const SAMPLE_PAYLOAD_BY_TYPE: Record<NotificationType, Record<string, unknown>> 
   // FR-025·FR-013(Task 040) — 오너 이양·크루 해산.
   ownership_transferred: { crewId: "crew-1", crewName: "테스트크루" },
   crew_disbanded: { crewId: "crew-2", crewName: "테스트크루" },
+  // FR-046(Task 044) — 제안 철회.
+  poll_withdrawn: { crewId: "crew-1", postId: "post-3" },
 };
 
 export async function simulateNotificationEventAction(type: NotificationType): Promise<Notification> {

@@ -221,16 +221,27 @@ src/
 
 ESLint 규칙만으로 아키텍처를 완전히 강제할 수는 없다(파일명 케이스 검사는 별도 플러그인이 필요하며 이 Task의 파일 담당 경계상 `package.json`을 건드릴 수 없어 보류 — 아래 "남은 리스크" 참고). 대신 **import 방향**은 규칙으로 강제했다.
 
-| 위치(`files`) | 차단 대상 | 근거 |
-| --- | --- | --- |
-| `src/lib/rules/**` | `react`·`react-dom`·`next/*`, `@/app/*`, `@/components/*`, `@/lib/data/*`, `@/lib/realtime/*`, Supabase 클라이언트 | NFR-036, R-015, CON-05 — 순수 함수는 프레임워크·데이터 레이어에 의존하지 않는다 |
-| `src/lib/data/mock/**` | `@/lib/data/supabase/*`, Supabase 클라이언트 | NFR-034 — Mock 구현은 실데이터 구현을 참조하지 않는다 |
-| `src/lib/data/supabase/**` | `@/lib/data/mock/*` | NFR-034 — 실데이터 구현은 Mock 구현을 참조하지 않는다 (Supabase 클라이언트는 여기서 허용) |
-| `src/components/**/*.tsx`(표현, `ui/`·`*Container.tsx` 제외) | `@/lib/data/*`, `@/lib/realtime/*`(딥 임포트), Supabase 클라이언트 | D-030 ① — 표현 컴포넌트는 데이터를 props로만 받는다 |
-| `src/components/ui/**/*.tsx`, `src/components/**/*Container.tsx` | Supabase 클라이언트, `@/lib/data/mock/*`·`@/lib/data/supabase/*`·`@/lib/realtime/mock`·`@/lib/realtime/broadcast`(딥 임포트) | D-030 ② — 컨테이너도 배럴(`@/lib/data`, `@/lib/realtime`)만 통해 접근한다 |
-| 그 외 `src/**`(예: `app/`, `lib/actions`, `lib/utils.ts`, `hooks`, **`src/components/**`의 `.tsx`가 아닌 일반 TS 모듈** — 예: `components/shell/get-auth-session.ts`) | Supabase 클라이언트, 위와 같은 딥 임포트 | R-015 신호("컴포넌트 파일에서 Supabase 클라이언트를 직접 import") 예방을 전역으로 적용. `.ts` 파일은 `<Name>.tsx`/`<Name>Container.tsx` 표현/컨테이너 분리(D-030 ①)의 대상이 아니므로 이 일반 규칙으로 떨어진다(3일차 프로브 검증 기록 참고) |
+**아래 표가 zone 1~8(6b 포함) 전체의 단일 소스다 — I-088(21일차, DESIGN 발견) 해소.** zone 7·8은
+신설 시점에, zone 3의 `noProfileHandleOracleRelative` 추가와 zone 6→6/6b 분리는 21일차 변경
+시점에 각각 이 표에 등재되지 않은 채로 남아 있었다(zone 1~6만 반영된 옛 표). **새 zone을
+추가하거나 기존 zone의 `files`/`ignores`/차단 대상을 바꾸면 반드시 이 표도 같은 커밋에서
+갱신한다** — `eslint.config.mjs` 상단 주석에도 같은 문구를 남겼다. zone 번호는 파일 안 등장
+순서(파일 내 실제 배치 순서, 선언 순서와 다를 수 있다 — 예: zone 7·8이 zone 3과 zone 4 사이에
+온다)를 그대로 따른다.
 
-`src/lib/data/supabase/**`와 `src/lib/realtime/**`(구현체 파일)만 Supabase 클라이언트 import가 허용된다.
+| zone | 대상(`files`) | 제외(`ignores`) | 차단 대상 | 근거 |
+| --- | --- | --- | --- | --- |
+| 1 | `src/lib/rules/**` | — | `react`·`react-dom`, `next`·`next/*`, `@/app/*`, `@/components/*`, `@/lib/data/*`, `@/lib/realtime/*`, Supabase 클라이언트(`@supabase/supabase-js`·`@supabase/*`) | NFR-036, R-015, CON-05 — 순수 함수는 프레임워크·데이터 레이어에 의존하지 않는다 |
+| 2 | `src/lib/data/mock/**` | — | `@/lib/data/supabase/*`, Supabase 클라이언트 | NFR-034 — Mock 구현은 실데이터 구현을 참조하지 않는다 |
+| 3 | `src/lib/data/supabase/**` | — | `@/lib/data/mock/*`, `profile-handle-oracle`(모든 상대경로 표기·확장자 변형, `noProfileHandleOracleRelative`) | NFR-034 — 실데이터 구현은 Mock 구현을 참조하지 않는다(Supabase 클라이언트는 여기서 허용). `profile-handle-oracle` 제한은 I-074(21일차) 재발 방지 — service-role로 RLS를 완전 우회하는 `getProfileByHandle`을 이 파일 밖에서 상대경로로 import하지 못하게 막는다 |
+| 7 | `src/lib/auth/**` | — | `@/lib/data/mock/*`, `@/lib/data/supabase/*`(단 `server`·`client`·`env` 3개는 예외 허용) | Task 030(17일차, CREW) — 인증 세션은 `lib/data/contracts.ts`의 CON-05·CON-06(이 레이어는 쿠키·세션·요청 객체를 직접 읽지 않는다) 때문에 데이터 배럴에 섞을 수 없다. `src/lib/realtime/**`와 대칭인 독립 계층. 클라이언트 팩터리 3개만 재사용하고 도메인 구현 딥 임포트는 막는다 |
+| 8 | `src/lib/audit/**` | — | `@/lib/data/mock/*`, `@/lib/data/supabase/*`(단 `server`·`client`·`env` 3개는 예외 허용) | Task 038(18일차, BOARD) — 감사 로그·레이트 리밋은 zone 7과 같은 이유(CON-05·CON-06)로 데이터 배럴 밖에 있다. `audit_logs`·`handle_search_attempts` 둘 다 `anon`/`authenticated` 완전 거부 RLS라 service-role 클라이언트가 필요하다 |
+| 4 | `src/components/**/*.tsx`(표현) | `src/components/ui/**`, `src/components/**/*Container.tsx` | `@/lib/data/*`, `@/lib/realtime/*`, Supabase 클라이언트 | D-030 ① — 표현 컴포넌트는 데이터를 props로만 받는다 |
+| 5 | `src/components/ui/**/*.tsx`, `src/components/**/*Container.tsx` | — | Supabase 클라이언트, `@/lib/data/mock/*`·`@/lib/data/supabase/*`·`@/lib/realtime/mock`·`@/lib/realtime/broadcast`(딥 임포트) | D-030 ② — 컨테이너도 배럴(`@/lib/data`, `@/lib/realtime`)만 통해 접근한다 |
+| 6 | 그 외 `src/**`(예: `app/`, `lib/actions`, `lib/utils.ts`, `hooks`, **`src/components/**`의 `.tsx`가 아닌 일반 TS 모듈** — 예: `components/shell/get-auth-session.ts`) | `src/lib/rules/**`·`src/lib/data/**`·`src/lib/realtime/**`·`src/lib/auth/**`·`src/lib/audit/**`(zone 1·2·3·7·8과 겹치지 않게), `src/components/**/*.tsx`(zone 4·5와 겹치지 않게), `lib/actions/check-handle-availability.ts`·`lib/actions/invite-crew-member.ts`(zone 6b로 이관) | Supabase 클라이언트, `@/lib/data/mock/*`·`@/lib/data/supabase/*`·`@/lib/realtime/mock`·`@/lib/realtime/broadcast`(딥 임포트), `@/lib/data`에서 `getProfileByHandle` named import(`noGetProfileByHandleFromBarrel`) | R-015 신호("컴포넌트 파일에서 Supabase 클라이언트를 직접 import") 예방을 전역 적용. `.ts` 파일은 D-030 ①의 표현/컨테이너 분리 대상이 아니므로 이 일반 규칙으로 떨어진다(3일차 프로브 검증 기록 참고). `getProfileByHandle` 제한은 I-074 — 허용된 두 진입점만 zone 6b로 예외 처리한다 |
+| 6b | `lib/actions/check-handle-availability.ts`, `lib/actions/invite-crew-member.ts` | — | zone 6과 동일(Supabase 클라이언트, mock/realtime 딥 임포트) 단 `getProfileByHandle` 제한만 제외 | I-074(21일차) — `getProfileByHandle`(익명 오라클 위험)을 호출해도 되는 실제 두 소비자만 zone 6의 새 제한에서 뺀다 |
+
+`src/lib/data/supabase/**`와 `src/lib/realtime/**`(구현체 파일)만 Supabase 클라이언트 import가 허용된다(zone 7·8은 클라이언트 팩터리 3종만 예외적으로 재사용한다).
 
 ---
 

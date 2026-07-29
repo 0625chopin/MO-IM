@@ -689,6 +689,48 @@ export const ko = {
         description: "이 기기에서 로그아웃해요. 저장된 내용은 그대로 남아 있어요.",
       },
       /**
+       * FR-072(Task 044) — 알림 환경설정. `NotificationPreferencesContainer`가 이 화면
+       * (`/settings`)에 조립한다. `typeLabels`는 `notification.messages`(토스트·알림 센터 문구,
+       * "~됐어요")를 그대로 재사용하지 않는다 — 설정 화면의 토글 라벨은 "이벤트가 이미
+       * 일어났다"가 아니라 "이 유형의 알림을 받을지"를 묻는 다른 시제·어투가 자연스럽다(§4
+       * "같은 개체라도 도메인 맥락이 다르면 공유하지 않는다").
+       */
+      notifications: {
+        heading: "알림 설정",
+        description: "이벤트 유형별로, 또는 크루별로 토스트 알림을 켜고 끌 수 있어요.",
+        typeSection: {
+          title: "이벤트 유형별 알림",
+        },
+        crewSection: {
+          title: "크루별 알림",
+          empty: "소속된 크루가 없어요",
+          /** AC2 — 크루 하나를 통째로 끄는 토글의 라벨. `{crewName}`은 컨테이너가 조립한다. */
+          muteToggleLabel: "{crewName} 알림 끄기",
+        },
+        /** AC3 — 항상 켜져 있는 두 유형(`poll_closed`·`member_removed`) 옆에 붙는 안내. */
+        mandatoryHint: "권리·의무에 영향을 주는 알림이라 끌 수 없어요",
+        typeLabels: {
+          pollClosed: "투표 종료",
+          joinRequestReceived: "가입 신청 접수",
+          joinRequestApproved: "가입 신청 승인",
+          joinRequestRejected: "가입 신청 반려",
+          invitationReceived: "크루 초대",
+          staffAppointed: "임원 임명",
+          memberRemoved: "강퇴",
+          meetupCreated: "모임 생성",
+          meetupCancelled: "모임 취소",
+          postCommented: "내 글의 새 댓글",
+          ownershipTransferred: "오너 변경",
+          crewDisbanded: "크루 해산",
+          pollWithdrawn: "제안 철회",
+        },
+        errors: {
+          updateFailed: "설정을 저장하지 못했어요. 다시 시도해 주세요",
+          forbidden: "이 알림 유형은 끌 수 없어요",
+          loadFailed: "알림 설정을 불러오지 못했어요",
+        },
+      },
+      /**
        * FR-005 회원 탈퇴(Task 039, D-010). 계정 설정 화면의 가장 아래 섹션 — 파괴적 행위라
        * 별도 다이얼로그(비밀번호 재확인)를 거친다. `blockedByOwnership`은 AC1(오너 크루 보유
        * 시 차단)의 안내 문구다.
@@ -961,6 +1003,17 @@ export const ko = {
       alreadyClosed: "이미 종료된 투표예요",
       forbidden: "조기 종료 권한이 없어요",
     },
+    /** FR-046 AC1·AC3(Task 044) — 제안 철회. `earlyClose`와 같은 Dialog 확인 형태를 쓴다. */
+    withdraw: {
+      trigger: "제안 철회",
+      confirmTitle: "이 제안을 철회할까요?",
+      confirmDescription: "철회하면 투표가 취소되고 대상자 전원에게 알림이 가요. 되돌릴 수 없어요.",
+      confirmAction: "철회하기",
+      cancelAction: "취소",
+      pending: "철회 처리 중…",
+      alreadyClosed: "이미 종료되었거나 취소된 투표예요",
+      forbidden: "철회 권한이 없어요",
+    },
   },
 
   /**
@@ -1106,6 +1159,12 @@ export const ko = {
         sendFailed: "메시지를 보내지 못했어요. 다시 시도해 주세요",
       },
     },
+    /** FR-055(Task 044) — 크루 목록의 읽지 않은 메시지 배지(`CrewCard`). 숫자 자체는 시각
+     *  장식이라 `aria-hidden`이고, 이 문구가 배지의 유일한 스크린 리더 이름이다(`a11y.
+     *  unreadCount`와 같은 원칙, 다만 "알림"이 아니라 "채팅"이라 도메인을 분리했다). */
+    unread: {
+      badgeLabel: "읽지 않은 메시지 {count}건",
+    },
   },
 
   /**
@@ -1145,6 +1204,8 @@ export const ko = {
       ownershipTransferred: "크루 오너가 바뀌었어요",
       /** FR-013 크루 해산(Task 040) — 해산 시점의 전 크루원에게 보낸다. */
       crewDisbanded: "크루가 해산됐어요",
+      /** FR-046 제안 철회(Task 044) — 진행 중 투표 대상자 전원에게 보낸다. */
+      pollWithdrawn: "제안이 철회됐어요",
     },
   },
 

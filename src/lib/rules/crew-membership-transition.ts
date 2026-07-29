@@ -1,10 +1,20 @@
 /**
  * 크루 멤버십 상태 전이 순수 함수 — Task 009B (NFR-036, R-015).
  *
- * `docs/requirements/requirements.md` 2.4절 "Crew 멤버십 상태" 다이어그램을
- * 그대로 옮긴다. 다이어그램의 각 화살표가 `TRANSITIONS`의 한 항목과 1:1
- * 대응하므로, 다이어그램이 바뀌면 이 표만 고치면 된다(그 외 로직은 표를
- * 읽기만 한다).
+ * **I-109·I-110(23일차) 정정**: 이 파일 상단 주석은 원래 `docs/requirements/requirements.md`
+ * 2.4절 다이어그램("declined/rejected/left/removed --> [*], 종결 상태, 이후 전이 없음")을
+ * 그대로 옮긴 것이었다. 그런데 DB(`crew_memberships_guard_self_transition`·
+ * `crew_memberships_extend_self_service_join_request_transitions`·
+ * `crews_guard_owner_transfer_target_active`·`invitations_provision_membership` 등,
+ * `supabase/migrations/`)는 이미 **세 종류의 "종결 상태 탈출"을 실제로 허용하고 있었다**
+ * — `{declined,rejected,left}→requested`(FR-022 자진 재신청)·`removed→active`(FR-027 E3
+ * 강퇴 해제, 오너 전용)·`{declined,rejected,left,removed}→invited`(FR-020 재초대, DESIGN이
+ * DB→모듈 방향 대조로 추가 발견). 즉 **2.4절 다이어그램 자체가 FR-020·FR-022·FR-027 E3와
+ * 모순**되고, 이 모듈("2.4절의 단일 소스"라고 스스로 선언한 곳, NFR-036)이 다이어그램
+ * 쪽을 따라가는 바람에 DB·FR과 어긋나 있었다. `requirements.md`의 다이어그램은 이번에
+ * 고치지 않는다(CORE가 같은 파일을 FR-063 건으로 동시에 고치고 있어 충돌을 피한다) —
+ * 이슈(I-110, 부분 해결)에만 기록하고 다음 회차로 넘긴다. 이 파일은 **DB가 실제로
+ * 허용하는 전이를 반영**하도록 아래처럼 갱신한다.
  *
  * ```
  * [*] --> invited   : 오너/임원이 초대 (FR-020)
@@ -12,11 +22,32 @@
  * invited --> active   : 사용자 수락 (FR-021)
  * invited --> declined : 사용자 거절 (FR-021)
  * requested --> active   : 오너/임원 승인 (FR-023)
- * requested --> rejected : 오너/임원 반려 (FR-023)
+ * requested --> rejected : 오너/임원 반려 · 본인 자진 철회 (FR-023 · FR-022 E4)
  * active --> left    : 본인 탈퇴 (FR-026)
  * active --> removed : 강퇴 (FR-027)
- * declined/rejected/left/removed --> [*] (종결 상태, 이후 전이 없음)
+ * declined/rejected/left --> requested : 본인 자진 재신청 (FR-022,
+ *   `crew_memberships_extend_self_service_join_request_transitions`·
+ *   `crew_memberships_block_removed_self_reapply` — `removed`는 이 재신청 대상에서
+ *   명시적으로 제외된다, FR-022 E3/FR-027 AC2)
+ * removed --> active : 오너의 강퇴 해제 (FR-027 E3, 오너 전용 — `crew_memberships_
+ *   guard_self_transition`의 "남의 행" 분기. role은 항상 `member`로 정규화된다,
+ *   D-002·D-067·D-068과 대칭)
+ * declined/rejected/left/removed --> invited : 오너/임원의 재초대 (FR-020,
+ *   `invitations_provision_membership`의 `ON CONFLICT ... WHERE status IN (...)` —
+ *   `src/lib/rules/invite-eligibility.ts`가 "FR-020은 FR-022 E3 같은 재초대 제한을 두지
+ *   않는다"고 이미 의도된 동작으로 문서화해 뒀다. `removed`도 배제하지 않는다 — 가입
+ *   신청과 달리 초대는 오너·임원의 명시적 의사이기 때문이다. 이 전이는 status만 바꾸고
+ *   role은 그대로다 — 그 다음 `invited→active`에서 I-107이 role을 `member`로 정규화한다)
  * ```
+ *
+ * **`isTerminalMembershipStatus`를 삭제했다(I-110, 23일차)**: 위 세 전이(재신청·강퇴 해제·
+ * 재초대)가 반영되면서 `declined`·`rejected`·`left`·`removed` 전부가 최소 하나의 outgoing
+ * 이벤트를 갖게 됐다 — "종결 상태"라는 개념 자체가 이 도메인에 더 이상 존재하지 않는다.
+ * 그 함수는 호출부가 저장소 전체에서 0건이었지만(`npx tsc --noEmit`으로 재확인), 이름이
+ * 약속하는 의미("이 상태는 종결인가")와 실제 동작(이제 항상 `false`)이 정반대가 되어
+ * 그대로 남기면 다음 개발자가 이름만 보고 잘못 쓸 위험이 이름을 지운 이익보다 컸다 — 개념이
+ * 사라졌으면 그 개념의 함수도 함께 지운다. 종결 여부가 필요하면 `isActiveMembership`(소속
+ * 여부)이나 개별 `canTransitionCrewMembership` 호출로 판단한다.
  *
  * React·Next·데이터 레이어를 import하지 않는다(zone 1). 실제 멤버십 레코드
  * 조회·갱신은 이 함수의 몫이 아니다 — 호출자(Server Action)가 현재 상태를
@@ -35,7 +66,14 @@ export type CrewMembershipEvent =
   | "approve_request"
   | "reject_request"
   | "leave"
-  | "remove";
+  | "remove"
+  // I-109(23일차) 추가 — DB가 이미 허용하던 두 탈출 전이를 반영한다(위 파일 docstring
+  // "I-109 정정" 참고). 원 2.4절 다이어그램에는 없던 이벤트라 이름도 새로 붙였다.
+  | "reapply"
+  | "reinstate"
+  // I-110(23일차, DESIGN 최종 대조로 추가 발견) — `invitations_provision_membership`의
+  // ON CONFLICT WHERE 목록이 네 상태 전부에서 재초대를 허용한다(아래 TRANSITIONS 참고).
+  | "reinvite";
 
 /**
  * 상태별 허용 이벤트 → 다음 상태. 값이 없는 이벤트(예: `declined`에서
@@ -59,13 +97,36 @@ const TRANSITIONS: Record<CrewMembershipStatus, Partial<Record<CrewMembershipEve
     leave: "left",
     remove: "removed",
   },
-  // 종결 상태 — 2.4절 다이어그램에서 모두 `--> [*]`로만 끝나고 나가는
-  // 화살표가 없다. 빈 객체 자체가 "여기서는 어떤 이벤트도 허용되지 않는다"는
-  // 뜻이라 별도 처리 없이 TRANSITIONS[status][event] 조회가 자연히 실패한다.
-  declined: {},
-  rejected: {},
-  left: {},
-  removed: {},
+  // I-109(23일차) — 아래 네 상태는 2.4절 다이어그램상 "종결"로 그려졌지만 DB는 이미
+  // 탈출 전이를 허용한다(파일 상단 docstring 참고). `removed`만 재신청 대상에서
+  // 명시적으로 제외된다(FR-022 E3/FR-027 AC2, `crew_memberships_block_removed_self_
+  // reapply`) — 강퇴자는 `reapply`가 아니라 오너의 `reinstate`로만 돌아올 수 있다.
+  //
+  // I-110(23일차, DESIGN 최종 대조) — 네 상태 전부에 `reinvite: "invited"`도 추가한다.
+  // `invitations_provision_membership`의 `ON CONFLICT ... WHERE status IN ('declined',
+  // 'rejected','left','removed')`가 이 네 상태 전부에서 재초대를 허용한다(FR-020,
+  // `src/lib/rules/invite-eligibility.ts`가 "FR-020은 FR-022 E3 같은 재초대 제한을 두지
+  // 않는다"고 이미 의도된 동작으로 문서화해 뒀다). `reapply`(본인 자진 재신청, FR-022)와
+  // 달리 `reinvite`는 오너·임원의 제3자 행위이고 `removed`도 배제하지 않는다 — 강퇴자도
+  // 초대는 다시 받을 수 있다(가입 신청과 다른 규칙, 위 참조 파일 근거). 이 전이는 status만
+  // `invited`로 바꾸고 role은 건드리지 않는다 — 그다음 `invited→active`(수락)에서 I-107이
+  // role을 `member`로 정규화하므로 안전하다.
+  declined: {
+    reapply: "requested",
+    reinvite: "invited",
+  },
+  rejected: {
+    reapply: "requested",
+    reinvite: "invited",
+  },
+  left: {
+    reapply: "requested",
+    reinvite: "invited",
+  },
+  removed: {
+    reinstate: "active",
+    reinvite: "invited",
+  },
 };
 
 /**
@@ -95,15 +156,6 @@ export function canTransitionCrewMembership(
   event: CrewMembershipEvent,
 ): boolean {
   return transitionCrewMembershipStatus(current, event) !== null;
-}
-
-/**
- * 종결 상태 — 2.4절 다이어그램에서 `--> [*]`로 끝나는 4개 상태
- * (`declined`·`rejected`·`left`·`removed`). `active`는 종결이 아니다(그 자체가
- * 계속 유지되는 정상 상태이지 최종 도착점이 아니다).
- */
-export function isTerminalMembershipStatus(status: CrewMembershipStatus): boolean {
-  return Object.keys(TRANSITIONS[status]).length === 0;
 }
 
 /** 크루 컨텍스트 권한 판정(`permission.ts`)이 "소속 중"으로 취급할 상태인지. */

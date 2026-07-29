@@ -24,7 +24,7 @@ export function NotificationCenterListContainer({
   initialNotifications,
   initialUnreadCount,
 }: NotificationCenterListContainerProps) {
-  const { notifications, unreadCount, markRead, markAllRead } = useNotificationFeed(
+  const { notifications, unreadCount, markRead, markAllRead, recordImpressions } = useNotificationFeed(
     profileId,
     initialNotifications,
     initialUnreadCount,
@@ -35,6 +35,7 @@ export function NotificationCenterListContainer({
       notifications={notifications}
       onSelect={markRead}
       onMarkAllRead={unreadCount > 0 ? markAllRead : undefined}
+      onImpression={recordImpressions}
     />
   );
 }

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import type { NotificationImpressionItem } from "@/lib/actions/record-notification-impression";
 import { strings, t } from "@/lib/strings";
 import type { Id } from "@/lib/types";
 
@@ -23,6 +24,9 @@ export interface NotificationBellProps {
   loadError?: boolean;
   onSelect?: (id: Id) => void;
   onMarkAllRead?: () => void;
+  /** NFR-030 KPI-3 분모 — `NotificationList`로 그대로 전달한다(팝오버가 열려 실제로 렌더될
+   *  때만 마운트되므로 "벨을 열어 봤다"가 곧 노출이다). */
+  onImpression?: (items: NotificationImpressionItem[]) => void;
 }
 
 /**
@@ -38,6 +42,7 @@ export function NotificationBell({
   loadError = false,
   onSelect,
   onMarkAllRead,
+  onImpression,
 }: NotificationBellProps) {
   return (
     <Popover>
@@ -75,7 +80,12 @@ export function NotificationBell({
             className="border-none shadow-none"
           />
         ) : (
-          <NotificationList notifications={notifications} onSelect={onSelect} onMarkAllRead={onMarkAllRead} />
+          <NotificationList
+            notifications={notifications}
+            onSelect={onSelect}
+            onMarkAllRead={onMarkAllRead}
+            onImpression={onImpression}
+          />
         )}
         <Separator className="mt-1" />
         <Link

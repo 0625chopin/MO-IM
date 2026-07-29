@@ -81,6 +81,13 @@ const NOTIFICATION_ROUTE_RESOLVERS: Record<NotificationType, NotificationRouteRe
   // FR-013 크루 해산(Task 040) — member_removed와 같은 이유(해산된 크루로는 더 이상 갈 수
   // 없다, D-030 ③) 크루 탐색 일반 목록으로 보낸다.
   crew_disbanded: () => CREW_EXPLORE_HREF,
+  // FR-046 철회(Task 044) — 철회된 제안글도 여전히 열람 가능하다(cancelled 상태로 상세에
+  // 남는다, `poll_closed`와 같은 이유) 게시글 상세로 보낸다.
+  poll_withdrawn: (payload) => {
+    const crewId = readResourceId(payload, "crewId");
+    const postId = readResourceId(payload, "postId");
+    return crewId && postId ? getPostDetailHref(crewId, postId) : null;
+  },
 };
 
 /**

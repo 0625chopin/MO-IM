@@ -1,10 +1,14 @@
+import type { NotificationPreferencesViewModel } from "@/components/notifications/notification-preference-view-models";
 import type { NotificationItemViewModel } from "@/components/notifications/notification-view-models";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { NotificationItem } from "@/components/notifications/NotificationItem";
 import { NotificationList } from "@/components/notifications/NotificationList";
 import { NotificationListSkeleton } from "@/components/notifications/NotificationListSkeleton";
+import { NotificationPreferencesPanel } from "@/components/notifications/NotificationPreferencesPanel";
+import { NotificationPreferencesPanelSkeleton } from "@/components/notifications/NotificationPreferencesPanelSkeleton";
 import { NotificationSimulatorPreviewContainer } from "@/components/sample/sections/NotificationSimulatorPreviewContainer";
 import { defineSection } from "@/components/sample/showcase-types";
+import { ErrorState } from "@/components/ui/error-state";
 import { strings } from "@/lib/strings";
 
 /**
@@ -62,10 +66,33 @@ const SAMPLE_LIST: NotificationItemViewModel[] = [
   }),
 ];
 
+/** `NotificationPreferencesPanel` 데모용 고정 데이터(Task 044, FR-072) — 실제
+ *  `NotificationPreferencesContainer`가 `toNotificationPreferencesViewModel`로 만드는 조인
+ *  결과 모양을 손으로 채운 것이다(`sections/poll.tsx`의 `buildPoll`과 같은 패턴). 필수 2종
+ *  (poll_closed·member_removed)은 항상 배열 맨 앞이다(컨테이너가 그렇게 조립한다). */
+function buildNotificationPreferences(
+  overrides: Partial<NotificationPreferencesViewModel> = {},
+): NotificationPreferencesViewModel {
+  return {
+    types: [
+      { type: "poll_closed", label: strings.account.settings.notifications.typeLabels.pollClosed, enabled: true, mandatory: true },
+      { type: "member_removed", label: strings.account.settings.notifications.typeLabels.memberRemoved, enabled: true, mandatory: true },
+      { type: "join_request_received", label: strings.account.settings.notifications.typeLabels.joinRequestReceived, enabled: true, mandatory: false },
+      { type: "meetup_cancelled", label: strings.account.settings.notifications.typeLabels.meetupCancelled, enabled: false, mandatory: false },
+      { type: "post_commented", label: strings.account.settings.notifications.typeLabels.postCommented, enabled: true, mandatory: false },
+    ],
+    crews: [
+      { crewId: "crew-1", crewName: "주말 러닝 크루", muted: false },
+      { crewId: "crew-3", crewName: "홈카페 취향 공유", muted: true },
+    ],
+    ...overrides,
+  };
+}
+
 export const notificationsSection = defineSection({
   id: "notifications",
   label: "알림",
-  title: "알림 — NotificationItem · NotificationList · NotificationBell · ToastHost",
+  title: "알림 — NotificationItem · NotificationList · NotificationBell · NotificationPreferencesPanel · ToastHost",
   description: (
     <>
       투표 종료·가입 신청·초대·모임 생성 등 FR-070이 정의한 대상 이벤트 10종의 토스트(FR-070)와
@@ -100,6 +127,24 @@ export const notificationsSection = defineSection({
         loading: <NotificationBell unreadCount={0} notifications={[]} isLoading />,
         empty: <NotificationBell unreadCount={0} notifications={[]} />,
         error: <NotificationBell unreadCount={0} notifications={[]} loadError />,
+      },
+    },
+    {
+      name: "NotificationPreferencesPanel",
+      note: "알림 환경설정(FR-072 AC1·AC2·AC3, Task 044). 필수 2종(투표 종료·강퇴)은 스위치가 항상 비활성 + 켬 고정입니다(AC3, 실제 방어선은 DB 가드 트리거). '빈 상태'는 소속 크루가 없어 크루별 섹션이 비는 경우, '오류'는 저장 실패 시 표시되는 인라인 오류(실제로는 토글 실패 후 로컬 상태가 되돌아가며 함께 뜬다 — /sample은 클로저로 재현할 수 없어 ErrorState 원자로 정적 재현합니다, JoinRequestPanel과 같은 이유).",
+      panels: {
+        default: <NotificationPreferencesPanel viewModel={buildNotificationPreferences()} />,
+        loading: <NotificationPreferencesPanelSkeleton />,
+        empty: <NotificationPreferencesPanel viewModel={buildNotificationPreferences({ crews: [] })} />,
+        error: (
+          <div className="flex flex-col gap-3">
+            <NotificationPreferencesPanel viewModel={buildNotificationPreferences()} />
+            <ErrorState
+              title={strings.error.conflict.title}
+              description={strings.account.settings.notifications.errors.updateFailed}
+            />
+          </div>
+        ),
       },
     },
     {

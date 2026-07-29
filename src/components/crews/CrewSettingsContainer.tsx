@@ -59,7 +59,7 @@ export async function CrewSettingsContainer({ crewId }: { crewId: Id }) {
   const canDisband = checkPermission({ role, action: "crew:disband" }).allowed;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-4 sm:p-6">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 p-4">
       <header className="flex flex-col gap-1">
         <h1 className="font-heading text-lg font-medium text-foreground">{strings.crew.settings.title}</h1>
         <p className="text-sm text-muted-foreground">{strings.crew.settings.description}</p>

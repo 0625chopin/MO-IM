@@ -9,6 +9,7 @@ import {
   Mail,
   MessageSquare,
   ShieldCheck,
+  Undo2,
   UserCheck,
   UserMinus,
   UserPlus,
@@ -39,6 +40,8 @@ const NOTIFICATION_ICONS: Record<NotificationType, LucideIcon> = {
   // FR-025·FR-013(Task 040) — 오너 이양·크루 해산.
   ownership_transferred: Crown,
   crew_disbanded: Archive,
+  // FR-046(Task 044) — 제안 철회.
+  poll_withdrawn: Undo2,
 };
 
 export interface NotificationItemProps {

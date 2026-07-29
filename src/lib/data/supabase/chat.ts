@@ -156,6 +156,55 @@ export async function sendMessage(input: SendMessageInput): Promise<DataResult<C
   return ok(toChatMessage(data));
 }
 
+/**
+ * 읽지 않은 메시지 수(FR-055 AC1). `chat_room_reads`에 아직 행이 없으면(가입 이후 한 번도
+ * 안 읽음) `last_read_at`을 "태초"로 취급해 본인이 보내지 않은 전체 메시지를 센다. 본인이 보낸
+ * 메시지는 세지 않는다(전송 시점에 이미 화면에 보여 "안읽음"이 아니다) — `head:true`로 행
+ * 전송 없이 개수만 받는다(`countUnreadNotifications`와 같은 패턴).
+ */
+export async function getUnreadMessageCount(roomId: Id, profileId: Id): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: readRow, error: readError } = await supabase
+    .from("chat_room_reads")
+    .select("last_read_at")
+    .eq("room_id", roomId)
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  let query = supabase
+    .from("chat_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("room_id", roomId)
+    .neq("sender_id", profileId)
+    .is("deleted_at", null);
+  if (readRow?.last_read_at) {
+    query = query.gt("created_at", readRow.last_read_at);
+  }
+
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/**
+ * 읽음 지점 갱신(FR-055 AC2). `chat_room_reads_insert_self_member`·`..._update_self_member`
+ * RLS가 "본인 + 그 방이 속한 크루의 활성 크루원"만 허용한다 — 비소속자가 임의 roomId로 호출하면
+ * upsert 자체가 RLS 위반으로 실패해 예외가 던져진다(방어적 — 호출부는 이미 크루원인 화면에서만
+ * 부른다). 실패해도 사용자 경험을 막을 이유가 없는 배경 쓰기라 `DataResult`로 감싸지 않는다
+ * (`markNotificationRead`와 달리 "본인 소유 아님" 같은 사용자에게 보여줄 도메인 오류가 없다 —
+ * 있다면 그건 버그다).
+ */
+export async function markRoomRead(roomId: Id, profileId: Id): Promise<void> {
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("chat_room_reads").upsert(
+    { room_id: roomId, profile_id: profileId, last_read_at: new Date().toISOString() },
+    { onConflict: "room_id,profile_id" },
+  );
+  if (error) throw error;
+}
+
 /** 메시지 삭제(FR-054, v0.2) — 소프트 삭제. `chat_messages_guard_delete_only` 트리거가
  *  `deletedAt` 외 컬럼 변경을 전원(발신자 포함)에게 막는다. */
 export async function deleteMessage(id: Id): Promise<DataResult<ChatMessage>> {

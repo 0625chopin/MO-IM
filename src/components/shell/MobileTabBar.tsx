@@ -13,11 +13,16 @@ import { getAccountNavItems, getPrimaryNavItems, type NavItem } from "./nav-item
 import type { AuthSession } from "./auth-session";
 
 /**
- * 360px 뷰포트(NFR-026)의 1차 내비게이션. `md` 이상에서는 `HeaderNav`가 같은 정보를 인라인
- * 링크로 이미 보여주므로 숨긴다(`md:hidden`) — 항목을 두 군데서 중복 렌더링하지 않는다.
- * 그 `md:`는 이제 **뷰포트가 아니라 앱 프레임 폭** 기준이다(`globals.css`의 `@custom-variant`
- * 블록) — 프레임이 430px로 묶여 있는 한 이 탭바는 넓은 화면에서도 계속 보이고, `HeaderNav`의
- * 인라인 링크는 계속 숨는다. 즉 대화면에서도 내비게이션은 한 벌만 남는다.
+ * 360/768/1280px(NFR-026)의 1차 내비게이션 — **세 폭 전부에서**, `AppShell`의 `docstring`이
+ * 정리하듯(I-099·D-066, 23일차) 유일한 1차 내비게이션이다. `md:hidden`이 붙어 있어 `HeaderNav`가
+ * 같은 정보를 인라인 링크로 보여줄 "때"만 숨는 것처럼 읽히지만, 그 `md:`는 이제 **뷰포트가
+ * 아니라 앱 프레임 폭** 기준이고(`globals.css`의 `@custom-variant` 블록) 프레임이 430px에
+ * 하드캡돼 있어 `md:`(48rem=768px)에 영원히 닿지 않는다 — 이 탭바는 **항상** 보이고
+ * `HeaderNav`의 인라인 링크는 **항상** 숨는다. D-066이 이걸 "고쳐야 할 버그"가 아니라 "이
+ * 제품은 항상 모바일 폭 프레임 하나만 쓴다"는 의도된 동작으로 확정했으므로, 대화면에서도
+ * 내비게이션은 이 탭바 한 벌만 남는 것이 맞는 상태다. 이전 버전의 이 docstring은 이 사실을
+ * `AppShell.tsx`의 (그때는 틀렸던) "데스크톱은 HeaderNav가 맡는다" 서술과 모순되는 채로 방치해
+ * 뒀었다 — 두 파일은 이제 같은 사실을 말한다. 근거·실측: `docs/decisions/appframe-responsive-audit-099.md`.
  *
  * **`fixed`라서 폭을 직접 프레임에 맞춰야 한다.** `fixed`의 containing block은 뷰포트다. 프레임의
  * `@container/appframe`이 이걸 바꿔 주지 않는다 — `container-type: inline-size`가 fixed 자손의

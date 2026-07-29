@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { recordCrewSearchEventAction } from "@/lib/actions/record-crew-search-event";
 import { CREW_CATEGORIES } from "@/lib/rules/crew-category";
 import { validateCrewSearchQuery } from "@/lib/rules/crew-search-query";
 import { strings } from "@/lib/strings";
@@ -64,6 +65,15 @@ export function CrewSearchBar({ initialQuery, initialCategory }: CrewSearchBarPr
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!validation.valid) return;
+    const trimmed = query.trim();
+    // NFR-030 KPI-5 분모 — 실제 키워드 검색 제출만 기록한다(카테고리만 바꾸는
+    // `handleCategoryChange`는 "검색"이 아니라 "필터"라 여기서 부르지 않는다). 결과를
+    // 기다리지 않는다 — 실패해도 검색/이동을 막을 이유가 없다(fire-and-forget).
+    if (trimmed) {
+      void recordCrewSearchEventAction(trimmed, initialCategory).catch(() => {
+        // 관측 실패는 조용히 무시한다 — `recordProductEvent`가 이미 내부에서 로깅한다.
+      });
+    }
     navigate(query, initialCategory);
   }
 

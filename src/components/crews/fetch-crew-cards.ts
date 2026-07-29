@@ -1,6 +1,8 @@
 import { toCrewCardViewModel, type CrewCardViewModel } from "@/components/crews/crew-explore-view-models";
 import {
+  getChatRoomByCrewId,
   getPublicCrewMemberCount,
+  getUnreadMessageCount,
   listCrewMembers,
   listCrews,
   listCrewsByProfile,
@@ -45,7 +47,16 @@ export async function fetchCrewCardsPage(
       const memberCount = isMember
         ? (await listCrewMembers(crew.id)).filter((m) => isActiveMembership(m.status)).length
         : await getPublicCrewMemberCount(crew.id);
-      return toCrewCardViewModel(crew, memberCount, isMember);
+      // FR-055 AC1 — 비소속자는 채팅방 접근 권한이 없어(FR-050 AC3) 조회 자체를 생략한다.
+      // `query.viewerProfileId`가 없으면(비로그인) 세어 줄 "내 읽음 지점"이 없어 마찬가지로
+      // 0으로 둔다.
+      const viewerProfileId = query.viewerProfileId;
+      let unreadMessageCount = 0;
+      if (isMember && viewerProfileId) {
+        const room = await getChatRoomByCrewId(crew.id);
+        unreadMessageCount = room ? await getUnreadMessageCount(room.id, viewerProfileId) : 0;
+      }
+      return toCrewCardViewModel(crew, memberCount, isMember, unreadMessageCount);
     }),
   );
 

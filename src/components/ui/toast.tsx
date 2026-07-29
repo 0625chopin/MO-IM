@@ -99,8 +99,17 @@ function ToastViewport({ className, ...props }: ToastPrimitive.Viewport.Props) {
   return (
     <ToastPrimitive.Viewport
       data-slot="toast-viewport"
+      // shadcn 기본값의 `sm:inset-x-auto sm:right-4`(넓은 화면에서 우하단 고정)는 I-099
+      // 전수 조사(CORE, 23일차)로 제거했다 — `<Toaster />`는 `src/app/layout.tsx`에서
+      // `AppShell`의 **형제**로 렌더된다(자손이 아니다), 즉 `appframe` 컨테이너가 DOM
+      // 트리 어디에도 조상으로 없다. `globals.css`가 재정의한 `sm:`은 그 컨테이너를 찾는
+      // 조건이라 프레임 폭과 무관하게 항상 꺼져 있었다(`DialogFooter` 주석과 같은 원인).
+      // 실제로는 오히려 이게 맞는 동작이다 — 이 앱은 넓은 화면에서도 중앙의 모바일 폭
+      // 프레임 하나만 보여주므로(D-066), 토스트가 프레임과 무관하게 브라우저 우하단
+      // 모서리에 붙으면 "프레임 밖에 뜬 이질적인 배너"로 보인다. 지금처럼 가운데
+      // 하단(프레임과 같은 중심선)에 고정되는 편이 제품 정체성과 맞는다.
       className={cn(
-        "fixed inset-x-4 bottom-4 z-50 mx-auto flex w-auto max-w-sm flex-col gap-2 outline-none sm:inset-x-auto sm:right-4",
+        "fixed inset-x-4 bottom-4 z-50 mx-auto flex w-auto max-w-sm flex-col gap-2 outline-none",
         className,
       )}
       {...props}

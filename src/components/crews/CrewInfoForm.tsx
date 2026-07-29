@@ -155,7 +155,7 @@ export function CrewInfoForm({
       )}
 
       <FieldContent>
-        <Button type="submit" disabled={isPending} className="w-full sm:w-auto">
+        <Button type="submit" disabled={isPending} className="w-full">
           {isPending && <Loader2Icon aria-hidden="true" className="animate-spin" />}
           {state.success && !isPending && <CheckCircle2Icon aria-hidden="true" />}
           {isPending

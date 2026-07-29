@@ -135,15 +135,25 @@ export interface CreateMeetupFromPollInput {
 }
 
 /**
- * 가결 Meetup 자동 등록(FR-060). `meetups_insert_proposal_author_or_staff` RLS가 제안자
- * 본인 또는 임원 이상만 허용한다 — 호출자(Server Action, 종료 트리거 문맥)가 이미 그 역할로
- * 실행 중이라는 전제(Mock과 동일하게 이 함수는 가결 여부를 재판정하지 않는다).
+ * 가결 Meetup 자동 등록(FR-060). **Task 034(20일차)부터 실제 프로덕션 경로는 이 함수가
+ * 아니다** — Meetup 생성은 `public.finalize_closed_poll`(DB AFTER UPDATE 트리거, SECURITY
+ * DEFINER, 테이블 소유자 `postgres` 권한으로 실행되어 RLS·GRANT 둘 다 우회)이 담당한다
+ * (`docs/decisions/poll-pipeline-034.md`). 이 TS 함수는 현재 아무도 호출하지 않는다(grep
+ * 확인).
  *
- * **Task 034(20일차)부터 실제 프로덕션 경로는 이 함수가 아니다** — Meetup 생성은
- * `public.finalize_closed_poll`(DB AFTER UPDATE 트리거, SECURITY DEFINER, RLS 우회)이
- * 담당한다(`docs/decisions/poll-pipeline-034.md`). 이 TS 함수는 현재 아무도 호출하지
- * 않는다(grep 확인) — RLS를 우회하지 않는 별도 호출부가 필요해지면(예: 관리자 수동 보정
- * 도구) 그때 다시 쓰일 수 있어 남겨 뒀다.
+ * **I-101(22일차, CRITICAL) 이후로 이 함수는 세션 클라이언트로 호출하면 항상 실패한다.**
+ * `meetups_insert_proposal_author_or_staff` RLS(제안자 본인 또는 임원 이상만 허용)가 poll의
+ * 상태(`status`)를 전혀 검사하지 않아, 제안 작성자는 자기 poll이 열려 있든·부결됐든·철회됐든
+ * 상관없이, staff/owner는 **아무 poll_id**(심지어 다른 크루의 poll)로도 Meetup을 위조해 INSERT
+ * 할 수 있었다(실 REST로 재현 확인, `docs/decisions/meetups-insert-bypass-101.md`). D-003
+ * "Meetup은 오직 투표로만 확정된다"·FR-060 "행위자: 시스템"에 staff/owner의 수동 생성 같은
+ * 예외가 없음을 요구사항 원문으로 재확인했고, 이 RLS 자체가 결함이라 고칠 수 없었다(패치할
+ * 조건을 더 얹는 대신 I-090과 같은 원칙 — 클라이언트 직접 쓰기를 전면 금지). 마이그레이션
+ * `major_fix_i101_meetups_direct_insert_bypass`가 `anon`·`authenticated`의 INSERT/DELETE/
+ * TRUNCATE 권한 자체를 회수하고 이 RLS 정책을 삭제했다 — **이 함수를 되살리려면 세션
+ * 클라이언트가 아니라 service-role 클라이언트(또는 이 함수 자체를 SECURITY DEFINER RPC로
+ * 재작성)가 필요하다.** "RLS를 우회하지 않는 별도 호출부"라는 원래의 존재 이유는 이제
+ * 성립하지 않는다.
  */
 export async function createMeetupFromPoll(input: CreateMeetupFromPollInput): Promise<Meetup> {
   const supabase = await createSupabaseServerClient();

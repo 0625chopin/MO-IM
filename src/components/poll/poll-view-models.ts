@@ -57,4 +57,7 @@ export interface PollViewModel {
   viewer: PollBallotViewer;
   /** `poll:close_early` 판정 결과(제안자 본인 또는 임원 이상). */
   canCloseEarly: boolean;
+  /** FR-046 AC1(Task 044) — 철회 권한. `poll:close_early`와 대상이 완전히 같아(제안자 본인
+   *  또는 임원 이상, NFR-036) 같은 판정 결과를 공유한다. */
+  canWithdraw: boolean;
 }
