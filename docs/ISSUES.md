@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-093** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
+- **다음 이슈 번호: I-100** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-0" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다)
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
 - **새 이슈는 상태와 무관하게 파일 맨 끝(아래 "이슈 기록" 절의 마지막)에 번호순으로 붙인다.** 절 제목을 보고 "열린 이슈" 절에 넣지 않는다 — 그 절은 **외부 입력(고객 답변·요금제 선정 등)을 기다리는 초기 미결 4~11건만 남은 역사적 구획**이고, I-027 이후는 전부 아래 시간순 기록에 쌓여 있다. **각 이슈가 열렸는지 닫혔는지는 절 위치가 아니라 항목 안의 `상태` 필드가 단일 소스다.** (18일차에 한 팀원이 절 제목을 그대로 믿고 열린 이슈를 위쪽 절에 등재해 30건 넘는 기존 항목과 어긋났다 — 팀장이 옮기고 이 규칙을 명시했다.)
@@ -40,21 +40,22 @@
 
 ### I-017 · Supabase 요금제를 확정해야 한다
 
-- **상태**: 열림
+- **상태**: 해결됨(22일차, BOARD, Task 037)
 - **영역**: 인프라
 - **제보**: prd-validator (2026-07-23)
 - **내용**: 실측 한도는 동시 연결 Free **200** / Pro **500** / Pro(지출 상한 해제) **10,000** 이다. **NFR-006의 "전체 1,000세션"은 앞의 둘을 초과**하므로 Pro + 지출 상한 해제 이상을 전제한다. 문서 어디에도 요금제가 적혀 있지 않다. NFR-006이 C·v1.0 등급이라 v0.2까지는 Free/Pro로 진행 가능하나, **v0.2 실측 시점에 200/500 한도에 걸리는지 확인**해야 한다.
 - **영향**: NFR-003·006·007, R-011, D-023. 비용이 걸린 결정이라 기술만으로 정할 수 없다.
-- **후속**: 확정되면 D-\* 로 승격. **I-018과 함께 판단해야 한다** — 팬아웃 계수에 따라 필요한 요금제가 달라진다.
+- **후속**: **D-057로 확정** — 연결 상한(사용량 무관, 순수 산술)과 실측 팬아웃 계수(I-018, N+1)를 결합한 초당 메시지 처리량 계산 둘 다 **Pro(지출 상한 해제)만 NFR-006을 충족**함을 보였다. **월간 메시지 과금(변동비)은 실 트래픽이 없어 이번에 확정하지 않았고, 실제 현재 요금제(대시보드 전용 조회)도 이 세션의 MCP 도구로는 확인하지 못했다** — 두 잔여 항목은 I-094로 남긴다. 근거: `docs/decisions/concurrency-load-037.md` §5.
+- **재현 검증**: NFR-006이 요구하는 "크루당 100세션" 정확히 그 값으로 실제 채팅 팬아웃 부하(N=100 소켓, 실 계정 JWT 재사용)를 실측했다(I-018 참고) — 100/100 수신, p95 71.5ms.
 
 ### I-018 · Realtime 팬아웃 계수를 실측해야 한다
 
-- **상태**: 열림
+- **상태**: 해결됨(22일차, BOARD, Task 037)
 - **영역**: 기술
 - **제보**: prd-validator (2026-07-23)
 - **내용**: Supabase 공식 quotas 문서가 "이벤트 = 클라이언트에게 전달되거나 클라이언트가 보낸 WebSocket 메시지"라고만 정의하고, **브로드캐스트 1건을 구독자 N명에게 보낼 때 1로 세는지 N으로 세는지 명시하지 않는다.** N으로 센다면 Pro(초당 500)에서 100명 방의 채팅이 **초당 5건**이 상한이 되어 용량 계획이 20배 달라진다.
 - **영향**: D-023, NFR-003·006, R-011, **R-019**. I-017의 요금제 판단이 이 값에 종속된다.
-- **후속**: 해소 방법 — ① Supabase 대시보드 **Project Settings > Product Reports > Realtime** 에서 소규모 부하로 실측 ② Supabase 지원팀 문의(공식 문서가 Postgres Changes 항목에서 직접 권하는 경로). MO-IM 프로젝트가 초기화되어(**D-037**) 실측을 막던 선행 조건은 해소됐다.
+- **후속**: **공식 문서로 확정 + 실측으로 재확인했다.** [Manage Realtime Messages usage](https://supabase.com/docs/guides/platform/manage-your-usage/realtime-messages)가 "Broadcast: 1건을 N명이 구독하면 1(발신)+N(수신) = N+1 메시지"라고 명시한다(질문에 있던 "1로 세는지 N으로 세는지"의 답은 "N+1"). 크루 채팅 토픽에 실 구독 소켓 N=10/30/60/100을 열고 실 INSERT 1건을 브로드캐스트해 재확인 — 전부 N/N 수신 성공, 지연 p95 66~72ms(NFR-003 1초 목표 대비 큰 여유), 쿼터 초과 에러(`get_logs`) 없음. 해소 방법 ①(대시보드 소규모 부하 실측)을 스크립트 기반 직접 부하로 대체 수행, ②(지원팀 문의)는 필요 없었다(문서가 이미 명시적). 근거: `docs/decisions/concurrency-load-037.md` §1·§3.
 
 ### I-019 · 팀 규모가 미정이라 일정을 산출할 수 없다
 
@@ -2856,7 +2857,13 @@
 
 ### I-088 · `CONVENTIONS.md`에 `eslint.config.mjs` zone 1~8 전체를 정리한 표가 없다 — 신설 zone이 등재 없이 늘어나는 관행
 
-- **상태**: 열림 — 다음 회차 후보(21일차 지시로 이번 회차 범위 확대 보류)
+- **상태**: **해결됨(2026-07-29, CREW 22일차)** — `docs/CONVENTIONS.md` "ESLint로 강제하는
+  것" 절의 표를 zone 1·2·3·4·5·6·6b·7·8 전체(9개 블록)로 다시 작성했다. `eslint.config.mjs`
+  실제 정의를 대조해 zone 3(`noProfileHandleOracleRelative`, I-074)·zone 6→6/6b 분리·zone
+  7·8 신설분을 전부 반영했다. `eslint.config.mjs` 상단 주석에 "새 zone을 추가·변경하면 이
+  표도 같은 커밋에서 갱신한다"는 규약 한 줄을 추가해 재발을 막는다(아래 "후속" 제안 그대로
+  채택). `npm run lint`·`npx tsc --noEmit` 통과(문서·주석만 변경, 규칙 자체는 무변경이라
+  회귀 없음).
 - **영역**: 문서 / 빌드
 - **제보**: DESIGN (2026-07-26, 21일차 — CORE의 I-074 major 수정 교차검증 중 발견, 팀장이
   다음 회차 후보로 등재만 지시)
@@ -3090,8 +3097,8 @@ finalize_closed_poll`(AFTER UPDATE)을 통해 **전혀 다른 테이블(`meetups
 | `join_requests` | `requester_id=auth.uid()` | **RLS `WITH CHECK` 자체**(`status='withdrawn'`만 허용) | AFTER 트리거(`sync_membership_on_decision`, approved/rejected 시) | **I-085로 이번에 고침 — 전엔 WITH CHECK가 상태값을 전혀 제한하지 않아 자가 승인 가능했다** |
 | `polls` | 제안자(`post.author_id=auth.uid()`) | 전무 → **BEFORE 트리거 신설**(`polls_guard_decision_integrity`, 재계산 후 덮어쓰기) | **AFTER 트리거(`finalize_closed_poll`) — `meetups` 실제 생성까지 캐스케이드** | **I-089로 이번에 고침(CRITICAL)** |
 | `meetup_attendances` | `profile_id=auth.uid()` | 전무 → CORE가 이번 회차에 고침 | 없음(`meetups.attending_count`는 직접 안 건드림) | **I-090으로 이번에 고침** |
-| `invitations` | `invitee_id=auth.uid()` | **전무, BEFORE 트리거 없음(확인함 — `pg_trigger` 조회 결과 AFTER 트리거 2개뿐)** | AFTER 트리거(`sync_membership_on_response`) | **미수정 — 코드 리뷰만 했고 실제 익스플로잇 재현은 안 함(시간 제약). 다음 회차 1순위 후보.** 최악의 경우를 추정하면: invitee가 `status`를 `pending`/`accepted`/`declined` 사이에서 임의로 반복 전환해 `crew_memberships` 동기화를 계속 재발화시킬 수 있어 보인다(CHECK 제약이 값 집합은 `pending`/`accepted`/`declined`/`expired` 4개로 막아 두지만, "한 번 응답하면 끝"이라는 FR-021의 암묵적 전제를 컬럼 값 자체는 강제하지 않는다) — `polls`·`meetup_attendances`만큼 심각하지 않아 보이지만 **미실측**이다. |
-| `notification_preferences` | `profile_id=auth.uid()` | 전무 | 없음 | **의도적으로 손 안 댐** — 개인 알림 수신 설정값이라 비즈니스 불변식이 아니다(본인이 자기 알림 설정을 뭘로 바꾸든 다른 사용자·크루에 영향이 없다). 이 범주의 "위험 낮음" 대조군으로만 기록. |
+| `invitations` | `invitee_id=auth.uid()` | **BEFORE 트리거 신설(`invitations_guard_response_transition`)** — 이전엔 전무했다(확인함 — `pg_trigger` 조회 결과 AFTER 트리거 2개뿐) | AFTER 트리거(`sync_membership_on_response`) | **I-093으로 이번 회차에 실제로 익스플로잇 재현 후 수정(22일차, CREW).** 반복 status 플립(accepted↔declined)은 `crew_memberships` 쪽 `where status='invited'` 가드가 우연히 재승격까지는 막았지만, **만료된 `pending` 초대를 invitee가 직접 accept하는 경로(FR-021 E1 미강제)와 staff/owner가 타인 초대를 동의 없이 강제 accept하는 경로("본인" 원칙 미강제) 둘 다 실제로 `crew_memberships`를 `invited`→`active`로 전이시킴을 실측 확인**(다운스트림 캐스케이드 실증, MAJOR 판정) — SQL 시뮬레이션과 실 로그인 토큰의 실 REST `curl` 호출 둘 다로 재현·수정 검증. 근거: `docs/decisions/invitations-self-service-i091.md`. |
+| `notification_preferences` | `profile_id=auth.uid()` | **BEFORE INSERT OR UPDATE 트리거 신설**(`notification_preferences_guard_mandatory_types`) — `poll_closed`·`member_removed` 2종의 `enabled=false`만 차단(INSERT·UPDATE 둘 다), 나머지 11종은 여전히 무제한 | 없음 | **D-063으로 이번 회차에 부분 수정(CORE, Task 044, FR-072 AC3)** — 원 판정("의도적으로 손 안 댐, 위험 낮음")은 FR-072 AC3("투표 종료·강퇴 알림은 끌 수 없다")가 생기기 전 시점의 것이었다. AC3 이후 이 두 타입만 "권리·의무에 영향을 주는 필수 알림"으로 바뀌어 원 전제가 깨진다 — `begin…rollback`으로 수정 전 무제한(성공)·수정 후 차단(INSERT·UPDATE 둘 다 예외) 실측. **나머지 11종은 원 판정이 여전히 유효**(개인 설정값, 다른 사용자·크루에 영향 없음)해 그대로 무제한으로 둔다. |
 
 #### 후속(다음 회차 지침)
 
@@ -3176,3 +3183,444 @@ finalize_closed_poll`(AFTER UPDATE)을 통해 **전혀 다른 테이블(`meetups
   재검토 대상이다 — 다른 유사 가드들(`profiles_guard_self_status_transition` 등)은 대부분
   INVOKER지만, 이 함수처럼 **가드 로직 자체가 다른 테이블의 RLS 가시성에 의존하는 경우**는
   SECURITY DEFINER로 바꿔 "우연한 방어"를 "의도된 방어"로 바꾸는 것이 안전하다.
+
+### I-093 · `invitations` UPDATE가 self-service 컬럼값을 전혀 제한하지 않아 만료된 초대 accept·타인 초대 강제 승인이 가능했다 — I-091 표의 `invitations` 행 해소
+
+- **상태**: **해결됨(2026-07-29, CREW 22일차)** — 마이그레이션
+  `major_fix_i091_invitations_response_transition_guard`. I-091이 "전무 + 미수정 + 미실측"으로
+  남겨 둔 `invitations` 행을 실제로 익스플로잇 재현(SQL 시뮬레이션 + 실 REST `curl` 직접 호출)
+  하고 고쳤다.
+- **영역**: 데이터 / 보안 — RLS·트리거 설계 (I-091 결함군)
+- **제보**: CREW (2026-07-29, 22일차 — 팀장이 I-091 후속 1순위로 지정한 조사)
+- **내용**: `invitations_update_invitee_or_staff` RLS(`invitee_id=auth.uid() OR staff/owner`)는
+  행 소유권만 확인하고 컬럼값은 전혀 제한하지 않았다. BEFORE UPDATE 트리거가 없어 `status`를
+  포함한 모든 컬럼을 self-service로 임의 변경할 수 있었다. 실측(전부 `begin`…`rollback`,
+  일부는 실 로그인 토큰으로 실 REST `curl` 직접 호출)으로 확인한 것:
+  1. 이미 `accepted`한 초대를 `declined`로 self-flip하면 `invitations.status`는 바뀌지만
+     `crew_memberships.status`는 그대로 `active`로 남아 **감사 기록이 실제 멤버십과 어긋난다**
+     (다운스트림 `sync_membership_on_response` 트리거의 `where status='invited'` 가드가
+     우연히 재승격은 막아 준다 — 그러나 상태 위조 자체는 성공한다).
+  2. `declined`→`accepted` self-flip도 같은 이유로 `invitations` 테이블 상태는 위조되지만
+     실제 `crew_memberships` 재입장까지는 이어지지 않았다(우연한 방어).
+  3. **`expires_at`이 지난 `pending` 초대를 invitee가 직접 `accepted`로 UPDATE하면 실제로
+     `crew_memberships`가 `invited`→`active`로 전이된다** — FR-021 E1("만료된 초대 처리
+     불가")이 앱 레이어(`evaluateInvitationResponseEligibility`)에만 있고 DB가 독립 강제하지
+     않아 REST 직접 호출로 뚫린다. 실측 중 유일하게 실제 멤버십 상태가 바뀐 케이스.
+  4. **staff/owner가 대상자(invitee) 동의 없이 남의 pending 초대를 `accepted`로 강제
+     전이시킬 수 있었다** — RLS 주석("초대 수락·거절(FR-021, **본인**) + 임원 이상의
+     취소/관리")이 명시한 "본인" 원칙이 실제로는 강제되지 않았다. 실측으로 `crew_memberships`가
+     실제 `active`로 전이됨을 확인.
+  5. 부수로, invitee가 `status`는 그대로 두고 `expires_at`만 미래로 self-service 연장할 수
+     있었다(1회성 초대의 유효기간을 스스로 무한 연장).
+- **FR-021 원문 재확인**: BOARD가 "암묵적 전제"라 불렀던 "한 번 응답하면 끝"은 실제로는 AC2
+  ("거절 후 재도전은 **새 초대 행 생성**"), 행위자 정의("초대받은 회원", 단수), E1("만료된
+  초대 처리 불가")에서 도출되는 **명시 요구사항**이었다.
+- **영향**: MAJOR로 판정(중간 — CRITICAL은 아님). 다운스트림 캐스케이드가 실제로 발동해
+  I-091의 심각도 기준을 충족하지만(3, 4번), 공격 표면이 "임의의 제3자가 아무 크루나 뚫는다"가
+  아니라 "이미 지정된 invitee 본인이 유효기간 제약만 우회"(3) 또는 "이미 신뢰된 그 크루의
+  staff/owner가 동의 절차를 생략"(4)로 한정된다.
+- **수정**: BEFORE UPDATE 트리거 `invitations_guard_response_transition`(SECURITY DEFINER,
+  client EXECUTE 회수, 21일차 `reports_guard_self_update_reason_only`·`crew_memberships_
+  guard_self_transition`과 동일 패턴) — ① `status` 외 컬럼은 전혀 변경 불가 ② `status` 전이는
+  `pending`→`accepted`\|`declined` 단 한 번만 허용 ③ 그 전이의 행위자는 반드시
+  `auth.uid()=old.invitee_id`(본인)여야 함 ④ `old.expires_at<=now()`면 거부. `pg_trigger_
+  depth()>1`(향후 시스템 경로) 또는 `auth.uid() is null`(service_role)은 통과(기존 컨벤션과
+  동일).
+- **재현 검증**: SQL 시뮬레이션 7개 시나리오 전부 기대 일치(회귀 2건 성공·공격 5건 거부) +
+  실 로그인 토큰으로 `curl` 직접 REST 호출(앱 서버 액션 미경유) 재현 — 정상 accept는 `200`,
+  직후 `declined` self-flip 시도는 `400 P0001 invitations: only a pending invitation may be
+  responded to (FR-021)`로 DB가 독립 거부함을 확인. 테스트로 생성된 실 데이터(`invitations`
+  행·`crew_memberships` active 행)는 직접 DELETE로 정리했다.
+- **advisors**: `get_advisors(security)` 신규 WARN 0건(기존 `auth_leaked_password_protection`
+  1건만 남음, 무관한 기존 항목). `npx tsc --noEmit` clean(TS 코드 무변경).
+- **미확인**: 실 브라우저 클릭 검증(Playwright 세션 공유 제약, 다른 회차와 같은 한계).
+  `invitations_update_invitee_or_staff` RLS의 staff/owner OR-분기는 이번 트리거로 사실상 죽은
+  코드가 됐지만 RLS 자체는 정리하지 않았다(동작 위험 없음, 별도 청소로 남김).
+- **근거**: `docs/decisions/invitations-self-service-i091.md`, `docs/prioritization-and-risks.md`
+  D-056. I-091 표의 `invitations` 행 갱신.
+
+### I-094 · Task 037이 남긴 잔여 — 월간 Realtime 메시지 과금 추정치·실제 요금제 확인은 미실측
+
+- **상태**: 열림 — 다음 회차(043B, NFR-006 몫) 참고
+- **영역**: 인프라 / 비용
+- **제보**: BOARD (2026-07-29, 22일차 — Task 037, I-017 확정 작업 중 의도적으로 미확정 처리)
+- **내용**: I-017을 D-057(Pro 지출 상한 해제로 확정)로 닫으면서 두 항목을 정직하게 미확정으로
+  남겼다. ① **월간 메시지 과금 쿼터**(Pro 500만 건/월) 대비 실제 사용량 — 실 트래픽 패턴이
+  없어 가정 기반 추정(`concurrency-load-037.md` §5.3, 크루 10개·활성 10시간/일 가정 시
+  약 1,818만 건/월로 쿼터 초과 가능성)만 냈고, 확정하지 않았다. ② **현재 프로젝트가 실제로
+  어느 요금제인지** — 이 세션에 노출된 Supabase MCP 도구(`get_advisors`·`get_logs`·
+  `list_tables`·`execute_sql` 등)에는 결제 플랜을 조회하는 도구가 없어 확인하지 못했다.
+  N=100 연결·부하 시험이 성공했다는 사실은 Free(200)·Pro(500) 어느 쪽 한도 안에도 들어가는
+  값이라 플랜을 특정하지 못한다.
+- **영향**: NFR-006, D-057. 연결·처리량 요건(요금제 선택 자체)은 D-057로 이미 확정됐으므로
+  이 이슈가 막는 것은 "정확한 월간 비용 산정"과 "실제 업그레이드 집행 여부 확인"뿐이다.
+- **후속**: v0.2 이후 실 트래픽이 쌓이면 Realtime Reports(`Project Settings > Product Reports
+  > Realtime`, `search_docs`로 확인한 공식 경로)로 재계산한다. 실제 요금제 전환(Free/Pro →
+  Pro 지출 상한 해제)은 대시보드 Billing에서 운영자가 수동으로 확인·집행해야 한다(MCP로 할
+  수 없는 대시보드 전용 설정 — SMTP 공급자 확정 때의 I-016과 같은 유형의 잔여).
+
+### I-095 · `(app)` 인증 가드 미통과 요청이 HTTP 200 + 콘솔 `assertAuthenticatedSession` 예외로 응답한다 — 화면은 정확하지만 상태 코드·로그가 이상하다
+
+- **상태**: 열림 — **원인 규명 완료, 수정은 이번 회차 범위 밖으로 보류**(CORE, 22일차 —
+  아래 두 번째 "원인 조사" + "판정" 절 참고). HTTP 200 자체는 D-040/D-048과 같은 뿌리(승인된
+  편차)이고, 콘솔 예외는 그와 별개인 Next 16 병렬 렌더링의 부작용 — 둘 다 데이터 유출은
+  아니다(재확인 완료).
+- **영역**: 라우팅 / 인증 / 관측성
+- **제보**: DESIGN (2026-07-29, 22일차 — Task 045 NFR-040 브라우저 스모크 테스트 중 발견)
+- **내용**: 쿠키 없는(=게스트) 요청으로 `(app)` 보호 라우트(`/calendar`·`/home`·
+  `/notifications`·`/settings`·`/invitations`)에 직접 접근하면 **HTTP 200**이 오고, 화면에는
+  "로그인이 필요합니다 / 로그인 화면으로 이동" 문구가 정확히 렌더된다(비공개 데이터 유출
+  없음, 응답 본문에서 확인). 그런데 서버 콘솔에는 매번 다음 예외가 로깅된다:
+  `assertAuthenticatedSession: (app) 레이아웃의 인증 가드를 통과했는데 세션이 미인증
+  상태다 — 레이아웃 가드가 깨졌다는 뜻이다`(digest 고정값). 이 어서션은 `(app)/layout.tsx`의
+  인증 가드가 이미 리다이렉트했어야 할 상황에서 하위 컨테이너가 그 보장을 다시 확인하다
+  실패하는 자리다(`docs/CONVENTIONS.md` "금지되는 재작성과 허용되는 재작성" 절 — 타입
+  내로잉용 `assertAuthenticatedSession`, `asserts` 서술어라 실패하면 `throw`). 실제로는
+  React 스트리밍(Suspense 경계)이 이 throw를 잡아 "로그인 필요" 폴백으로 안전하게 낮추고
+  있는 것으로 보이나, **왜 레이아웃의 리다이렉트가 먼저 완료되지 않고 하위 컨테이너까지
+  렌더가 진행되는지는 조사하지 않았다.**
+- **재현·검증**: `npm run build && npm start`(포트 3231, 내가 띄우고 종료함)와, 내가 손대지
+  않은 **팀장의 기존 `npm run dev`(포트 3000)** 양쪽에서 동일하게 재현했다 — 오늘 세션에서
+  일어난 회귀가 아니라 **기존부터 있던 동작**임을 확인했다. `curl`로 5개 라우트 응답 본문을
+  받아 대조했고, 홈/설정 응답 본문에 실제 프로필 데이터(핸들 등)가 섞여 있지 않음도 확인했다
+  (`grep`으로 handle 패턴 탐색, 0건).
+- **영향**: 사용자 영향은 낮아 보인다(화면 문구가 정확하고 데이터 유출도 없다) — I-044와
+  같은 성격("화면은 요구사항대로지만 HTTP 상태 코드가 이상하다")의 사례가 하나 더 늘었다.
+  다만 ① 콘솔에 "레이아웃 가드가 깨졌다"는 문구의 예외가 정상 게스트 트래픽마다 반복
+  로깅되는 것은 진짜 장애와 구분하기 어렵게 만들고(관측 신호 오염, NFR-028과 관련), ②
+  HTTP 200으로 나가는 것은 크롤러·모니터링이 "인증이 필요한 페이지"를 정상 200으로 오인할
+  수 있다는 점에서 I-044의 우려②(크롤러가 정상적인 접근 통제를 다르게 읽는다)와 동일하다.
+- **후속(제안, 조사·수정은 하지 않음)**: `(app)/layout.tsx`의 리다이렉트가 완료되기 전에
+  하위 Suspense 경계의 데이터 조회가 먼저 시작되는지(스트리밍 순서 문제인지), 아니면 다른
+  경로(직접 라우트 접근 시 레이아웃이 실제로 안 타는 경우가 있는지)를 CORE가 D-039 문서와
+  함께 확인해 보는 것을 제안한다.
+- **원인 조사(CORE, 2026-07-29, 22일차 — Task 044 완료 후 팀장 지시로 조사만 수행, 수정은
+  하지 않음)**: 위 "후속" 질문에 답이 나왔다. **`node_modules/next/dist/docs/01-app/01-
+  getting-started/06-fetching-data.md`("Parallel data fetching") 원문**: "By default,
+  layouts and pages are rendered in parallel. So each segment starts fetching data as soon
+  as possible." — 즉 **Next 16(App Router)은 레이아웃과 그 아래 페이지를 처음부터 병렬로
+  렌더한다**, 레이아웃의 비동기 함수(`getAuthSession` 호출 포함)가 먼저 끝나길 기다렸다가
+  페이지를 그 뒤에 렌더하는 게 아니다. `(app)/layout.tsx`가 미인증 세션에서 `{children}`
+  대신 `<RedirectToLogin/>`을 반환하기로 "결정"하는 시점과 무관하게, 그 아래 `page.tsx`
+  (예: `AccountSettingsPage`)는 **이미 병렬로 자기 자신의 `getAuthSession()`을 다시 호출해
+  `assertAuthenticatedSession()`을 실행하고 있다** — 세션이 미인증이므로 그 assertion이
+  그대로 예외를 던진다. 레이아웃이 최종적으로 `{children}`을 렌더하지 않기로 선택해 이
+  던져진 결과가 실제 응답 트리에는 포함되지 않지만(그래서 화면·본문은 정확하다), **서버
+  콘솔에는 이미 발생한 예외가 그대로 남는다** — 폐기된 병렬 브랜치의 부작용이다.
+  **왜 레이아웃이 `redirect()`로 원천 차단하지 않는가**: `(app)/layout.tsx` 자체
+  docstring이 이유를 밝히고 있다 — FR-002 AC3("로그인 성공 후 원래 요청 경로로 복귀")를
+  만족하려고 서버 `redirect("/login")`(경로 정보를 버리는 하드 리다이렉트) 대신 클라이언트
+  컴포넌트 `RedirectToLogin`을 의도적으로 쓴다(레이아웃은 자신이 감싸는 하위 경로를 공식적
+  으로 알 방법이 없어서다). `redirect()`를 썼다면 Next의 특수 제어 흐름 신호가 형제 세그먼트
+  렌더링을 조기에 취소시켰을 가능성이 있지만(미확인 — 별도 실측 필요), 그러면 FR-002 AC3
+  요구(복귀 경로 보존)를 잃는 트레이드오프가 된다. **결론**: 이건 회귀가 아니라 "레이아웃
+  병렬 렌더링(Next 16 문서화된 기본 동작)"과 "복귀 경로 보존을 위한 클라이언트 리다이렉트
+  선택(D-030 ④ 관련 설계)"이 겹쳐 나는, **구조적으로 내재된 로그 소음**이다. 수정하려면
+  ① 소음을 감수하고 그대로 두거나, ② `proxy.ts`(현재 D-011로 범위 밖)로 렌더링 시작 전
+  요청 단계에서 차단하거나, ③ 페이지 레벨 컨테이너들이 이 특정 상황(폐기될 병렬 브랜치)
+  에서는 던지지 않도록 `assertAuthenticatedSession` 계약 자체를 완화해야 하는데 ③은 이
+  함수가 다른 곳에서 "레이아웃 가드가 실제로 깨졌다"를 잡아내는 본래 목적을 약화시킨다 —
+  **셋 다 이번 지시 범위(조사만) 밖이라 코드는 건드리지 않았다.** 실측: `curl`로 팀장의
+  기존 `npm run dev`(포트 3000)에 쿠키 없이 `GET /settings` → `200 OK`, 본문에
+  `strings.auth.redirectingToLogin.message`("로그인이 필요합니다.", `RedirectToLogin`의
+  `<noscript>` 폴백 문구) 확인 + RSC 페이로드에 `digest` 값 존재(예외가 실제로 발생해
+  직렬화됐다는 정황) — 서버 프로세스 stdout(예외 스택 자체)은 이 세션 권한으로 볼 수 없어
+  `digest` 존재로만 간접 확인했다.
+- **판정(CORE, 22일차 — 팀장이 요청한 3가지 질문에 대한 답)**:
+  1. **"가드가 깨졌다"는 어서션 메시지가 틀린 경보다, 화면이 맞다.** 레이아웃은 정상
+     동작했다(미인증 세션에서 `{children}`을 렌더하지 않기로 올바르게 판단했다) — 다만
+     그 판단과 별개로 병렬 실행 중이던 페이지 컨테이너 브랜치가 이미 예외를 던졌고, 그
+     브랜치가 최종 응답에 쓰이지 않았을 뿐이다. `assertAuthenticatedSession`의 메시지("가드가
+     깨졌다는 뜻이다")는 이 시나리오를 예상하지 못하고 쓰인 문구라 오해를 유발한다 — 함수
+     docstring에 이 경고를 추가해 뒀다(`src/components/shell/auth-session.ts`, 코드 동작은
+     바꾸지 않았다).
+  2. **HTTP 200은 D-040/D-048과 같은 뿌리 — 새 결함이 아니라 이미 승인된 편차의 또 다른
+     발현이다.** D-040(21일차 워크로그 #7이 가리킨 그 결정)이 이미 이 저장소 전역에 "권한
+     거부는 `forbidden()`/`unauthorized()`(이 Next 버전에서 여전히 experimental/canary,
+     D-040 원문이 문서 직접 대조로 확인)를 쓰지 않고 값 반환 + `error.tsx` 패턴으로
+     처리한다 — 그 결과 HTTP 상태는 항상 200(20일차 "값 반환 전환" 이후) 또는 500(값 반환
+     전환 안 된 지점)이지 진짜 401/403이 아니다"를 확정해 뒀고, D-048이 FR-064 AC2에서 같은
+     정책을 재확인했다. `(app)/layout.tsx`의 `RedirectToLogin`(미인증 시 200 + 클라이언트
+     리다이렉트)도 정확히 같은 범주의 "값 반환 at 200" 패턴이다 — **재검토하려면 D-040
+     워크로그 #7이 이미 적어 둔 대로 `forbidden()`/`unauthorized()`의 stable 승격 여부부터
+     확인해야 한다**(이번에 다시 확인 — 여전히 experimental/canary, `next.config.ts`에
+     `authInterrupts` 플래그 없음, `node_modules/next/dist/docs`의 해당 문서 frontmatter
+     재확인함). 즉 **다르지 않다 — 같은 제약의 또 다른 사례**다.
+  3. **데이터 유출 직접 재확인(DESIGN의 handle 패턴 확인을 실 시드 데이터로 확장) — 5개
+     라우트 전부 깨끗함.** `/home`·`/calendar`·`/notifications`·`/settings`·`/invitations`
+     응답 본문을 각각 받아, 실 시드 크루명 8종(`알고리즘 스터디`·`전시 투어 소셜`·`강아지
+     산책 모임`·`주말 러닝 클럽`·`심야 독서 모임`·`육아 정보 나눔` 등)·실 프로필 핸들·
+     표시이름 8종(`seed_owner02~09`·`박도윤`·`최하은` 등)을 `grep`으로 대조 — **0건**.
+     RSC 플라이트 페이로드에 `memberCount`·`avatarUrl`·`crewId":"<uuid>`·`displayName":"
+     <값>`·`recipientId` 같은 도메인 필드 키 패턴이 섞여 있는지도 별도로 훑었다 — 이것도
+     **0건**. 5개 라우트 전부 정적 UI 문구(로그인 안내)만 담고 있음을 확인했다.
+- **결론(우선순위 판단)**: 진짜 결함이 아니다 — ①은 오진단 메시지(문서화로 대응, 코드
+  불변), ②는 이미 승인된 정책의 자연스러운 확장(새 결정 불필요), ③은 유출 없음(재확인
+  완료). **수정하지 않는다** — `assertAuthenticatedSession` 계약을 완화하면 다른 곳의 진짜
+  가드 붕괴 탐지력이 약해지고, `redirect()`로 바꾸면 FR-002 AC3(복귀 경로 보존)를 잃으며,
+  `proxy.ts`는 D-011로 범위 밖이다. 콘솔 로그 소음은 남지만 NFR-028(관측성) 관점의 개선
+  과제로 다음 회차 후보에만 남긴다.
+
+### I-096 · `polls_guard_decision_integrity`(I-089 핫픽스)가 `open→cancelled` 전이를 다루지
+않아 `disband_crew`(FR-013 AC1)의 투표 일괄 취소가 조용히 무력화돼 있었다 — 이번에 수정
+
+- **상태**: 닫힘 — **이번 회차(22일차, Task 044) 수정 완료**. 마이그레이션
+  `20260729075112_poll_withdrawal_guard_fix_and_notification_types_044.sql`.
+- **영역**: 데이터 / 트리거 설계
+- **제보**: CORE (2026-07-29, 22일차, Task 044 — FR-046 제안 철회 구현 전 "이 검사를 앱을
+  우회해서 DB에 직접 때리면 어떻게 되는가"를 `begin…rollback`으로 먼저 확인하다 발견)
+- **내용**: 17일차 I-089 핫픽스가 추가한 `polls_guard_decision_integrity`(BEFORE UPDATE
+  트리거)는 `old.status='open'`이고 `new.status`가 `closed_passed`·`closed_rejected`·
+  `closed_invalid` 중 하나가 아니면 `new.status`를 조용히 `old.status`로 되돌린다(회귀 방지
+  목적, 당시엔 `cancelled`라는 목표 상태를 고려하지 않았다). 이 트리거는 이 회차에 새로 만들
+  `withdrawPoll`(FR-046)뿐 아니라, **먼저 배포돼 있던 `disband_crew`(19일차 CREW, FR-013
+  AC1 "해산 시 진행 중 투표 전부 cancelled")의 `update polls set status='cancelled' where
+  status='open'`에도 똑같이 걸린다** — 트리거는 함수 코드와 독립적으로 테이블에 걸리므로,
+  `disband_crew` 자체는 그대로인데 나중에 추가된 트리거가 그 동작을 조용히 무력화했다.
+  **실측(`begin…rollback`)**: 수정 전 `update polls set status='cancelled' where id=X and
+  status='open' returning status`가 `status='open'`을 반환(UPDATE는 "1행 성공"으로 보이지만
+  실제 값은 안 바뀜).
+- **영향**: FR-013 AC1이 실 데이터에서 얼마나 오래 실패해 왔는지는 이번 조사 범위 밖이다
+  (코드 수정만 확인했다) — **해산된 크루가 있다면 그 크루의 진행 중이던 투표가 여전히
+  `status='open'`으로 남아 있을 가능성**이 있다. CREW·팀장이 실 데이터를 조회해 확인 필요
+  (`docs/decisions/remaining-c-features-044.md` §5 "다음 회차로 넘길 사항" 1번).
+- **수정**: `polls_guard_decision_integrity`에 `new.status='cancelled'` 전용 분기 추가 —
+  `old.status='open'` && `new.result is null`이면 허용(`decided_at`은 항상 `null`로 고정),
+  그 외는 기존 "종료 결과 불변" 분기가 그대로 막는다(부수 효과로 FR-046 AC3 DB 방어선도
+  겸한다). 수정 후 3개 시나리오(open→cancelled 성공·cancelled→open 재시도 예외·disband_crew
+  동일 UPDATE 재현) 전부 `begin…rollback`으로 재확인. `get_advisors(security)` 신규 WARN 0건.
+- **출처**: `docs/decisions/remaining-c-features-044.md` §1.2.
+
+### I-097 · `notifications.type` CHECK에 `ownership_transferred`·`crew_disbanded`가 없어
+FR-013·FR-025의 알림 생성이 100% 조용히 실패해 왔다 — 이번에 수정
+
+- **상태**: 닫힘 — **이번 회차(22일차, Task 044) 수정 완료**. 같은 마이그레이션(I-096과 동일
+  파일).
+- **영역**: 데이터 / 스키마
+- **제보**: CORE (2026-07-29, 22일차, Task 044 — FR-046용 `poll_withdrawn` 타입을 추가하려고
+  `notifications.type` CHECK를 넓히는 김에, Task 040(19일차)이 TS `NotificationType` 유니온에
+  추가한 `ownership_transferred`·`crew_disbanded` 두 값이 DB CHECK에도 실제로 있는지 실측
+  대조하다 발견)
+- **내용**: `notifications_type_check`(028)는 원문 FR-070 목록 10종만 담고 있었고, Task
+  040이 FR-025(오너 이양)·FR-013(크루 해산) 알림을 위해 TS 쪽에만 두 값을 추가했을 뿐 DB
+  CHECK는 갱신되지 않았다. **실측**: `insert into notifications (type='crew_disbanded', …)`
+  → `23514 check constraint violation`. `disband-crew.ts`·`transfer-crew-ownership.ts`는 이미
+  이 두 타입으로 `createNotification`을 호출하고 있고, 둘 다 `.catch(console.error)`로 실패를
+  삼킨다 — 예외가 화면에 드러나지 않아 지금까지 발견되지 않았다.
+- **영향**: FR-013 AC(전 크루원에게 해산 알림)·FR-025 AC(오너 이양 양측 알림)가 배포 시점부터
+  이번 수정 전까지 **한 번도 성공적으로 알림을 만들지 못했다** — 알림 센터·토스트 둘 다
+  발생하지 않았을 것이다(다른 주 행위인 해산·이양 자체는 정상 동작했다 — 알림만 부수효과로
+  실패).
+- **수정**: `notifications.type`·`notification_preferences.type` CHECK 둘 다 세 값
+  (`ownership_transferred`·`crew_disbanded`·`poll_withdrawn`)을 추가해 넓혔다. 수정 후
+  `insert ... type='crew_disbanded'`가 성공함을 재실측 확인.
+- **출처**: `docs/decisions/remaining-c-features-044.md` §1.3.
+
+### I-098 · MAJOR — `/sample`의 `PreviewFrame` 폭 토글(768/1280/전체)이 `AppShell`의 430px 프레임 제약에 막혀 실질적으로 무력화된다
+
+- **상태**: 열림 — 수정은 하지 않음(원인은 DESIGN이 만든 `PreviewFrame`이 아니라 CORE의
+  day-21 모바일 프레임 도입이 만든 전역 제약이라 담당 조율 필요)
+- **영역**: 디자인 시스템 / `/sample` 인프라
+- **제보**: DESIGN (2026-07-29, 22일차 — Task 045 NFR-040 재검증, 팀장 지시로 공유
+  Playwright 세션이 풀린 뒤 처음으로 실 브라우저 확인)
+- **내용**: `/sample`은 `src/app/layout.tsx`가 조립하는 `AppShell`(day 21, "모바일 프레임
+  도입")로 다른 모든 라우트와 똑같이 감싸인다. `AppShell`의 루트 `div`는
+  `@container/appframe ... max-w-app`(430px, `globals.css`의 `--container-app`)로 폭이
+  하드캡돼 있다. `/sample`의 각 컴포넌트 데모가 쓰는 `PreviewFrame`(`docs/CONVENTIONS.md`
+  "`/sample` 4상태 규칙"이 명시한 뷰포트 검증 도구, 360/768/1280/전체 폭 토글)은 이
+  `AppShell` 안쪽에 중첩돼 있어, **토글이 768·1280·전체 중 무엇을 선택해도 실제 사용
+  가능한 폭이 ~394~430px를 넘지 못한다.**
+- **실측**(`npm run build && npm start`, Chromium, `/sample` "컨테이너 쿼리" 섹션):
+  실제 브라우저 뷰포트 1905px 상태에서 폭 토글을 360→`grid-template-columns: 326px`(1열,
+  정상) 확인 후 1280으로 바꾸자 `grid-template-columns: 175px 175px`(2열, ~394px 폭) —
+  `@lg:grid-cols-3`(임계값 32rem=512px)에 도달하지 못했다. "전체"로 바꿔도 동일하게
+  ~396px에 머물렀다(조상 체인 실측: `PreviewFrame` 396px → ... → `AppShell` 루트 div
+  430px, `max-width:430px` 확인).
+- **영향**: `/sample`은 테스트 러너가 없는 이 프로젝트에서 "유일한 회귀 확인 지점"이라
+  R-002·CON-09가 이미 명시한다. 768·1280 폭에서의 컴포넌트 재배치를 이 도구로 검증한다는
+  전제(CONVENTIONS.md "`/sample` 4상태 규칙")가 **day 21 이후로 조용히 깨져 있었고, 아무도
+  브라우저로 열어 보지 않아 지금까지 발견되지 않았다.** 이 사이 등록된 컴포넌트의 768/1280
+  전용 재배치 확인은 전부 "폭 토글을 눌렀다"는 사실과 무관하게 360px 근방에서만 실제로
+  검증된 것일 수 있다(범위: day 21 이후 등록된 항목).
+- **후속(제안, 수정은 하지 않음)**: `/sample` 라우트 자체를 `AppShell`(또는 그 `max-w-app`
+  제약)에서 제외하는 방법을 검토해야 한다 — 예: `src/app/sample/`을 루트 `layout.tsx`의
+  `AppShell` 조립 밖에 두는 라우트 그룹 분리, 또는 `/sample`에서만 프레임 폭을 무시하는
+  별도 스위치. `AppShell`이 `src/app/layout.tsx`에 하드코딩돼 있어(라우트 그룹 없이 전
+  라우트 공통) 간단한 예외 처리가 아니다 — CORE(day-21 원 구현자)와 조율이 필요해 이번
+  회차엔 수정하지 않았다.
+- **근거**: `docs/decisions/observability-browser-045.md` §5.4-A.
+
+### I-099 · MAJOR — 앱 셸의 `HeaderNav`↔`MobileTabBar` 데스크톱·모바일 전환이 실제로는 전혀 일어나지 않는다 — NFR-026 요구사항 미충족(실 브라우저 확인 결과)
+
+- **상태**: 열림 — `AppShell.tsx`·`MobileTabBar.tsx` 문서 주석이 서로 다른 말을 한다(아래).
+  수정 방향 결정 필요, 이번 회차엔 확인만 하고 고치지 않았다(CORE 소관, day-21 원 구현)
+- **영역**: 디자인 시스템 / 반응형 / 앱 셸
+- **제보**: DESIGN (2026-07-29, 22일차 — Task 045 NFR-040 재검증, 팀장이 지목한 "헤더↔
+  탭바 전환에 같은 종류의 결함이 더 있는지" 확인 중 발견)
+- **내용**: `AppShell.tsx`의 docstring은 "360/768/1280 3종 뷰포트(NFR-026)에서 성립해야
+  한다: 데스크톱은 `HeaderNav`의 인라인 링크, 모바일은 하단 고정 `MobileTabBar`가 1차
+  내비게이션을 맡는다"고 **현재도 요구사항으로 명시**한다. 그런데 `MobileTabBar.tsx`의
+  docstring은 이미 "그 `md:`는 이제 뷰포트가 아니라 앱 프레임 폭 기준이다... 프레임이
+  430px로 묶여 있는 한 이 탭바는 넓은 화면에서도 계속 보이고, `HeaderNav`의 인라인 링크는
+  계속 숨는다"고 **반대로 서술**한다 — 두 컴포넌트의 문서가 같은 사실을 놓고 요구사항 충족
+  여부에 대해 서로 다른 전제를 깔고 있었다. 어느 쪽이 맞는지는 실제로 브라우저를 열기 전까진
+  아무도 확정하지 않았다(팀장이 정확히 이 지점을 지목했다).
+- **원인**: `globals.css`의 `@custom-variant md (@container appframe (min-width: 48rem))`
+  (day 21, 모바일 프레임 도입)가 `md:` variant를 뷰포트가 아니라 `AppShell`의 named
+  container(`appframe`, `max-w-app`=430px로 하드캡)로 전면 재정의했다. `HeaderNav`·
+  `MobileTabBar`가 이 `appframe` 컨테이너의 **직계 자손**이라, `md:`가 요구하는 48rem
+  (768px)에 그 컨테이너가 영원히 도달하지 못한다 — 실제 브라우저 창 폭과 무관하게.
+- **실측**(`npm run build && npm start`, Chromium, `/crews`·`/sample` 양쪽): 실 브라우저
+  뷰포트 390px→1024px→1280px 세 단계로 리사이즈하며 `header nav`·`MobileTabBar`의
+  `computed display`를 직접 측정 — **세 단계 전부 동일하게** `header nav: display:none`
+  (2개 모두)·`MobileTabBar: display:flex`. 1280px 스크린샷으로 시각 확인: 데스크톱 전체
+  폭에서도 헤더에는 로고 하나만 있고 크루 탐색·홈·계정 진입점은 전부 화면 아래 고정
+  탭바(4항목, 게스트 기준)로만 노출된다.
+- **영향**: NFR-026("360/768/1280 3종 뷰포트에서 성립")이 **헤더↔탭바 전환 항목에 한해
+  현재 충족되지 않는다.** 기능이 아예 막힌 것은 아니다(탭바가 4~5항목의 1차 내비게이션을
+  계속 제공하고, `MobileTabBar` 자체는 데스크톱 폭에서도 올바르게 중앙 정렬돼 렌더된다) —
+  하지만 데스크톱·태블릿에서 `HeaderNav`의 계정 메뉴·인라인 링크(day 21에 정리된
+  `LogoutButton` 통합 지점 포함)는 **어떤 화면 폭에서도 절대 나타나지 않는다.** 21일차에
+  발견된 "로그아웃 버튼이 `hidden md:flex` 탓에 렌더되지 않던" 결함(팀장이 이번 재검증을
+  지시하며 인용한 사례)이 부분 수정(컴포넌트 교체로 두 진입점 일관성 확보)만 되고 **근본
+  원인(전환 자체가 안 일어남)은 그대로 남아 있었음**을 이번에 확인했다.
+- **후속(제안, 수정은 하지 않음)**: 결정이 필요하다 — ① 이 앱은 **의도적으로 항상
+  "모바일 폭 프레임" 형태로만 보여준다**는 것이 최종 결정이면(즉 데스크톱에서도 하단
+  탭바만 쓰는 것이 제품 방향이면), `AppShell.tsx`의 NFR-026 인용 docstring을 정정하고
+  `HeaderNav`의 `primaryNav`/`accountNav`(md: 전용, 현재 죽은 코드)를 정리하거나 제거
+  여부를 결정해야 한다. ② 데스크톱·태블릿에서 진짜 전환이 필요하면, `HeaderNav`·
+  `MobileTabBar`의 `md:` 클래스만 `AppShell.tsx`의 `border-x`가 이미 쓴 방식(순수
+  뷰포트 `min-[…]` 임의값)으로 되돌려야 한다 — `globals.css` 주석이 스스로 "이 파일에서
+  유일하게 뷰포트 기준으로 남겨 둔 조건"이라고 부른 그 패턴이다. 어느 쪽이든 CORE
+  (day-21 원 구현자)의 판단이 필요해 이번 회차엔 고치지 않았다.
+- **근거**: `docs/decisions/observability-browser-045.md` §5.4-B.
+
+### I-100 · MAJOR — `join_requests.decided_at`(D-059, KPI-4)를 self-service·staff 양쪽이 임의 값으로 위조할 수 있었다 — 발견 즉시 수정
+
+- **상태**: **해결됨(2026-07-29, 22일차)** — 마이그레이션
+  `major_fix_join_requests_decided_at_client_forgery`
+- **영역**: 데이터 / 보안 — 트리거 설계
+- **제보**: CREW (2026-07-29, 22일차 — Task 045 교차검증 중 "DESIGN의 보고를 그대로 믿지
+  않는다"는 원칙에 따라 SQL로 직접 재현해 발견). **수정은 DESIGN(원 구현자, D-059)이 발견
+  직후 같은 회차에 했다.**
+- **내용**: D-059가 신설한 `join_requests_stamp_decided_at` 트리거는 `new.decided_at is
+  null`일 때만 `now()`로 채우는 조건이었다 — "값이 비어 있으면 기본값을 채워준다"는 의도였지,
+  D-054/D-055가 이미 확립한 "클라이언트가 뭘 보내든 무시하고 항상 재계산해 덮어쓴다" 패턴이
+  아니었다. 그 결과 클라이언트가 UPDATE 요청에 `decided_at` 값을 직접 실어 보내면(REST 직접
+  호출) 트리거가 손대지 않고 그 위조값이 그대로 저장됐다 — self-service 본인의 `withdrawn`
+  전이든, staff의 정당한 `approved` 처리든 상관없이 재현됐다.
+- **실측(CREW, `begin`…`rollback` 2건)**: ① requester 본인이 self-service `withdrawn` 전이 +
+  `decided_at='2020-01-01'` 동시 전송 → 위조값 그대로 저장(성공). ② staff가 정당하게
+  `approved` 처리 + `decided_at='2019-01-01'` 동시 전송 → `decided_by`는 정상이지만
+  `decided_at`은 위조값(`2019-01-01`) 그대로 저장.
+- **영향**: `decided_at`을 참조하는 다른 트리거·테이블이 없어(I-091 기준 다운스트림
+  캐스케이드는 없음) 개별 사용자에게 미치는 해는 없다. 그러나 **KPI-4("가입 신청 후 72시간
+  내 승인·반려 처리율") 집계를 조작할 수 있다** — `decided_at`을 아주 이른 시각으로 위조하면
+  실제로는 72시간을 넘겨 처리된 건도 "72시간 내 처리"로 집계된다. I-091이 정식화한 패턴("
+  self-service/신뢰된 역할의 쓰기 분기가 새 컬럼값을 제한하는지는 제각각")의 새 사례이자,
+  **이번 Task를 배정하며 팀장이 미리 경고한 바로 그 형태**("앱 레이어만 막고 DB가 독립으로
+  강제하지 않는다")가 DESIGN 자신의 신규 작업에서 재발한 사례다.
+- **수정**: D-054의 "거부가 아니라 덮어쓰기" 패턴을 그대로 재사용했다 — `new.decided_at is
+  null` 조건을 없애고, `pending→approved/rejected` 전이에서는 **클라이언트가 무엇을 보내든
+  항상** `now()`로 덮어쓴다. 그 외 모든 전이(자진 철회 포함)는 `decided_at`을 `old` 값으로
+  고정해 재조작 자체를 막는다.
+- **재검증(DESIGN, `begin`…`rollback` 3건)**: ① CREW의 시나리오 ①(withdrawn + 위조값)
+  재실행 → `decided_at`이 `old` 값(`null`)으로 유지, 위조 실패 확인. ② CREW의 시나리오
+  ②(approved + 위조값) 재실행 → 저장된 `decided_at`이 위조값이 아니라 실제 처리 시각(`now()`
+  근방)으로 정정됨 확인. ③ 정상 처리(값 없이 승인) 회귀 확인 — 이전과 동일하게 자동 스탬프됨.
+- **근거**: `docs/decisions/observability-browser-045.md` "교차검증(CREW, 22일차)" §2,
+  `docs/prioritization-and-risks.md` D-059 정정.
+
+### I-101 · CRITICAL — 제안 작성자·임원이 투표 가결 없이 `meetups`에 직접 INSERT해 "확정된" 모임을 위조할 수 있었다 — I-089가 막은 문과 독립된 두 번째 문
+
+- **상태**: 해결됨 (22일차, 2026-07-29) — 마이그레이션
+  `20260729084949_major_fix_i101_meetups_direct_insert_bypass`
+- **영역**: 데이터 / 보안 / 투표·Meetup
+- **제보**: CREW가 DESIGN의 Task 045를 교차검증하다 **인접 발견으로 한 줄 남긴 것**을 팀장이 SQL로
+  1차 확인해 BOARD에 배정, BOARD가 실 REST로 재현·확정·수정. 재검증 CREW.
+
+#### 경위 — 21일차 I-089를 고치고도 남아 있던 두 번째 진입문
+
+`meetups_insert_proposal_author_or_staff`의 `WITH CHECK`는 "내 활성 크루 AND (내가 작성자인 poll
+OR 내가 staff/owner)"만 봤고 **`polls.status`(가결 여부)를 전혀 확인하지 않았다.** 게다가
+`meetups`에 BEFORE INSERT 트리거가 **0개**였다(`trg_meetups_guard_attendee_scope`는 Task 032의
+BEFORE **UPDATE** 전용). 즉 **RLS가 INSERT의 유일한 문이었는데, 그 문이 D-003("Meetup은 오직
+투표(가결)로만 확정된다")·FR-060의 핵심 불변식을 안 봤다.**
+
+**21일차 I-089(CRITICAL)와 완전히 독립된 결함이다.** I-089는 `polls`를 위조해
+`trg_polls_finalize_closed_poll`(AFTER UPDATE)이 Meetup을 만들게 유도하는 경로를 막았다. 이건
+**그 트리거를 아예 거치지 않고 `meetups`에 직접 쓰는** 경로다 — I-089 수정으로는 전혀 막히지
+않았다.
+
+#### 실측 재현 (BOARD, 실 REST `POST /rest/v1/meetups`, 크루 `f202047b`)
+
+| # | 시나리오 | 결과(수정 전) |
+| --- | --- | --- |
+| a | 작성자, poll=`open`(투표 진행 중) | **201 성공** |
+| b | 작성자, poll=`closed_rejected`(부결) | **201 성공** |
+| c | 작성자, poll=`cancelled`(Task 044가 이번에 신설한 상태) | **201 성공** |
+| d+e | staff가 **다른 크루의**, **자기 크루 것도 아닌** poll_id를 빌려 씀 | **201 성공** |
+| f | 대조군 — 작성자도 staff/owner도 아닌 일반 크루원 | 403(정상 차단) |
+
+**5개 중 4개 성공.** 생성된 행은 `status='confirmed'`(기본값)라 **진짜 Meetup과 구별되지 않으며**,
+캘린더(FR-061)·참석 신청(FR-066)까지 정상 기능으로 반응했다(알림만 안 간다).
+
+#### 심각도 — CRITICAL
+
+I-091의 기준("이 경로가 다운스트림을 발동시키는가")으로 CRITICAL이다. 위조 즉시 살아 있는
+`confirmed` Meetup이 생기고 캘린더·참석까지 이어진다. **공격자 범위도 넓다** — "그 크루에 제안글을
+하나라도 써 본 사람"이면 그 투표가 부결·철회·진행 중이든 무관하게 가능했고, staff/owner는
+**DB 전체의 아무 poll_id로나** 사실상 무제한이었다.
+
+#### "임원의 수동 Meetup 생성"이 설계인지 먼저 기각했다
+
+팀장이 배정하며 "CREW의 지적을 무비판적으로 결함으로 확정하지 말고, 임원의 poll 없는 Meetup
+생성이 정당한 기능인지 요구사항으로 먼저 확인하라"고 단서를 달았다. BOARD의 확인 결과:
+FR-060의 **행위자가 "시스템"**(사람이 아니다), D-003이 "오직 투표로만 확정", `permission.ts`
+매트릭스에 **`meetup:create` 행 자체가 없다**(grep). 설계된 기능이 아니라 gap임을 근거로 확정했다.
+
+#### 수정 — I-090 선례 재사용(새 메커니즘 없음)
+
+`WITH CHECK`에 조건(poll 상태 + poll의 크루 = 대상 crew_id)을 더 얹는 대신 **클라이언트 직접
+쓰기를 전면 금지**했다. 손으로 쓴 다중 조인 boolean 식은 미묘하게 틀릴 수 있지만 REVOKE는 그럴
+수 없다는 근거이며, 21일차 I-090이 `meetup_attendances`에서 택한 것과 같은 원칙이다.
+
+```sql
+revoke insert, delete, truncate on public.meetups from anon, authenticated;
+drop policy if exists meetups_insert_proposal_author_or_staff on public.meetups;
+```
+
+DELETE·TRUNCATE도 함께 회수했다 — 지금은 DELETE 정책이 없어 무력하지만, **잠자는 GRANT를 남기면
+나중에 누가 DELETE 정책을 추가하는 순간 조용히 열린다**(I-090에서 실제로 겪은 패턴). UPDATE는
+건드리지 않았다(`cancelMeetup`·참석 카운트가 정당하게 쓰고, `trg_meetups_guard_attendee_scope`와
+`meetups_update_members_scoped_by_trigger`가 이미 보호한다). 죽은 정책도 함께 삭제해 "이것이
+방어"라고 오독되지 않게 했다.
+
+**정당 경로가 죽지 않는 이유**: `public.finalize_closed_poll`은 SECURITY DEFINER이고 테이블
+소유자(`postgres`) 권한으로 실행된다 — 테이블 소유자는 다른 롤을 대상으로 한 REVOKE의 영향을
+받지 않는다.
+
+#### 회귀 검증 (BOARD)
+
+- 공격 5종 재실행 → a·b·c·d+e 전부 **`403 permission denied for table meetups`**(RLS보다 앞선
+  GRANT 단계에서 차단)로 전환. 대조군 f는 그대로 차단.
+- **사람의 정상 조기종료**: 새 poll에 투표 후 `closePoll`과 동일한 형태로 실 REST PATCH → 200,
+  **Meetup 정상 생성 확인.**
+- **pg_cron 자동종료**: `closes_at`을 과거로 두고 투표 1건 후 `run_poll_auto_close_job()`(cron이
+  실제로 호출하는 함수) 직접 실행 → `processed:1`, **Meetup 정상 생성 확인.**
+- `get_advisors(security)` 신규 WARN 0건. 실 시드 데이터 오염 없음(전부 신규 테스트 데이터로
+  재현 후 정리).
+
+#### 부수 정리
+
+`createMeetupFromPoll`(원래도 호출부 0곳인 dead code)의 docstring이 "RLS가 제안자/staff만
+허용한다"는 이제 틀린 설명이 되어 갱신했다(코드 동작 무변경) — 되살리려면 service-role 경로가
+필요하다고 명시.
+
+#### 남은 것 (다음 회차 후보)
+
+**같은 패턴(“RLS만 있고 상태 검사 없음 + SECURITY DEFINER 정당 경로”)이 다른 테이블에 더 있는지는
+전수 조사하지 않았다.** BOARD가 `meetups`로 범위를 좁혔다고 명시했다. I-091 표가 self-service
+UPDATE를 훑었다면, 이 건은 **INSERT 쪽에 같은 종류의 표가 없다**는 것을 드러낸다.
+
+- **근거**: `docs/decisions/meetups-insert-bypass-101.md`(BOARD의 SSOT).

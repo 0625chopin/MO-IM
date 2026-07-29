@@ -227,6 +227,7 @@ export function generateCrewsAndMemberships(
       message: chanceMessage(rng),
       status: "pending",
       decidedBy: null,
+      decidedAt: null,
     });
     memberships.push({
       crewId: entry.crewId,
@@ -273,6 +274,7 @@ export function generateCrewsAndMemberships(
       message: chanceMessage(rng),
       status: "rejected",
       decidedBy: approverFor(entry),
+      decidedAt: addDays(SEED_NOW, -randomInt(rng, 0, 3)),
     });
     memberships.push({
       crewId: entry.crewId,
@@ -348,6 +350,7 @@ export function generateCrewsAndMemberships(
       message: chanceMessage(rng),
       status: "approved",
       decidedBy: approverFor(entry),
+      decidedAt: addDays(SEED_NOW, -randomInt(rng, 0, 10)),
     });
   }
 

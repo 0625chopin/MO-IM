@@ -3,7 +3,7 @@
 요구사항의 **우선순위**, **리스크 등록부**, **확정된 결정**을 기록한다.
 
 - 이 파일의 6.3절 **결정 기록(D-\*)**이 확정 결정의 **단일 소스**다. **미결 이슈·개선사항은 여기가 아니라 [`ISSUES.md`](./ISSUES.md)**에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
-- **다음 결정 번호: D-048** / **다음 리스크 번호: R-021** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -nE "^### D-0" docs/prioritization-and-risks.md | tail`로 실제 최댓값을 확인한다 — 18일차에 D-043·D-044가 등재됐는데도 이 줄이 D-043으로 남아 있었고, **19일차에 D-045(BOARD)·D-046(CREW)이 등재됐는데도 이 줄이 D-046으로 남아 같은 어긋남이 재발했다**. 두 사람이 각자 자기 번호를 잡고 이 줄을 갱신하면 나중에 등재한 쪽이 이기므로 항상 하나 모자란다 — 그래서 이 줄은 **읽는 쪽이 grep으로 검증해야 하는 값**이고, 팀장이 회차 마감마다 대조한다)
+- **다음 결정 번호: D-064** / **다음 리스크 번호: R-021** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -nE "^### D-0" docs/prioritization-and-risks.md | tail`로 실제 최댓값을 확인한다 — 18일차에 D-043·D-044가 등재됐는데도 이 줄이 D-043으로 남아 있었고, **19일차에 D-045(BOARD)·D-046(CREW)이 등재됐는데도 이 줄이 D-046으로 남아 같은 어긋남이 재발했다**. 두 사람이 각자 자기 번호를 잡고 이 줄을 갱신하면 나중에 등재한 쪽이 이기므로 항상 하나 모자란다 — 그래서 이 줄은 **읽는 쪽이 grep으로 검증해야 하는 값**이고, 팀장이 회차 마감마다 대조한다)
 - 리스크는 **누구나 제보**한다. 미결이 확정되면 `ISSUES.md`의 I-\* 를 닫고 여기 6.3절에 D-\* 로 옮긴다.
 - 항목은 상태가 바뀌어도 **지우지 않는다**. 같은 판단이 다시 올라왔을 때 이전 근거를 찾을 수 있어야 한다.
 
@@ -1646,3 +1646,269 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
   조기 종료 회귀) 전부 `begin`…`rollback`으로 확인, 전부 기대 일치.
 - **영향**: FR-041·D-003. 마이그레이션 1건: `major_fix_i092_poll_votes_invalidated_guard`.
   `docs/ISSUES.md` I-092 상태 갱신, I-091 표의 `poll_votes` 행 갱신. TS 코드 무변경.
+
+### D-056 · `invitations` self-service 응답은 `pending→accepted|declined` 단 1회, 본인만, 만료 전에만 허용한다 — I-091 후속·I-093 수정
+
+- **일자**: 2026-07-29
+- **결정자**: CREW (22일차 — I-091이 "전무 + 미수정 + 미실측"으로 남긴 `invitations` 행을
+  실제로 익스플로잇 재현하고 즉시 수정)
+- **맥락**: I-091 전수 표에서 `invitations`만 유일하게 미실측 상태였다. 실측(SQL 시뮬레이션
+  + 실 로그인 토큰의 실 REST `curl` 직접 호출) 결과, `invitations_update_invitee_or_staff`
+  RLS는 행 소유권만 확인하고 컬럼값은 전혀 제한하지 않았으며, BEFORE 트리거도 없었다. 반복
+  status 플립은 `crew_memberships` 쪽 `sync_membership_on_response`의 `where status='invited'`
+  가드가 우연히 재승격까지는 막았지만, **만료된 `pending` 초대의 직접 accept**와 **staff/
+  owner의 타인 초대 강제 accept**(대상자 동의 없음) 두 경로는 실제로 `crew_memberships`를
+  `invited`→`active`로 전이시켰다 — I-091의 심각도 기준("다운스트림 트리거 발동")을 충족하는
+  실제 결함이다(I-093, MAJOR).
+- **FR-021 원문 재확인**: BOARD가 "암묵적 전제"라 불렀던 "한 번 응답하면 끝"은 실제로는 AC2
+  (재도전은 새 초대 행 생성), 행위자 정의("초대받은 회원", 단수), E1(만료된 초대 처리 불가)
+  에서 도출되는 **명시 요구사항**임을 확인했다 — 이번 수정은 요구사항 보완이 아니라 미이행
+  해소다.
+- **결정**: 새 메커니즘을 만들지 않고 21일차 확립 패턴(`reports_guard_self_update_reason_only`·
+  `crew_memberships_guard_self_transition`과 동일 구조 — RLS는 "어떤 행", BEFORE 트리거는
+  "어떤 컬럼·전이")을 그대로 적용했다. `invitations_guard_response_transition`(BEFORE UPDATE,
+  SECURITY DEFINER, `search_path=''`, client EXECUTE 회수)이 ① `status` 외 컬럼 변경 전면
+  차단(`expires_at` 자가 연장 포함) ② `status` 전이는 `pending`→`accepted`\|`declined` 단
+  1회만 ③ 행위자는 반드시 `auth.uid()=old.invitee_id`(본인, staff/owner의 대리 승인 차단)
+  ④ `old.expires_at<=now()`면 거부. `pg_trigger_depth()>1`(향후 시스템 경로)·`auth.uid() is
+  null`(service_role)은 기존 컨벤션대로 통과시킨다.
+- **범위 밖으로 남긴 것**: `invitations_update_invitee_or_staff` RLS의 staff/owner OR-분기
+  자체는 좁히지 않았다 — 트리거가 실질 컬럼 변경을 전부 막아 그 분기는 사실상 죽은 코드가
+  됐지만(동작 위험 없음), RLS 정리는 별도 청소 작업으로 남긴다. `status='expired'`를 실제로
+  기록하는 크론 잡 신설도 스코프 밖이다(`cron.job`에 invitation 관련 잡 0건 확인 — 화면의
+  "만료됨" 판정은 기존과 동일하게 `expires_at` 비교로 애플리케이션이 계산한다).
+- **실측**: SQL 시뮬레이션 7개 시나리오(회귀 2건 성공·공격 5건 거부, `begin`…`rollback`) +
+  실 로그인 토큰의 실 REST `curl` 직접 호출(앱 서버 액션 미경유) — 정상 accept `200`, 직후
+  `declined` self-flip 시도가 `400 P0001`로 DB 독립 거부됨을 확인. 테스트로 생성된 실 데이터는
+  DELETE로 정리. `get_advisors(security)` 신규 WARN 0건, `npx tsc --noEmit` clean.
+- **영향**: FR-021. 마이그레이션 1건: `major_fix_i091_invitations_response_transition_guard`.
+  `docs/ISSUES.md` I-093 신규 등재, I-091 표의 `invitations` 행 갱신. 근거:
+  `docs/decisions/invitations-self-service-i091.md`. TS 코드 무변경.
+
+### D-057 · NFR-006(동시 1,000세션)이 요구하는 Supabase 요금제는 Pro(지출 상한 해제)로 확정한다 — I-017·I-018 해소
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: BOARD (Task 037 — I-017·I-018 실측, Task 033이 인계한 차단 이슈)
+- **맥락**: Task 033(19일차)이 Realtime Broadcast를 실연결하며 "용량 계획·요금제는 확정하지
+  않는다"고 명시적으로 I-017·I-018을 이 Task로 인계했다. 21일차에 확립된 "실계정 JWT + 병렬
+  실 HTTP 요청" 절차(I-090 재검증)를 재사용해 이번에 실측했다.
+- **I-018(팬아웃 계수)**: Supabase 공식 문서([Manage Realtime Messages usage](https://supabase.com/docs/guides/platform/manage-your-usage/realtime-messages))가 "Broadcast 1건을 N명이
+  구독하면 1(발신)+N(수신) = N+1 메시지"라고 명시한다. 크루 채팅 토픽에 실 구독 소켓
+  N=10/30/60/100(같은 프로세스 내 `performance.now()` 기준이라 clock skew 없음)을 열고 실
+  INSERT 1건을 브로드캐스트해 재확인 — 전 구간 N/N 수신, 지연 p95 66~72ms. **N=100은
+  NFR-006의 "크루당 100세션" 그 값이며, NFR-003(p95≤1초) 목표를 약 7% 수준에서 만족한다.**
+- **I-017(요금제)**: [Realtime Limits](https://supabase.com/docs/guides/realtime/limits)
+  재확인(2026-07-23 prd-validator 수치와 일치) — 동시 연결 Free 200/Pro 500/Pro-지출상한해제
+  10,000, 초당 메시지 Free 100/Pro 500/Pro-지출상한해제 2,500. NFR-006(전체 1,000세션)은
+  연결 수 자체가 Free·Pro 둘 다 미달(순수 산술, 사용 패턴 무관)이고, 팬아웃 N+1을 적용하면
+  크루 10개(각 100세션)가 동시에 메시지 1건씩만 보내도 순간 1,010 메시지로 Free·Pro의 초당
+  처리량도 함께 초과한다. **Pro(지출 상한 해제)만 연결·처리량 두 축을 동시에 충족한다.**
+- **결정**: NFR-006이 v1.0 시점에 요구하는 요금제를 **Pro(지출 상한 해제)로 확정**한다.
+  NFR-006은 C등급·v1.0 목표라 이 결정은 "v1.0까지 이 요금제가 필요하다"는 뜻이지 지금 당장
+  업그레이드를 집행하라는 뜻이 아니다(I-017 원문의 유예를 그대로 유지).
+- **확정하지 않은 것**: 월간 메시지 과금 쿼터(Pro 500만 건/월) 대비 실사용량은 실 트래픽이
+  없어 가정 기반 추정만 냈고(크루 10개·활성 10시간/일 가정 시 약 1,818만 건/월로 쿼터 초과
+  가능성), D-\*로 확정하지 않았다. 프로젝트의 **현재 실제 요금제**도 이 세션의 MCP 도구로는
+  조회할 수 없어 확인하지 못했다(대시보드 Billing 전용 조회). 두 항목은 **I-094**로 남겼다.
+- **동시성 회귀(부수 검증)**: D-019(정원 원자성, 21일차 CORE 수정)를 진짜 동시 HTTP 5회
+  반복으로 재검증 — 5/5 전부 정확히 1명만 성공, 승자가 매번 달라져 진짜 경합임을 확인(회귀
+  없음). D-054/D-055(투표 판정 재계산 트리거)를 동시 조기 종료 2건으로 재검증 — Postgres
+  행 잠금이 안전하게 직렬화했고, 승자 요청이 틀린 값(`passed`)을 보냈음에도 트리거가 진짜
+  값(`rejected`, 1:1 동수 D-003)으로 덮어썼다. 패자는 "이미 종료됨"으로 정상 거부(400
+  P0001), 지연 오버헤드는 27ms에 불과했다.
+- **영향**: NFR-003·006, CON-08, R-011·R-019. `docs/ISSUES.md` I-017·I-018 해결됨으로 갱신,
+  I-094 신규 등재. 근거: `docs/decisions/concurrency-load-037.md`.
+
+### D-058 · NFR-030 KPI 이벤트는 `audit_logs`와 별도인 self-service `product_events` 테이블로 수집한다(외부 SaaS는 도입하지 않는다)
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: DESIGN (Task 045)
+- **맥락**: KPI-1~5 중 KPI-3(투표 종료 알림 클릭률)·KPI-5(크루 검색→가입 신청 전환율)만
+  DB 어디에도 원천 이벤트가 없었다(KPI-1·2는 기존 타임스탬프로, KPI-4는 컬럼 하나로 해결 —
+  D-059). 신규 이벤트 인프라가 필요한 것은 이 둘뿐이었다.
+- **결정 A — 새 테이블 `product_events`를 만든다(외부 SaaS 미도입)**: Vercel Analytics는
+  사용자 단위 퍼널을 표현할 계약이 없고, PostHog는 실사용자가 0명인 v0.1에 지금 붙이면
+  "도구가 있다"는 착시만 남기며(D-052의 vitest 미도입과 같은 우려) 제3자로 `profiles.id`를
+  내보내는 것 자체가 별도 검토(개인정보)가 필요해 이번 회차 규모를 넘었다.
+- **결정 B — `audit_logs`(Task 038)와 다른 신뢰 모델을 쓴다**: 감사 로그는 관리 행위의
+  포렌식 기록이라 service-role 전용 쓰기 + 클라이언트 완전 거부다. `product_events`는
+  반대로 평범한 사용자 자신의 행동(검색·알림 노출·클릭)을 그 사용자 자신이 self-service로
+  기록한다 — RLS는 "자기 행 INSERT만 허용"(`actor_id=auth.uid()`), UPDATE/DELETE 정책은
+  두지 않는다(추가 후 불변).
+- **실측(전부 `begin`…`rollback`, 실 계정 2개로 신원 전환)**: 자기 행 INSERT 성공·타인
+  `actor_id` 위조 INSERT 차단·authenticated SELECT/UPDATE 차단·anon INSERT/SELECT 차단
+  6개 시나리오 전부 기대와 일치. 이 프로젝트의 새 테이블은 기본적으로 anon/authenticated에
+  ALL 권한이 GRANT되므로(I-090이 실측한 전역 기본값) RLS만 믿지 않고 `revoke`를 명시했다.
+- **범위**: 이번 Task는 **쓰기(수집)까지**다 — 집계·대시보드는 범위 밖(v0.1에 조회 화면
+  없음, `product_events` SELECT 권한 자체가 anon/authenticated에 없다). 계측 지점(검색 제출·
+  알림 노출·알림 클릭)과 알려진 측정 한계는 `docs/decisions/observability-browser-045.md`
+  §4가 SSOT다.
+- **영향**: NFR-030. 마이그레이션 `kpi_045_product_events`. 신규 문서
+  `docs/decisions/observability-browser-045.md`.
+
+### D-059 · NFR-030 KPI-4(가입 신청 72시간 내 처리율)는 새 이벤트가 아니라 `join_requests.decided_at` 컬럼으로 해결한다
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: DESIGN (Task 045)
+- **맥락**: `join_requests`에는 `decided_by`(누가 처리했는지)만 있고 **언제** 처리됐는지가
+  없어 72시간 창을 계산할 수 없었다.
+- **결정**: 별도 이벤트 로그 행이 아니라 **엔티티 자신의 속성**으로 둔다 — "언제 승인/
+  반려됐는가"는 `join_requests`의 생애주기 속성이지 관측되는 "행동"이 아니라고 판단했다.
+  `decided_at timestamptz null` 컬럼을 추가하고, `BEFORE UPDATE` 트리거
+  (`join_requests_stamp_decided_at`)가 `pending→approved/rejected` 전이에서만 `now()`로
+  채운다. **앱 레이어(`decide-join-request.ts`)는 이 컬럼을 전혀 쓰지 않는다** — I-071/
+  D-054의 "같은 사실을 TS·SQL 두 곳에 두지 않는다" 원칙을 그대로 따랐다.
+- **실측**: pending→approved 전이 시 자동 스탬프 확인, pending→withdrawn(자진 철회)에는
+  스탬프되지 않음을 확인(KPI-4는 임원 처리만 재는 지표라는 설계 의도와 일치). 실측 과정에서
+  트랜잭션 래핑 없이 실행해 테스트 행이 실제로 커밋되는 사고가 있었으나 즉시 발견해 삭제,
+  연쇄 부수효과(`crew_memberships`) 없음을 재조회로 확인했다 — 경위는
+  `docs/decisions/observability-browser-045.md` §3에 정직하게 남겼다.
+- **영향**: NFR-030, `join_requests` 스키마(FR-023). 마이그레이션
+  `kpi_045_join_requests_decided_at`. `JoinRequest` 타입에 `decidedAt` 추가(Mock 픽스처
+  4곳 동반 수정, 배럴엔 미노출).
+- **정정(같은 날, CREW 교차검증 → I-100)**: 위 트리거의 "`new.decided_at is null`일 때만
+  채운다" 조건은 **"기본값 채우기"였지 D-054가 이미 확립한 "클라이언트가 뭘 보내든 무시하고
+  덮어쓴다" 방어가 아니었다** — self-service·staff 양쪽 다 UPDATE 요청에 `decided_at` 값을
+  직접 실어 보내면 그 위조값이 그대로 저장됐다(KPI-4 집계 조작 가능). CREW가 실측으로 발견한
+  즉시 같은 회차에 수정했다 — `pending→approved/rejected` 전이에서는 조건 없이 항상 `now()`로
+  덮어쓰고, 그 외 전이는 `old` 값으로 고정한다(D-054 패턴 재사용). 마이그레이션
+  `major_fix_join_requests_decided_at_client_forgery`. 상세는 `docs/ISSUES.md` **I-100**.
+
+### D-060 · NFR-041(JS 비활성 비지원)은 v0.1에서 명시 확정으로 종결한다 — `<noscript>` 등 구현은 추가하지 않는다
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: DESIGN (Task 045)
+- **맥락**: `requirements.md`·6.1절이 이미 NFR-041을 "JavaScript 비활성 환경은 지원 대상이
+  아니다(명시적 비지원)"·W등급·차기로 분류해 뒀다. 이번 Task의 역할은 이 결정을 뒤집거나
+  구현을 추가하는 것이 아니라 **다시 흔들리지 않게 종결**하는 것이었다.
+- **결정**: `<noscript>` 안내 문구 등 어떤 코드도 추가하지 않는다(확인함 — `src/app/`에
+  `noscript` 0건). 실시간 채팅·투표가 핵심 기능인 이 제품의 목적과 비활성 JS 지원이
+  양립하지 않는다는 원 근거를 그대로 유지하고, 이 상태가 **의도된 것이지 누락이 아님**을
+  D-\*로 명문화해 다음 사람이 근거 없이 재조사하지 않게 한다.
+- **영향**: NFR-041. 코드 변경 없음.
+
+### D-061 · FR-046(제안 철회·재투표) — 권한은 `poll:close_early` 재사용, DB 트리거를
+`open→cancelled` 허용하도록 고치며, AC2(재제안)는 기존 파이프라인으로 이미 충족한다
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: CORE (Task 044)
+- **맥락**: FR-046 AC1(철회)·AC2(재제안)·AC3(재개 거부). 팀장 인계 메시지가 "I-079(D-051, Meetup
+  일정 변경 UNIQUE 제약)를 마주칠 것"이라 경고했으나, 실제 대조 결과 **마주치지 않는다** —
+  I-079/D-051은 FR-065 AC2(가결된 **Meetup**의 같은 행을 유지한 채 날짜만 바꾸는 요구)를
+  다루고, FR-046 AC2는 정반대로 "새 게시글·새 투표"를 요구한다. 서로 다른 FR·서로 다른
+  요구라 겹치지 않는다는 게 이번에 확정됐다.
+- **결정**:
+  1. 철회 권한은 새 매트릭스 행을 만들지 않고 `poll:close_early`(제안자 본인 또는 임원
+     이상)를 그대로 재사용한다(NFR-036).
+  2. `polls_guard_decision_integrity` 트리거에 `open→cancelled` 전용 분기를 추가한다 —
+     이 수정이 없으면 조건부 UPDATE가 "성공한 것처럼" 보이지만 실제로는 상태가 안 바뀐다
+     (I-096, 이 트리거가 `disband_crew`의 FR-013 AC1도 똑같이 무력화하고 있었음을 함께
+     발견·수정). 같은 분기가 AC3(종료된 투표 재개 거부)의 DB 레벨 방어선을 겸한다.
+  3. AC2는 **코드를 추가하지 않는다** — "새 meetup_proposal 게시글 작성 → `createPoll`"이
+     이미 요구를 그대로 만족한다(`polls.post_id` UNIQUE라 항상 새 poll이 생기고 옛 기록은
+     손대지 않는다).
+  4. 알림 타입 `poll_withdrawn`을 신설하고, 그 김에 `notifications.type` CHECK에 누락돼
+     있던 `ownership_transferred`·`crew_disbanded`(Task 040이 TS에만 추가하고 DB CHECK를
+     안 넓혔던 기존 결함, I-097)도 함께 넓혔다.
+- **영향**: FR-046, FR-013(부수 수정), FR-025(부수 수정). 마이그레이션
+  `poll_withdrawal_guard_fix_and_notification_types_044`. I-079는 이번 회차로 해소되지
+  않는다(FR-046과 무관함이 확정됐을 뿐, 여전히 다음 회차 1순위 후보). 근거·실측 전문:
+  `docs/decisions/remaining-c-features-044.md` §1.
+
+### D-062 · FR-055(읽지 않은 메시지) — `chat_room_reads` 신설, 배지는 `/crews`의 `CrewCard`에,
+읽음 갱신은 하단 sentinel `IntersectionObserver`로 감지한다
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: CORE (Task 044)
+- **맥락**: FR-055는 requirements.md상 v1.0/C등급으로 v0.1 스키마 설계 범위 밖이었다 — "읽음
+  지점"을 담을 테이블이 처음부터 없었다. AC1("크루 목록 조회 시 배지")이 가리키는 "크루
+  목록" 화면도 이 저장소에 명확히 하나로 정해져 있지 않았다(홈 대시보드의 "내 크루" 섹션은
+  다른 Task가 범위 밖으로 명시해 뒀다).
+- **결정**:
+  1. `chat_room_reads(room_id, profile_id, last_read_at, updated_at)`, PK `(room_id,
+     profile_id)`. `notifications.read_at` 패턴과 달리 컬럼 제한 가드 트리거는 두지 않는다
+     — 이 테이블은 "서버가 만든 행을 본인이 일부만 고친다"가 아니라 "행 자체를 본인이
+     소유·생성"하는 구조라 RLS의 `profile_id=auth.uid()` 자체가 유일한 불변식이다. INSERT·
+     UPDATE 둘 다 "본인 + 그 방 크루의 활성 크루원"을 추가로 요구한다(비소속자가 임의
+     room_id로 쓰는 것을 막는 방어적 일관성, RLS 실측으로 확인).
+  2. 배지는 `/crews`(`CrewCard`)에 놓는다 — 이 저장소에서 "소속 크루 목록"이라 부를 수 있는
+     유일한 화면이기 때문이다. 홈 대시보드에 전용 "내 크루" 섹션이 생기면 계산 로직
+     (`getUnreadMessageCount`)을 그대로 옮기면 된다.
+  3. AC2("최신까지 스크롤 → 갱신")는 `MessageList`의 기존 "위로 이어 로드" 상단 sentinel과
+     대칭인 하단 sentinel + `IntersectionObserver`로 감지한다 — 최초 진입이 앵커 없이
+     최하단으로 스크롤되는 일반적인 경우 마운트 직후 자동으로 한 번 발화한다.
+- **영향**: FR-055. 마이그레이션 `create_chat_room_reads_table_044`. 한계(다음 회차 후보):
+  크루 목록 화면이 열려 있는 동안 실시간 배지 갱신 없음(재방문 시에만 반영), 소속 크루
+  수만큼 순차 조회(N+1, 기존 `memberCount` 계산과 같은 패턴). 근거·실측 전문:
+  `docs/decisions/remaining-c-features-044.md` §2.
+
+### D-063 · FR-072(알림 환경설정) — 필수 2종은 DB 가드 트리거로 끌 수 없게 막고, 음소거
+판정은 `notifications_broadcast`(발신 시점)에서 하며, 설정 UI는 유형×크루 매트릭스가 아니라
+두 개의 독립 토글 목록이다 — I-091의 "위험 낮음" 판정을 이 두 타입에 한해 뒤집는다
+
+- **일자**: 2026-07-29(22일차)
+- **결정자**: CORE (Task 044)
+- **맥락**: I-091이 `notification_preferences`를 "self-service 컬럼값 제한 전무이지만 비즈니스
+  불변식이 아니라 위험 낮음" 대조군으로 판정했다 — 그 판정은 FR-072 AC3("투표 종료·강퇴
+  알림은 끌 수 없다")가 스코프에 없던 시점의 것이다. AC3이 생기면서 이 두 타입만 "개인 설정"
+  에서 "권리·의무에 영향을 주는 필수 알림"으로 바뀌어 I-091의 전제가 깨진다. 실측
+  (`begin…rollback`)으로 오늘 상태(제한 없음)를 먼저 재현해 확인했다.
+- **결정**:
+  1. `notification_preferences_guard_mandatory_types`(BEFORE INSERT OR UPDATE)가
+     `type in ('poll_closed','member_removed')` && `enabled=false`를 예외로 막는다 — INSERT·
+     UPDATE 양쪽 다 실측 확인(가드는 컬럼값 자체를 제한하지, self-service 여부를 컬럼값으로
+     구분하는 조건부 셀 패턴이 아니다).
+  2. 음소거 판정은 `notifications` INSERT 시점이 아니라 `notifications_broadcast`(Task 033
+     기존 트리거, `realtime.send` 직전)에서 한다 — 이래야 FR-071(알림 센터)이 요구하는 행
+     자체는 항상 남고 토스트만 조건부로 억제된다. 우선순위는 크루별 설정 > 전역 설정 >
+     기본값 켬(행 없음). 필수 2종은 이 판정 자체를 생략한다(가드 트리거가 이미 막지만 이중
+     방어).
+  3. 설정 화면은 유형×크루 전체 매트릭스를 만들지 않는다 — (a) 유형별 전역 토글 13개(필수
+     2개는 항상 켬·비활성), (b) 크루별 "이 크루 알림 끄기"(끄면 `MUTABLE_NOTIFICATION_TYPES`
+     11종 전부를 그 크루 스코프로 일괄 disable) 두 독립 목록으로 AC1·AC2를 문자 그대로만
+     만족한다 — AC 원문이 유형×크루 조합까지 요구하지 않는다. 스키마(`crew_id` nullable)는
+     세분 UI로 확장 가능한 형태를 이미 갖췄다.
+  4. 구현 중 `.upsert()`가 부분 유니크 인덱스(`uq_notification_prefs_global`·`_per_crew`,
+     028의 "crew_id nullable" 설계) 위에서 `ON CONFLICT` 추론에 실패함을 실측으로 발견 —
+     `sendMessage`(chat.ts)의 23505 복구 관용구로 대체했다(UPDATE 먼저 시도 → 없으면 INSERT).
+- **영향**: FR-072. I-091 표의 `notification_preferences` 행 판정이 `poll_closed`·
+  `member_removed` 두 타입에 한해 뒤집힌다(나머지 11종은 I-091의 "위험 낮음" 판단이 여전히
+  유효 — 개인 알림 설정이라 다른 사용자·크루에 영향이 없다). 마이그레이션
+  `notification_preferences_mandatory_guard_and_mute_aware_broadcast_044`. 미확인: 실
+  브라우저로 토스트 억제를 관측하지 못했다(SQL 레벨 로직 검증까지만, `npm run dev` 금지
+  규칙). 근거·실측 전문: `docs/decisions/remaining-c-features-044.md` §3.
+
+### D-064 · `meetups` 행 생성은 서버 경로(`finalize_closed_poll`) 단독이며, 클라이언트의 직접 INSERT는 정책이 아니라 GRANT 단계에서 전면 금지한다 — I-101 수정
+
+- **일자**: 2026-07-29 (22일차) / **제안**: BOARD / **재검증**: CREW / **배정**: 팀장
+- **배경**: I-101(CRITICAL)에서 `meetups_insert_proposal_author_or_staff`의 `WITH CHECK`가
+  `polls.status`를 전혀 보지 않아, 제안 작성자가 부결·철회·진행 중인 자기 poll로, 임원은 **DB
+  전체의 아무 poll_id로나** `status='confirmed'` Meetup을 위조할 수 있었다(실 REST 5종 중 4종
+  성공). `meetups`에 BEFORE INSERT 트리거가 0개라 RLS가 유일한 문이었다.
+- **결정**:
+  1. **`revoke insert, delete, truncate on public.meetups from anon, authenticated`**. 정책
+     보강이 아니라 권한 회수로 막는다 — 손으로 쓴 다중 조인 boolean `WITH CHECK`는 미묘하게
+     틀릴 수 있지만 REVOKE는 그럴 수 없다(**I-090이 `meetup_attendances`에서 택한 원칙과
+     동일**하며, 새 메커니즘을 만들지 않는다는 이 저장소의 방침을 따른다).
+  2. **죽은 정책 `meetups_insert_proposal_author_or_staff`는 삭제한다.** GRANT 단계에서 이미
+     막히므로 남겨 두면 "이것이 방어"라고 오독된다(I-090에서 `meetup_attendances_insert_self`
+     등을 지운 것과 같은 이유).
+  3. **DELETE·TRUNCATE도 함께 회수한다.** 지금은 DELETE 정책이 없어 무력하지만, 잠자는 GRANT는
+     나중에 누가 DELETE 정책을 추가하는 순간 조용히 열린다 — I-090에서 실제로 겪은 패턴이다.
+  4. **UPDATE GRANT는 유지한다.** `cancelMeetup`(FR-065 AC1)과 `respond_meetup_attendance`의
+     `attending_count` 쓰기가 정당하게 쓰며, `trg_meetups_guard_attendee_scope`(Task 032)와
+     `meetups_update_members_scoped_by_trigger`가 이미 독립으로 보호한다.
+- **정당 경로가 죽지 않는 근거**: `public.finalize_closed_poll`은 SECURITY DEFINER이고 테이블
+  소유자(`postgres`) 권한으로 실행된다 — 테이블 소유자는 다른 롤 대상 REVOKE의 영향을 받지
+  않는다. **사람의 조기종료와 pg_cron 자동종료 두 갈래 모두 실측으로 Meetup 생성을 확인했다.**
+- **기각한 대안**: "임원은 투표 없이 Meetup을 만들 수 있게 둔다" — FR-060의 행위자가
+  **"시스템"**이고, D-003이 "오직 투표(가결)로만 확정", `permission.ts` 매트릭스에 `meetup:create`
+  행 자체가 없다. 설계된 기능이 아니라 gap임을 근거로 기각했다(팀장이 배정 시 "무비판적으로
+  결함으로 확정하지 말라"고 단서를 단 지점이며, 그 확인을 거쳐 확정했다).
+- **영향**: D-003·FR-060·FR-061·FR-066. 마이그레이션
+  `20260729084949_major_fix_i101_meetups_direct_insert_bypass`. 근거·실측 전문:
+  `docs/decisions/meetups-insert-bypass-101.md`, 이슈는 `docs/ISSUES.md` I-101.
+- **남긴 것**: 같은 패턴("RLS만 있고 상태 검사 없음 + SECURITY DEFINER 정당 경로")이 다른
+  테이블에 더 있는지는 전수 조사하지 않았다 — `meetups`로 범위를 좁혔다. **I-091 표가
+  self-service UPDATE를 훑었다면, 이 건은 INSERT 쪽에 같은 종류의 표가 없다는 것을 드러낸다.**
+  다음 회차 후보다.

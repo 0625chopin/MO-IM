@@ -5,6 +5,7 @@ import { PollCountdown } from "@/components/poll/PollCountdown";
 import { PollEarlyCloseControl } from "@/components/poll/PollEarlyCloseControl";
 import { PollResult } from "@/components/poll/PollResult";
 import { PollTally } from "@/components/poll/PollTally";
+import { PollWithdrawControl } from "@/components/poll/PollWithdrawControl";
 import type { Id } from "@/lib/types";
 
 export interface PollPanelProps {
@@ -57,6 +58,11 @@ export function PollPanel({ crewId, poll }: PollPanelProps) {
           />
           {poll.canCloseEarly && !poll.isAwaitingClosure && (
             <PollEarlyCloseControl crewId={crewId} pollId={poll.id} />
+          )}
+          {/* FR-046 AC1(Task 044) — 철회는 조기 종료와 나란히 둔다(둘 다 제안자 본인 또는
+              임원 이상만 보이고, 결과 집계 중에는 더 취소·종료할 것이 없다). */}
+          {poll.canWithdraw && !poll.isAwaitingClosure && (
+            <PollWithdrawControl crewId={crewId} pollId={poll.id} />
           )}
         </>
       ) : (

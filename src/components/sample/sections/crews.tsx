@@ -42,6 +42,8 @@ const SAMPLE_CREW_CARDS: CrewCardViewModel[] = [
     colorIndex: 0,
     memberCount: 12,
     isMember: true,
+    // FR-055 AC1(Task 044) — 가입된 크루 카드에만 읽지 않은 메시지 배지가 뜬다.
+    unreadMessageCount: 5,
   },
   {
     id: "crew-3",
@@ -51,6 +53,7 @@ const SAMPLE_CREW_CARDS: CrewCardViewModel[] = [
     colorIndex: 3,
     memberCount: 4,
     isMember: false,
+    unreadMessageCount: 0,
   },
   {
     id: "crew-7",
@@ -60,6 +63,7 @@ const SAMPLE_CREW_CARDS: CrewCardViewModel[] = [
     colorIndex: 7,
     memberCount: 55,
     isMember: false,
+    unreadMessageCount: 0,
   },
 ];
 

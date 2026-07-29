@@ -13,6 +13,7 @@ import {
 import { MessageList } from "@/components/chat/MessageList";
 import { deleteChatMessageAction } from "@/lib/actions/delete-chat-message";
 import { loadEarlierMessagesAction } from "@/lib/actions/load-earlier-messages";
+import { markRoomReadAction } from "@/lib/actions/mark-room-read";
 import { resyncChatMessagesAction } from "@/lib/actions/resync-chat-messages";
 import type { SendChatMessageState } from "@/lib/actions/send-chat-message";
 import { sendChatMessageAction } from "@/lib/actions/send-chat-message";
@@ -384,6 +385,18 @@ export function MessageRoomContainer({
     })();
   };
 
+  /**
+   * FR-055 AC2 — `MessageList`의 하단 sentinel이 보일 때마다 배경으로 읽음 지점을 갱신한다.
+   * `refresh()`를 부르지 않는다(모듈 docstring의 D-030 ② 실시간 경계 원칙 — 이 화면 자체는
+   * 배지를 그리지 않는다). 실패해도 사용자에게 보여줄 오류가 아니라 로그만 남긴다
+   * (`markRoomReadAction`이 세션 미인증이면 조용히 아무 일도 하지 않는다).
+   */
+  const handleReachLatest = () => {
+    void markRoomReadAction(roomId).catch((error) =>
+      console.error("[chat] 읽음 지점 갱신 실패", error),
+    );
+  };
+
   const handleManualReconnect = () => {
     // 실제로 오프라인이면 "재연결됨"으로 잘못 넘어가지 않는다 — 사용자가 배너의 버튼을 눌러도
     // 네트워크 자체가 없으면 아무 일도 일어나지 않는다(다시 온라인이 되면 `online` 이벤트가
@@ -416,6 +429,7 @@ export function MessageRoomContainer({
         onDelete={handleDeleteMessage}
         canDeleteAnyMessage={canDeleteAnyMessage}
         blockedProfileIds={blockedProfileIdSet}
+        onReachLatest={handleReachLatest}
       />
       <Composer canSend={canSend} onSubmit={handleComposerSubmit} />
     </div>

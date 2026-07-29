@@ -68,6 +68,18 @@ export function isAuthenticated(
  * `redirect`가 아니라 `throw`로 표현한다(D-030 ③ — 진짜 프로그래밍 오류는 예외로 던진다).
  * `as` 타입 단언을 쓰지 않는 이유도 같다 — 단언은 이 불변식이 실제로 깨져도 조용히 통과시켜
  * 버그를 숨기지만, `throw`는 런타임에 실제로 검사한다.
+ *
+ * **알려진 무해한 발화 지점(I-095, 22일차 CORE 조사)**: Next 16은 레이아웃과 그 아래 페이지를
+ * **병렬로** 렌더한다(`node_modules/next/dist/docs/01-app/01-getting-started/06-fetching-
+ * data.md` "Parallel data fetching"). `(app)/layout.tsx`가 미인증 세션에서 `{children}` 대신
+ * `<RedirectToLogin/>`을 반환하기로 "결정"하는 시점과 무관하게, 그 아래 페이지 컨테이너는
+ * 이미 병렬로 자기 세션을 다시 조회해 이 함수를 호출하고 있을 수 있다 — 그 병렬 브랜치에서는
+ * 세션이 실제로 미인증이므로 이 함수가 그대로 예외를 던진다. 레이아웃이 최종적으로 그
+ * 브랜치를 렌더하지 않기로 선택해 응답(HTTP 상태·화면)에는 영향이 없지만, 서버 콘솔에는
+ * 이미 발생한 예외가 그대로 남는다 — **"레이아웃 가드가 깨졌다"는 이 메시지가 실제로는
+ * 틀린 경보일 수 있다는 뜻**이다(가드 자체는 정상 동작 중이었다). 진짜 가드 붕괴와
+ * 구분하려면 응답 상태·화면이 실제로 미인증 콘텐츠를 노출했는지를 함께 봐야 한다(그렇다면
+ * 진짜 결함, 아니라면 이 병렬 렌더링 부작용). 상세 실측: `docs/ISSUES.md` I-095.
  */
 export function assertAuthenticatedSession(
   session: AuthSession,

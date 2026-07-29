@@ -191,6 +191,42 @@ export type Database = {
           },
         ]
       }
+      chat_room_reads: {
+        Row: {
+          last_read_at: string | null
+          profile_id: string
+          room_id: string
+          updated_at: string
+        }
+        Insert: {
+          last_read_at?: string | null
+          profile_id: string
+          room_id: string
+          updated_at?: string
+        }
+        Update: {
+          last_read_at?: string | null
+          profile_id?: string
+          room_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_room_reads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_room_reads_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "chat_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_rooms: {
         Row: {
           crew_id: string
@@ -470,6 +506,7 @@ export type Database = {
         Row: {
           created_at: string
           crew_id: string
+          decided_at: string | null
           decided_by: string | null
           id: string
           message: string | null
@@ -479,6 +516,7 @@ export type Database = {
         Insert: {
           created_at?: string
           crew_id: string
+          decided_at?: string | null
           decided_by?: string | null
           id?: string
           message?: string | null
@@ -488,6 +526,7 @@ export type Database = {
         Update: {
           created_at?: string
           crew_id?: string
+          decided_at?: string | null
           decided_by?: string | null
           id?: string
           message?: string | null
@@ -877,6 +916,38 @@ export type Database = {
           },
         ]
       }
+      product_events: {
+        Row: {
+          actor_id: string
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+        }
+        Insert: {
+          actor_id: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+        }
+        Update: {
+          actor_id?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           anonymized_at: string | null
@@ -1252,9 +1323,3 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
-
-export const Constants = {
-  public: {
-    Enums: {},
-  },
-} as const

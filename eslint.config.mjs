@@ -7,11 +7,16 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 // Task 001 (CORE, 1주차) — 디렉터리 구조·명명 규약과 짝을 이루는 import 경계 규칙.
 // 규약 문서: docs/CONVENTIONS.md. 참조: R-007, R-003, R-015, NFR-034·036·037, CON-05, D-030.
 //
-// 아래 zone 1~6 블록은 대상 `files`/`ignores`가 서로 겹치지 않도록 설계했다.
+// 아래 zone 1~8(6b 포함) 블록은 대상 `files`/`ignores`가 서로 겹치지 않도록 설계했다.
 // ESLint flat config는 같은 파일에 매치되는 여러 config 객체의 같은 rule을
 // "병합"하지 않고 배열 순서상 나중 객체가 통째로 덮어쓴다 — 겹치면 앞 블록의
 // 제한이 조용히 무력화된다. 블록을 늘릴 때는 겹침이 없는지 먼저 확인할 것
 // (docs/CONVENTIONS.md "리뷰 짝이 볼 핵심 포인트" 1번).
+//
+// **새 zone을 추가하거나 기존 zone의 files/ignores/차단 대상을 바꾸면 docs/CONVENTIONS.md
+// "ESLint로 강제하는 것" 표도 같은 커밋에서 갱신한다.** zone 7·8이 신설 시점에, zone 3·6의
+// 변경(I-074, 21일차)이 각각 그 표에 반영되지 않은 채로 남았던 것이 I-088이다 — 이 규약이
+// 그 재발을 막는다.
 // ---------------------------------------------------------------------------
 
 const SUPABASE_CLIENT_MESSAGE =

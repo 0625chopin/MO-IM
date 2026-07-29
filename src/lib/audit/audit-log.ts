@@ -55,6 +55,9 @@ export type AuditAction =
   // 일정을 뒤집는 행위라 "누가 취소했는지" 자체가 항상 기록 가치가 있다고 봤다).
   | "comment.force_deleted"
   | "meetup.cancelled"
+  // Task 044(CORE) 추가 — FR-046 AC1 제안 철회. `meetup.cancelled`와 같은 판단(되돌릴 수 없는
+  // 상태 전이라 본인 여부와 무관하게 항상 기록한다).
+  | "poll.withdrawn"
   // Task 042B(관리자 콘솔, CREW, 21일차) 추가 — FR-082 AC1. 위 docstring 참고: 실제 INSERT는
   // `admin_resolve_report` SQL RPC 안에서 일어나므로 이 값들을 인자로 `recordAuditLog()`를
   // 호출하는 TS 코드는 없다. `report.dismissed`의 targetId는 reports.id(부수효과가 없는

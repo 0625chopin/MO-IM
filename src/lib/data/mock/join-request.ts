@@ -29,6 +29,7 @@ export async function createJoinRequest(
     message: input.message ?? null,
     status: "pending",
     decidedBy: null,
+    decidedAt: null,
   };
   store.joinRequests.push(joinRequest);
   return ok(joinRequest);

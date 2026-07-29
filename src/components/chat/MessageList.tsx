@@ -32,6 +32,11 @@ export interface MessageListProps {
    *  `blockedProfileIds.has(message.senderId)`를 넘긴다(`MessageRoomContainer` 모듈 docstring
    *  참고 — 실시간 메시지도 이 판정을 그대로 탄다). */
   blockedProfileIds: ReadonlySet<Id>;
+  /** FR-055 AC2(Task 044) — "최신까지 스크롤"을 감지했을 때 컨테이너가 읽음 지점을 갱신하도록
+   *  알린다. 하단 sentinel의 `IntersectionObserver`가 감지원이다 — 최초 진입이 앵커 없이(FR-053
+   *  AC2 복원 앵커가 없어 바로 최하단으로 스크롤된) 시작하면 마운트 직후 한 번, 위로 이어
+   *  읽다가 다시 최하단으로 스크롤을 내리면 그때마다 호출된다. */
+  onReachLatest?: () => void;
 }
 
 /**
@@ -72,10 +77,16 @@ export function MessageList({
   onDelete,
   canDeleteAnyMessage,
   blockedProfileIds,
+  onReachLatest,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
+  const onReachLatestRef = useRef(onReachLatest);
+  useEffect(() => {
+    onReachLatestRef.current = onReachLatest;
+  });
   // ref는 렌더 중이 아니라 렌더 이후(effect)에만 갱신한다 — 렌더 중 갱신은
   // react-hooks/refs(렌더 순수성) 위반이다.
   useEffect(() => {
@@ -191,6 +202,22 @@ export function MessageList({
     return () => observer.disconnect();
   }, [hasMore]);
 
+  // FR-055 AC2 — 하단 sentinel이 보이면(최초 진입 즉시 최하단이거나, 위로 읽다가 다시 내려온
+  // 경우) 읽음 지점을 갱신한다. 빈 목록(위 조기 반환)에는 sentinel 자체가 없다 — 메시지가
+  // 없으면 "읽지 않은 메시지"도 없으므로 호출할 이유가 없다.
+  useLayoutEffect(() => {
+    const sentinel = bottomSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onReachLatestRef.current?.();
+      },
+      { root: scrollRef.current, threshold: 1 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [messages.length]);
+
   if (messages.length === 0) {
     return (
       <Empty className="flex-1">
@@ -234,6 +261,9 @@ export function MessageList({
             />
           );
         })}
+        {/* FR-055 AC2 — 최하단 도달 감지 sentinel(위 top sentinel과 대칭, 높이 0이라 레이아웃에
+            영향이 없다). */}
+        <div ref={bottomSentinelRef} aria-hidden="true" />
       </div>
     </div>
   );

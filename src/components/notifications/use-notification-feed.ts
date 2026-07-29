@@ -11,6 +11,9 @@ import { toNotificationItemViewModel } from "@/components/notifications/notifica
 import type { NotificationItemViewModel } from "@/components/notifications/notification-view-models";
 import { markAllNotificationsReadAction } from "@/lib/actions/mark-all-notifications-read";
 import { markNotificationReadAction } from "@/lib/actions/mark-notification-read";
+import { recordNotificationClickAction } from "@/lib/actions/record-notification-click";
+import { recordNotificationImpressionAction } from "@/lib/actions/record-notification-impression";
+import type { NotificationImpressionItem } from "@/lib/actions/record-notification-impression";
 import { describeRealtimeError } from "@/lib/realtime";
 import type { Id } from "@/lib/types";
 
@@ -19,6 +22,8 @@ export interface UseNotificationFeedResult {
   unreadCount: number;
   markRead: (id: Id) => void;
   markAllRead: () => void;
+  /** NFR-030 KPI-3 분모 — `NotificationList`의 마운트 이펙트가 부른다(아래 참고). */
+  recordImpressions: (items: NotificationImpressionItem[]) => void;
   isPending: boolean;
 }
 
@@ -61,6 +66,10 @@ export function useNotificationFeed(
   }, [profileId]);
 
   function markRead(id: Id) {
+    // NFR-030 KPI-3 분자(클릭) — 읽음 처리와는 별개 개념이라 같은 상태 갱신에 얹지 않고
+    // 클릭 시점의 알림 유형만 조회해 둔다(읽음은 멱등이라 이미 읽은 알림도 다시 markRead가
+    // 불릴 수 있지만, 클릭 이벤트는 그때마다 기록해도 무방한 행동 로그다).
+    const clicked = notifications.find((n) => n.id === id);
     let didChange = false;
     setNotifications((prev) =>
       prev.map((n) => {
@@ -72,6 +81,7 @@ export function useNotificationFeed(
     if (didChange) setUnreadCount((count) => Math.max(0, count - 1));
     startTransition(async () => {
       await markNotificationReadAction(id);
+      if (clicked) await recordNotificationClickAction(id, clicked.type);
     });
   }
 
@@ -83,5 +93,12 @@ export function useNotificationFeed(
     });
   }
 
-  return { notifications, unreadCount, markRead, markAllRead, isPending };
+  function recordImpressions(items: NotificationImpressionItem[]) {
+    if (items.length === 0) return;
+    startTransition(async () => {
+      await recordNotificationImpressionAction(items);
+    });
+  }
+
+  return { notifications, unreadCount, markRead, markAllRead, recordImpressions, isPending };
 }

@@ -316,6 +316,31 @@ const STATUS_BY_OUTCOME: Record<PollOutcome, "closed_passed" | "closed_rejected"
  * 임원이 아닐 수 있어 RLS가 조용히 0행을 반환할 수 있다(`err("conflict", …)`로 표현된다) —
  * `cast-vote.ts`가 이 실패를 표 저장 성공과 분리해 처리한다(I-049).
  */
+/**
+ * 제안 철회(FR-046 AC1). 조건부 UPDATE(`.eq("status","open")`)로 이미 종료된 투표의 재취소
+ * 시도를 막는다(AC3) — `closePoll`과 같은 패턴. `polls_guard_decision_integrity` 트리거(Task 044
+ * 수정, `docs/decisions/remaining-c-features-044.md` 참고)가 `open → cancelled` 전이만 허용하고
+ * 그 외(이미 `cancelled`이거나 `closed_*`인 상태에서 다시 바꾸려는 시도)는 예외를 던진다 — 이
+ * 함수가 던지는 예외가 아니라 DB가 던지는 예외이므로 그대로 전파한다(`castVote`가 상태 검사를
+ * 먼저 하는 것과 달리, 여기서는 트리거가 두 번째 방어선이다). `polls_update_proposal_author_or_
+ * staff` RLS가 제안자·임원 이상만 허용한다(AC1 "제안자, 임원, 오너").
+ */
+export async function withdrawPoll(pollId: Id): Promise<DataResult<Poll>> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("polls")
+    .update({ status: "cancelled", result: null, decided_at: null })
+    .eq("id", pollId)
+    .eq("status", "open")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) {
+    return err("conflict", `poll ${pollId} 는 이미 종료됐거나 취소됐다.`);
+  }
+  return ok(toPoll(data));
+}
+
 export async function closePoll(input: ClosePollInput): Promise<DataResult<Poll>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase

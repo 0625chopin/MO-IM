@@ -17,6 +17,7 @@ import type {
   MeetupAttendance,
   Notification,
   NotificationChannel,
+  NotificationPreference,
   NotificationType,
   Poll,
   PollEligibleVoter,
@@ -139,6 +140,7 @@ export function toJoinRequest(row: Tables<"join_requests">): JoinRequest {
     message: row.message,
     status: row.status as JoinRequestStatus,
     decidedBy: row.decided_by,
+    decidedAt: row.decided_at,
   };
 }
 
@@ -177,6 +179,17 @@ export function toNotification(row: Tables<"notifications">): Notification {
     payload: (row.payload ?? {}) as Record<string, unknown>,
     readAt: row.read_at,
     createdAt: row.created_at,
+  };
+}
+
+/** FR-072(Task 044). 도메인 타입은 DB의 대리키 `id`를 노출하지 않는다(`profileId`·`type`·
+ *  `crewId` 조합이 유일성을 이미 보장한다, `notification.types.ts` 참고). */
+export function toNotificationPreference(row: Tables<"notification_preferences">): NotificationPreference {
+  return {
+    profileId: row.profile_id,
+    type: row.type as NotificationType,
+    crewId: row.crew_id,
+    enabled: row.enabled,
   };
 }
 

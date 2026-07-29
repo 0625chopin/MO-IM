@@ -110,6 +110,9 @@ export async function PollPanelContainer({ crewId, postId }: PollPanelContainerP
     meetupId: meetup?.id ?? null,
     viewer: { canVote, ineligibleReason, myChoice },
     canCloseEarly,
+    // FR-046 AC1(Task 044) — `poll:close_early`와 대상이 완전히 같은 판정이라(제안자 본인 또는
+    // 임원 이상) 다시 판정하지 않고 그대로 재사용한다(NFR-036).
+    canWithdraw: canCloseEarly,
   };
 
   // 실시간 갱신(FR-042 AC2, Task 033)은 진행 중(open) 투표에서만 의미가 있다 — 종료된 투표는

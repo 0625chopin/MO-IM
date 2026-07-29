@@ -9,4 +9,5 @@ export * from "./moderation.types";
 export * from "./notification.types";
 export * from "./permission.types";
 export * from "./poll.types";
+export * from "./product-event.types";
 export * from "./profile.types";

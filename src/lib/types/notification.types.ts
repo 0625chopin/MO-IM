@@ -7,6 +7,10 @@ import type { Id, ISODateTimeString } from "./common.types";
  * `ownership_transferred`·`crew_disbanded`는 Task 040(크루 생애주기, FR-025·FR-013)이
  * 추가했다 — 원문 FR-070 목록에는 없지만 D-030 정상 흐름이 "양측 알림"·"전 크루원에게 알림"을
  * 명시해 필요했다.
+ *
+ * `poll_withdrawn`은 Task 044(FR-046 AC1, 제안 철회)가 추가했다 — 제안자·임원·오너가 진행 중
+ * 투표를 철회하면 대상자 전원에게 이 유형으로 알림이 간다(`poll_closed`와는 구분되는 값 —
+ * 판정 없이 취소됐다는 사실 자체가 다른 정보다).
  */
 export type NotificationType =
   | "poll_closed"
@@ -20,7 +24,8 @@ export type NotificationType =
   | "meetup_cancelled"
   | "post_commented"
   | "ownership_transferred"
-  | "crew_disbanded";
+  | "crew_disbanded"
+  | "poll_withdrawn";
 
 /**
  * 채널 추상화(NFR-038). v0.1에서 실제로 발송하는 채널은 `in_app`뿐이며

@@ -16,4 +16,7 @@ export interface JoinRequest {
   status: JoinRequestStatus;
   /** 승인/반려 처리자(임원 이상). 대기 상태면 null. */
   decidedBy: Id | null;
+  /** 승인/반려 처리 시각. 대기 상태(또는 자진 철회)면 null — NFR-030 KPI-4(72시간 내 처리율)
+   *  산출용. DB 트리거(`join_requests_stamp_decided_at`, Task 045)가 채운다. */
+  decidedAt: string | null;
 }

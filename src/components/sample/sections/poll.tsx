@@ -6,6 +6,7 @@ import { PollPanel } from "@/components/poll/PollPanel";
 import { PollPanelSkeleton } from "@/components/poll/PollPanelSkeleton";
 import { PollResult } from "@/components/poll/PollResult";
 import { PollTally } from "@/components/poll/PollTally";
+import { PollWithdrawControl } from "@/components/poll/PollWithdrawControl";
 import { PreviewFrame } from "@/components/sample/PreviewFrame";
 import { PollAutoCloseSimulatorPreview } from "@/components/sample/sections/PollAutoCloseSimulatorPreview";
 import { defineSection } from "@/components/sample/showcase-types";
@@ -46,6 +47,7 @@ function buildPoll(overrides: Partial<PollViewModel> = {}): PollViewModel {
     meetupId: null,
     viewer: { canVote: true, ineligibleReason: null, myChoice: null },
     canCloseEarly: true,
+    canWithdraw: true,
     ...overrides,
   };
 }
@@ -62,7 +64,8 @@ function LabeledDemo({ label, children }: { label: string; children: ReactNode }
 export const pollSection = defineSection({
   id: "poll",
   label: "투표",
-  title: "투표 — PollBallot · PollCountdown · PollTally · PollResult · PollEarlyCloseControl · PollPanel",
+  title:
+    "투표 — PollBallot · PollCountdown · PollTally · PollResult · PollEarlyCloseControl · PollWithdrawControl · PollPanel",
   description: (
     <>
       찬반 투표(FR-040~045, Task 019) — 참여·현황·마감 카운트다운·종료 결과·조기 종료·상태 전이
@@ -270,13 +273,26 @@ export const pollSection = defineSection({
     },
     {
       name: "PollEarlyCloseControl",
-      note: "조기 종료(D-003 트리거②, FR-043 AC3) — 제안자 본인 또는 임원 이상만 렌더된다(`poll.canCloseEarly`, 컨테이너가 이미 판정). Dialog 확인 후 `closePollEarlyAction`을 직접 호출합니다. pollId가 실재하지 않는 값이라 실제로 눌러도 서버가 안전하게 not_found로 실패합니다 — '오류' 패널은 그 실패가 화면에 어떻게 보이는지(이미 종료됨 문구)를 고정값으로 보여줍니다.",
+      note: "조기 종료(D-003 트리거②, FR-043 AC3) — 제안자 본인 또는 임원 이상만 렌더된다(`poll.canCloseEarly`, 컨테이너가 이미 판정). Dialog 확인 후 `closePollEarlyAction`을 직접 호출합니다. pollId가 실재하지 않는 값이라 실제로 눌러도 서버가 안전하게 not_found로 실패합니다 — '오류' 패널은 그 실패가 화면에 어떻게 보이는지(이미 종료됨 문구)를 고정값으로 보여줍니다. '로딩'·'빈 상태' 패널은 두지 않았다 — 버튼 하나뿐인 컨트롤이라 '목록이 비었다'는 개념 자체가 없고(`NotificationItem`과 같은 이유), 서버 왕복 중 로딩은 별도 패널이 아니라 버튼 라벨 자체가 `strings.vote.earlyClose.pending`으로 바뀌는 것으로 표현된다.",
       panels: {
         default: <PollEarlyCloseControl crewId="sample-crew" pollId="sample-poll-early-close" />,
         error: (
           <ErrorState
             title={strings.error.conflict.title}
             description={strings.vote.earlyClose.alreadyClosed}
+          />
+        ),
+      },
+    },
+    {
+      name: "PollWithdrawControl",
+      note: "제안 철회(FR-046 AC1·AC3, Task 044) — 제안자 본인 또는 임원 이상만 렌더된다(`poll.canWithdraw`, `poll:close_early`와 동일 판정을 재사용). Dialog 확인 후 `withdrawPollAction`을 직접 호출합니다. pollId가 실재하지 않는 값이라 실제로 눌러도 서버가 안전하게 not_found로 실패합니다 — '오류' 패널은 이미 종료·취소된 투표를 다시 철회하려 할 때(AC3)의 문구를 고정값으로 보여줍니다. '로딩'·'빈 상태' 패널은 두지 않았다 — `PollEarlyCloseControl`(같은 형태를 그대로 복제한 컨트롤)과 같은 이유로, 버튼 하나뿐이라 '비었다'는 개념이 없고 로딩은 버튼 라벨이 `strings.vote.withdraw.pending`으로 바뀌는 것으로 표현된다.",
+      panels: {
+        default: <PollWithdrawControl crewId="sample-crew" pollId="sample-poll-withdraw" />,
+        error: (
+          <ErrorState
+            title={strings.error.conflict.title}
+            description={strings.vote.withdraw.alreadyClosed}
           />
         ),
       },
@@ -323,6 +339,7 @@ export const pollSection = defineSection({
                 poll={buildPoll({
                   viewer: { canVote: false, ineligibleReason: "not_in_snapshot", myChoice: null },
                   canCloseEarly: false,
+                  canWithdraw: false,
                 })}
               />
             </LabeledDemo>
