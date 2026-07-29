@@ -1,7 +1,7 @@
 "use server";
 
 import { confirmPasswordReset, signOutSupabaseSession } from "@/lib/auth";
-import { validatePasswordFormat } from "@/lib/rules/auth-credentials";
+import { passwordsMatch, validatePasswordFormat } from "@/lib/rules/auth-credentials";
 import { strings } from "@/lib/strings";
 
 /**
@@ -27,9 +27,20 @@ export async function confirmPasswordResetAction(
   formData: FormData,
 ): Promise<ConfirmPasswordResetState> {
   const password = String(formData.get("password") ?? "");
+  // 비밀번호는 앞뒤 공백도 유의미해 `trim()`하지 않는다(`signup.ts`와 같은 이유).
+  const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
   const format = validatePasswordFormat(password);
   if (!format.valid) {
     return { status: "error", errorMessage: strings.auth.resetPassword.confirm.errors.passwordTooShort };
+  }
+
+  // 21일차 — 확인란 불일치. 폼이 blur 시점에 같은 판정을 이미 하지만 그 결과를 신뢰하지
+  // 않는다(Next.js "Validate inputs"). **`confirmPasswordReset` 호출 전에** 막는 것이 핵심이다
+  // — 통과시키면 오타로 친 비밀번호가 실제로 저장되고, 그 직후 이 액션이 세션까지 폐기해
+  // (⑤~⑥) 사용자는 자기가 모르는 비밀번호로 잠긴 계정을 마주한다. 재설정 링크는 이미
+  // 소모된 뒤라 복구하려면 처음부터 다시 요청해야 한다.
+  if (!passwordsMatch(password, passwordConfirm)) {
+    return { status: "error", errorMessage: strings.auth.resetPassword.confirm.errors.passwordMismatch };
   }
 
   const result = await confirmPasswordReset(password);

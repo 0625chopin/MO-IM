@@ -1,3 +1,4 @@
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import { AccountWithdrawSection } from "@/components/profile/AccountWithdrawSection";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { ProfileEditForm } from "@/components/profile/ProfileEditForm";
@@ -80,6 +81,21 @@ export async function AccountSettingsContainer({
           <p className="text-sm text-muted-foreground">{strings.account.search.description}</p>
         </div>
         <UserSearchField />
+      </section>
+
+      {/* FR-002 로그아웃. 탈퇴 섹션 **위**에 둔다 — 둘 다 "세션을 끝내는" 행위로 읽히지만
+          하나는 되돌릴 수 있고 하나는 30일 유예가 걸린 파괴적 행위다. 가벼운 쪽을 먼저 놓아
+          화면 맨 아래(파괴적 행위 자리)와 시각적으로 분리한다. */}
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <div>
+          <h2 className="text-sm font-medium text-foreground">
+            {strings.account.settings.logout.heading}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {strings.account.settings.logout.description}
+          </p>
+        </div>
+        <LogoutButton formClassName="w-fit" />
       </section>
 
       <AccountWithdrawSection ownedActiveCrews={ownedActiveCrews} />

@@ -31,6 +31,25 @@ export function validatePasswordFormat(password: string): PasswordFormatCheckRes
   return { valid: violations.length === 0, violations };
 }
 
+/**
+ * 회원가입 폼의 "비밀번호 확인" 일치 검증(21일차). 비교 자체는 `===` 한 줄이지만 함수로 두는
+ * 이유는 `SignupForm`(클라이언트 즉시 피드백)과 `signupAction`(서버 최종 판정)이 **같은 판정을
+ * 두 번 구현하지 않게** 하기 위해서다 — 이 모듈의 다른 검증(`validatePasswordFormat` 등)이
+ * 이미 그 계약으로 쓰이고 있고, `SignupForm` docstring도 "판정 로직의 단일 소스는 `lib/rules`,
+ * 컴포넌트는 호출만 한다"고 못박고 있다.
+ *
+ * **입력값을 트리밍하지 않는다.** 비밀번호는 앞뒤 공백도 유의미한 문자라 한쪽만 다듬으면
+ * "눈에는 같은데 계속 불일치"가 되거나, 반대로 실제로 다른 값을 같다고 통과시킨다 — 저장되는
+ * 값(`signUpWithPassword`에 그대로 넘어가는 원문)과 정확히 같은 기준으로 비교한다.
+ *
+ * 빈 확인값(`confirmation === ""`)도 불일치로 본다 — 별도 "필수" 위반을 두지 않는 것은 이
+ * 필드가 비어 있으면 어차피 비밀번호와 같을 수 없어 안내 문구가 하나로 충분하기 때문이다
+ * (폼의 `required` 속성이 브라우저 단계에서 먼저 걸러 준다).
+ */
+export function passwordsMatch(password: string, confirmation: string): boolean {
+  return password === confirmation;
+}
+
 /** RFC 5322를 완전히 구현하지 않는다 — 서버 측 최종 검증은 실제 인증 스택(Task 026 이후)의
  *  몫이고, 여기서는 "명백히 이메일이 아닌 값"만 클라이언트에서 조기에 걸러낸다. */
 const EMAIL_FORMAT_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

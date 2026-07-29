@@ -85,7 +85,24 @@ function getClient(): BroadcastClient {
   return client;
 }
 
-const TERMINAL_STATUSES = new Set(["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"]);
+/**
+ * `onError`로 올려보낼 상태. **`CLOSED`는 여기 없다 — 오류가 아니라 정상 종료 신호다.**
+ *
+ * 원래는 셋 다 들어 있었는데, 그 때문에 **로그아웃할 때마다 콘솔에 구독 실패가 찍혔다**(21일차
+ * 실측). 흐름은 이렇다: `logoutAction`이 서버 세션을 폐기하면 그 JWT로 인가받은 채널이 닫히고,
+ * 리다이렉트로 알림 벨이 언마운트되며 `unsubscribe()`가 `removeChannel`을 부른다 — 양쪽 모두
+ * `CLOSED`를 발화하는데 그게 "인가 거부(RLS)이거나 네트워크 문제"라는 문구로 보고돼, 정상적인
+ * 정리 과정이 장애처럼 보였다(Next.js dev 오버레이에도 이슈 배지가 떴다). 로그아웃 UI가 실제로
+ * 노출된 적이 없어(그 버튼은 `HeaderNav`의 `md:` 계정 내비 안에만 있었고 430px 프레임에서는
+ * 켜지지 않았다) 지금까지 드러나지 않았던 경로다.
+ *
+ * Supabase 공식 문서도 `subscribe()` 콜백에서 **`CHANNEL_ERROR`·`TIMED_OUT` 둘만** 오류로
+ * 다루는 예제를 싣고 있고, 채널 상태 설명에서 `CLOSED`를 "Channel is closed"로만 정의한다
+ * (`CHANNEL_ERROR`는 클라이언트가 자동 재시도한다). 인가 거부는 `CLOSED`가 아니라
+ * `CHANNEL_ERROR`로 오므로 이 변경으로 놓치는 실패는 없다 — `/sample`의 Realtime 인가 거부
+ * 데모(`RealtimeAuthErrorDemoContainer`)가 그 경로를 계속 보여준다.
+ */
+const TERMINAL_STATUSES = new Set(["CHANNEL_ERROR", "TIMED_OUT"]);
 
 /** `SubscribeToRoom` 계약의 실데이터 구현. `index.ts`가 이 값을 `subscribeToRoom`으로 노출한다.
  *  전송 계층이라 payload 내용을 해석하지 않는다(`types.ts` 참고) — `occurredAt`은 이 클라이언트가

@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { checkHandleAvailabilityAction } from "@/lib/actions/check-handle-availability";
 import type { SignupFormState } from "@/lib/actions/signup";
 import { signupAction } from "@/lib/actions/signup";
+import { passwordsMatch } from "@/lib/rules/auth-credentials";
 import { validateHandleFormat } from "@/lib/rules/handle-validation";
 import { strings, t } from "@/lib/strings";
 
@@ -67,6 +68,27 @@ export function SignupForm() {
   const [handleStatus, setHandleStatus] = useState<HandleCheckStatus>({ kind: "idle" });
   const [isCheckingHandle, startHandleCheck] = useTransition();
   const [passwordVisible, setPasswordVisible] = useState(false);
+  // 비밀번호 확인 불일치(21일차). blur 시점에만 판정한다 — 타이핑 도중 매 글자마다 "일치하지
+  // 않아요"를 띄우면 정상적으로 입력하는 사람에게도 거의 항상 오류가 보인다(두 번째 글자부터
+  // 마지막 글자 직전까지 계속 불일치다). 값이 다시 바뀌면 즉시 해제해 수정 중에는 조용하다.
+  const [passwordMismatch, setPasswordMismatch] = useState(false);
+  // blur 판정에 상대 필드의 현재 값이 필요하다 — 두 필드 중 어느 쪽을 나중에 벗어나든 같은
+  // 비교를 할 수 있어야 해서 양쪽 DOM 노드를 참조로 잡는다(입력값 자체를 state로 들고 있으면
+  // 비밀번호 원문이 React 트리에 머무는 시간이 길어져 피하고 싶었다).
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const passwordConfirmRef = useRef<HTMLInputElement>(null);
+
+  /** 두 칸 모두 값이 있을 때만 판정한다 — 아직 확인란을 채우지 않은 사람에게 불일치를
+   *  들이밀지 않기 위해서다(빈 값은 제출 시 `required`와 서버가 잡는다). */
+  function checkPasswordsMatch() {
+    const password = passwordRef.current?.value ?? "";
+    const confirmation = passwordConfirmRef.current?.value ?? "";
+    if (!password || !confirmation) {
+      setPasswordMismatch(false);
+      return;
+    }
+    setPasswordMismatch(!passwordsMatch(password, confirmation));
+  }
   // D-047 — 이미 서버에 확인한 값으로 다시 blur해도 재호출하지 않는다(20일차, 리밋 소진
   // 완화). 값뿐 아니라 그때의 결과 상태도 같이 기억해야 한다 — 그 사이 `onChange`가
   // `handleStatus`를 "idle"로 되돌려 놨을 수 있어(타이핑했다가 원래 값으로 되돌린 경우),
@@ -110,6 +132,12 @@ export function SignupForm() {
     });
   }
 
+  // 서버가 돌려준 오류를 우선한다 — 클라이언트 blur 판정은 즉시 피드백용이고, 최종 판정은
+  // 항상 `signupAction`이다(핸들 오류가 같은 우선순위를 쓰는 것과 같은 이유).
+  const passwordConfirmError =
+    state.fieldErrors.passwordConfirm ??
+    (passwordMismatch ? strings.auth.signup.errors.passwordMismatch : undefined);
+
   const handleFieldError =
     state.fieldErrors.handle ??
     (handleStatus.kind === "taken"
@@ -122,8 +150,15 @@ export function SignupForm() {
   // 단계에서 제출 버튼을 막지는 않는다(클릭 시점엔 60초 윈도가 이미 풀렸을 수 있다). 다만
   // 실제로 여전히 걸려 있으면 제출 자체는 `signupAction`(서버)이 막는다 — `state.fieldErrors.handle`
   // 로 돌아와 위 `handleFieldError`에 반영된다(20일차, 위 컴포넌트 docstring 참고).
+  // 불일치가 확인된 상태에서는 제출을 막는다(핸들 중복·형식 오류와 같은 취급) — 어차피 서버가
+  // 거절할 요청을 왕복시킬 이유가 없다. `passwordMismatch`는 blur로만 켜지고 값이 바뀌면 즉시
+  // 꺼지므로, 고치는 도중에 버튼이 잠기지는 않는다.
   const submitDisabled =
-    isPending || isCheckingHandle || handleStatus.kind === "taken" || handleStatus.kind === "invalid_format";
+    isPending ||
+    isCheckingHandle ||
+    passwordMismatch ||
+    handleStatus.kind === "taken" ||
+    handleStatus.kind === "invalid_format";
 
   // FR-001 정상 흐름 ⑤ — 가입은 성공했으나 세션은 아직 없다(이메일 인증 대기, Task 030 실측
   // 결과: 이 프로젝트는 "Confirm email"이 켜져 있다). 폼 대신 안내 패널을 보여준다.
@@ -173,6 +208,7 @@ export function SignupForm() {
           <FieldLabel htmlFor="signup-password">{strings.auth.signup.fields.password}</FieldLabel>
           <div className="relative">
             <Input
+              ref={passwordRef}
               id="signup-password"
               name="password"
               type={passwordVisible ? "text" : "password"}
@@ -180,6 +216,8 @@ export function SignupForm() {
               required
               minLength={8}
               className="pr-8"
+              onBlur={checkPasswordsMatch}
+              onChange={() => setPasswordMismatch(false)}
               aria-invalid={Boolean(state.fieldErrors.password)}
               aria-describedby={state.fieldErrors.password ? "signup-password-error" : "signup-password-desc"}
             />
@@ -199,6 +237,37 @@ export function SignupForm() {
           ) : (
             <FieldDescription id="signup-password-desc">
               {strings.auth.signup.fields.passwordDescription}
+            </FieldDescription>
+          )}
+        </Field>
+
+        {/* 비밀번호 확인(21일차). 표시 토글은 위 필드와 `passwordVisible` 하나를 공유한다 —
+            두 칸은 같은 값을 담는 한 쌍이라 한쪽만 보이면 대조라는 목적 자체가 반쪽이 된다.
+            그래서 이 칸에는 토글 버튼을 따로 두지 않는다(같은 일을 하는 버튼이 둘이면 어느
+            쪽이 무엇을 여는지 오히려 불분명하다). */}
+        <Field data-invalid={Boolean(passwordConfirmError)}>
+          <FieldLabel htmlFor="signup-password-confirm">
+            {strings.auth.signup.fields.passwordConfirm}
+          </FieldLabel>
+          <Input
+            ref={passwordConfirmRef}
+            id="signup-password-confirm"
+            name="passwordConfirm"
+            type={passwordVisible ? "text" : "password"}
+            autoComplete="new-password"
+            required
+            onBlur={checkPasswordsMatch}
+            onChange={() => setPasswordMismatch(false)}
+            aria-invalid={Boolean(passwordConfirmError)}
+            aria-describedby={
+              passwordConfirmError ? "signup-password-confirm-error" : "signup-password-confirm-desc"
+            }
+          />
+          {passwordConfirmError ? (
+            <FieldError id="signup-password-confirm-error">{passwordConfirmError}</FieldError>
+          ) : (
+            <FieldDescription id="signup-password-confirm-desc">
+              {strings.auth.signup.fields.passwordConfirmDescription}
             </FieldDescription>
           )}
         </Field>

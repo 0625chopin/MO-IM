@@ -39,10 +39,10 @@ export const authSection = defineSection({
   items: [
     {
       name: "SignupForm",
-      note: "핸들 실시간 중복 검사(FR-001 AC2)는 정적 프리뷰로 재현할 수 없어 /signup에서 직접 확인합니다.",
+      note: "핸들 실시간 중복 검사(FR-001 AC2)와 비밀번호 확인 불일치 판정은 모두 blur 시점 인터랙션이라 정적 프리뷰로 재현할 수 없어 /signup에서 직접 확인합니다 — '오류' 패널은 불일치가 잡힌 뒤의 모습입니다.",
       panels: {
         default: (
-          <PreviewFrame height={560}>
+          <PreviewFrame height={680}>
             <div className="mx-auto w-full max-w-sm p-4">
               <FieldGroup>
                 <Field>
@@ -59,6 +59,15 @@ export const authSection = defineSection({
                     />
                   </div>
                   <FieldDescription>{strings.auth.signup.fields.passwordDescription}</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="sample-signup-password-confirm">
+                    {strings.auth.signup.fields.passwordConfirm}
+                  </FieldLabel>
+                  <Input id="sample-signup-password-confirm" type="password" />
+                  <FieldDescription>
+                    {strings.auth.signup.fields.passwordConfirmDescription}
+                  </FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="sample-signup-handle">{strings.auth.signup.fields.handle}</FieldLabel>
@@ -89,7 +98,7 @@ export const authSection = defineSection({
           </PreviewFrame>
         ),
         error: (
-          <PreviewFrame height={560}>
+          <PreviewFrame height={680}>
             <div className="mx-auto w-full max-w-sm p-4">
               <FieldGroup>
                 <Field data-invalid>
@@ -103,6 +112,18 @@ export const authSection = defineSection({
                   </FieldLabel>
                   <Input id="sample-signup-password-err" type="password" defaultValue="1234" aria-invalid="true" />
                   <FieldError>{strings.auth.signup.errors.passwordTooShort}</FieldError>
+                </Field>
+                <Field data-invalid>
+                  <FieldLabel htmlFor="sample-signup-password-confirm-err">
+                    {strings.auth.signup.fields.passwordConfirm}
+                  </FieldLabel>
+                  <Input
+                    id="sample-signup-password-confirm-err"
+                    type="password"
+                    defaultValue="12345"
+                    aria-invalid="true"
+                  />
+                  <FieldError>{strings.auth.signup.errors.passwordMismatch}</FieldError>
                 </Field>
                 <Field data-invalid>
                   <FieldLabel htmlFor="sample-signup-handle-err">{strings.auth.signup.fields.handle}</FieldLabel>
@@ -322,10 +343,10 @@ export const authSection = defineSection({
     },
     {
       name: "ConfirmPasswordResetForm",
-      note: "FR-003 정상 흐름 ④~⑥. 실제 라우트는 /reset-password/confirm — /auth/confirm 토큰 교환이 성공해야 도달합니다. '오류' 패널은 E2(링크 만료·재사용)입니다.",
+      note: "FR-003 정상 흐름 ④~⑥. 실제 라우트는 /reset-password/confirm — /auth/confirm 토큰 교환이 성공해야 도달합니다. '오류' 패널에는 서로 다른 두 실패가 함께 있습니다: E2(링크 만료·재사용)는 폼 자체를 대신하는 화면이고, 확인란 불일치는 폼 안에 남은 채 표시되는 필드 오류입니다(실제 판정은 blur 시점이라 여기서는 결과 모습만 보여줍니다).",
       panels: {
         default: (
-          <PreviewFrame height={220}>
+          <PreviewFrame height={340}>
             <div className="mx-auto w-full max-w-sm p-4">
               <FieldGroup>
                 <Field>
@@ -334,6 +355,15 @@ export const authSection = defineSection({
                   </FieldLabel>
                   <Input id="sample-reset-confirm-password" type="password" />
                   <FieldDescription>{strings.auth.resetPassword.confirm.fields.passwordDescription}</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="sample-reset-confirm-password-confirm">
+                    {strings.auth.resetPassword.confirm.fields.passwordConfirm}
+                  </FieldLabel>
+                  <Input id="sample-reset-confirm-password-confirm" type="password" />
+                  <FieldDescription>
+                    {strings.auth.resetPassword.confirm.fields.passwordConfirmDescription}
+                  </FieldDescription>
                 </Field>
               </FieldGroup>
               <Button className="mt-6 w-full">{strings.auth.resetPassword.confirm.submit}</Button>
@@ -351,12 +381,33 @@ export const authSection = defineSection({
           </PreviewFrame>
         ),
         error: (
-          <PreviewFrame height={200}>
-            <div className="mx-auto w-full max-w-sm p-4">
-              <Alert variant="destructive">
-                <AlertTriangleIcon aria-hidden="true" />
-                <AlertDescription>{strings.auth.resetPassword.confirm.errors.linkExpired}</AlertDescription>
-              </Alert>
+          <PreviewFrame height={380}>
+            <div className="mx-auto flex w-full max-w-sm flex-col gap-6 p-4">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs text-muted-foreground">E2 — 링크 만료·재사용(폼을 대신하는 화면)</p>
+                <Alert variant="destructive">
+                  <AlertTriangleIcon aria-hidden="true" />
+                  <AlertDescription>{strings.auth.resetPassword.confirm.errors.linkExpired}</AlertDescription>
+                </Alert>
+              </div>
+
+              <div className="flex flex-col gap-1.5 border-t border-border pt-4">
+                <p className="text-xs text-muted-foreground">확인란 불일치(폼 안에 남는 필드 오류)</p>
+                <FieldGroup>
+                  <Field data-invalid>
+                    <FieldLabel htmlFor="sample-reset-confirm-mismatch">
+                      {strings.auth.resetPassword.confirm.fields.passwordConfirm}
+                    </FieldLabel>
+                    <Input
+                      id="sample-reset-confirm-mismatch"
+                      type="password"
+                      defaultValue="12345"
+                      aria-invalid="true"
+                    />
+                    <FieldError>{strings.auth.resetPassword.confirm.errors.passwordMismatch}</FieldError>
+                  </Field>
+                </FieldGroup>
+              </div>
             </div>
           </PreviewFrame>
         ),

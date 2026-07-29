@@ -73,9 +73,13 @@ export function getPrimaryNavItems(session: AuthSession): NavItem[] {
 
 /**
  * PRD §5 "계정 메뉴" 하위 항목. 로그인 여부로 완전히 다른 목록이다(로그인/회원가입 ↔ 계정
- * 설정/받은 초대함). 로그아웃(F002)은 실제 세션 종료 로직이 없어(Task 030, I-016 차단) 이번
- * 회차에는 항목을 만들지 않는다 — 자리만 예약해 두는 것도 클릭 시 아무 동작 없는 죽은 링크를
- * 만드는 셈이라 보류가 낫다고 판단했다(보고 참고).
+ * 설정/받은 초대함).
+ *
+ * **로그아웃은 여기 없다** — Task 030에서 실제 세션 종료 로직(`logoutAction`)이 생긴 뒤에도
+ * `NavItem`으로 만들지 않았다. 이 목록의 항목은 전부 `href`를 가진 링크인데 로그아웃은 이동이
+ * 아니라 POST(세션 폐기)라 모양이 맞지 않는다. 대신 `LogoutButton`(`components/auth/`)을 폼
+ * 버튼으로 두 자리에 세운다 — `HeaderNav`의 계정 내비, 그리고 `/settings`의 로그아웃 섹션.
+ * 후자가 지금 실제로 보이는 유일한 진입점이다(그 컴포넌트 docstring의 프레임 폭 설명 참고).
  */
 export function getAccountNavItems(session: AuthSession): NavItem[] {
   if (isAuthenticated(session)) {

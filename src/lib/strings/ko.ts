@@ -680,6 +680,15 @@ export const ko = {
         },
       },
       /**
+       * FR-002 로그아웃 — 계정 설정 화면의 섹션 문구. 앱 프레임이 430px로 고정돼 `HeaderNav`의
+       * 계정 내비(`md:flex`)가 실제로는 켜지지 않으므로, 이 화면이 로그아웃의 유일한 진입점이다
+       * (`LogoutButton` docstring 참고). 버튼 라벨 자체는 헤더와 공유하는 `auth.logout`을 쓴다.
+       */
+      logout: {
+        heading: "로그아웃",
+        description: "이 기기에서 로그아웃해요. 저장된 내용은 그대로 남아 있어요.",
+      },
+      /**
        * FR-005 회원 탈퇴(Task 039, D-010). 계정 설정 화면의 가장 아래 섹션 — 파괴적 행위라
        * 별도 다이얼로그(비밀번호 재확인)를 거친다. `blockedByOwnership`은 AC1(오너 크루 보유
        * 시 차단)의 안내 문구다.
@@ -1147,8 +1156,12 @@ export const ko = {
    * 갈라져 있다.
    */
   auth: {
-    /** FR-002 로그아웃(Task 030) — `HeaderNav` 계정 메뉴의 폼 버튼 라벨. */
+    /** FR-002 로그아웃(Task 030) — `LogoutButton`의 버튼 라벨. `HeaderNav`와 `/settings`
+     *  로그아웃 섹션이 같은 컴포넌트를 쓰므로 라벨도 한 곳에서 공유한다. */
     logout: "로그아웃",
+    /** 세션 폐기 → 랜딩 리다이렉트까지 서버 왕복이 있어 pending 구간이 눈에 보인다 —
+     *  그 사이 버튼이 눌린 채로 남으면 이중 제출로 읽히므로 라벨을 바꿔 진행 중임을 알린다. */
+    logoutPending: "로그아웃하는 중…",
     /** FR-002 AC3(17일차) — `RedirectToLogin`의 `<noscript>` 폴백. JS가 꺼져 있으면
      *  `useEffect` 기반 클라이언트 리다이렉트가 동작하지 않아 수동으로 갈 수단이 필요하다. */
     redirectingToLogin: {
@@ -1184,6 +1197,11 @@ export const ko = {
         email: "이메일",
         password: "비밀번호",
         passwordDescription: "8자 이상으로 입력해 주세요.",
+        /** 21일차 추가 — 오타로 잘못된 비밀번호가 저장되면 이메일 인증까지 끝낸 뒤에야
+         *  로그인에서 막히므로(가입 직후에는 세션이 없어 즉시 드러나지 않는다) 입력 단계에서
+         *  잡는다. */
+        passwordConfirm: "비밀번호 확인",
+        passwordConfirmDescription: "확인을 위해 같은 비밀번호를 한 번 더 입력해 주세요.",
         handle: "핸들",
         handleDescription:
           "다른 사람이 나를 검색할 때 쓰는 공개 아이디예요. 영문 소문자로 시작하고 소문자·숫자·밑줄만 3~20자로 써 주세요.",
@@ -1211,6 +1229,10 @@ export const ko = {
          *  사용성을 위해 그대로 유지한다(requirements.md FR-001 E1 각주). */
         emailTaken: "이미 가입된 이메일입니다",
         passwordTooShort: "비밀번호는 8자 이상이어야 해요",
+        /** 21일차 — `passwordsMatch`(lib/rules/auth-credentials.ts) 위반. 어느 쪽이 틀렸는지
+         *  말하지 않는다(둘 다 사용자가 방금 친 값이라 "확인란이 다르다"로 충분하고, 원문을
+         *  되짚어 주는 안내는 어깨너머 노출 위험만 늘린다). */
+        passwordMismatch: "비밀번호가 일치하지 않아요",
         /** `common.handle.invalidFormat`과 같은 개념(핸들 형식, `validateHandleFormat`)이라
          *  6일차 W-2로 공유 승격했다 — `common` 모듈 docstring 참고. */
         handleInvalidFormat: common.handle.invalidFormat,
@@ -1302,6 +1324,12 @@ export const ko = {
         fields: {
           password: "새 비밀번호",
           passwordDescription: "8자 이상으로 입력해 주세요.",
+          /** 21일차 — 회원가입(`auth.signup.fields.passwordConfirm`)과 문구가 같지만 공유하지
+           *  않는다(§4 "같은 개체라도 도메인 맥락이 다르면 공유하지 않는다"). 이쪽은 "새"
+           *  비밀번호라 라벨이 이미 갈라져 있고(`password` 필드가 그 선례다), 나중에 어느 한쪽
+           *  어투만 다듬을 수 있어야 한다. */
+          passwordConfirm: "새 비밀번호 확인",
+          passwordConfirmDescription: "확인을 위해 같은 비밀번호를 한 번 더 입력해 주세요.",
         },
         submit: "비밀번호 변경",
         submitPending: "변경하는 중…",
@@ -1310,6 +1338,9 @@ export const ko = {
         successRedirectNotice: "비밀번호를 변경했어요. 새 비밀번호로 다시 로그인해 주세요.",
         errors: {
           passwordTooShort: "비밀번호는 8자 이상이어야 해요",
+          /** 21일차 — `passwordsMatch` 위반. 회원가입과 같은 이유로 어느 쪽이 틀렸는지는
+           *  말하지 않는다(`auth.signup.errors.passwordMismatch` 주석 참고). */
+          passwordMismatch: "비밀번호가 일치하지 않아요",
           /** FR-003 E2 — 링크 만료(1시간) 또는 이미 사용된 링크(E3). Supabase가 두 경우를
            *  같은 오류 코드로 구분하지 않아(`session_not_found`) 문구도 하나로 합친다. */
           linkExpired: "재설정 링크가 만료됐거나 이미 사용됐어요. 다시 요청해 주세요.",
