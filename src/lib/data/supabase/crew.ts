@@ -328,6 +328,11 @@ export async function updateCrewVisibility(
  * 임원 임명·해임(FR-024) — role만 바꾼다. `crew_memberships_guard_self_transition`(§029B)이
  * "오너만 임명/해임 가능·대상은 active 멤버·role은 staff/member만"을 이미 강제한다 — 호출자
  * (`set-crew-member-role.ts`)가 대상 상태(E1·E2)를 먼저 확인했다는 전제다.
+ *
+ * **I-124 해소(26일차)** — 호출자의 사전 확인은 이중화일 뿐 강제 경계가 아니다. 직접 REST로
+ * 우회하면(실측: staff 본인 JWT로 자기 자신의 role을 바꾸려 시도) 트리거가 `raise exception`을
+ * 던지고, 예전엔 `throw error`가 그대로 전파돼 `setCrewMemberRoleAction`까지 raw exception이
+ * 올라갔다 — `transferCrewOwnership`이 이미 쓰는 패턴(`err("forbidden", …)`)으로 맞춘다.
  */
 export async function setCrewMembershipRole(
   crewId: Id,
@@ -342,7 +347,11 @@ export async function setCrewMembershipRole(
     .eq("profile_id", profileId)
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // crew_memberships_guard_self_transition이 여기서 거부될 수 있다(FR-024 AC2 "오너만
+    // 임명·해임 가능" 등) — D-030 ③에 따라 예외를 던지지 않고 도메인 오류로 표현한다.
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `crew ${crewId} 의 멤버십(${profileId})을 찾을 수 없다.`);
   return ok(toCrewMembership(data));
 }
@@ -423,6 +432,13 @@ export async function disbandCrew(
  * (`crew_memberships_guard_self_transition`이 `active→left`는 본인, `active→removed`는
  * 오너/임원 자격을 각각 검사한다). 조건부 UPDATE(`.eq("status","active")`)로 이미 탈퇴·강퇴된
  * 행에 중복 적용하지 않는다.
+ *
+ * **I-124 해소(26일차)** — `leaveCrewAction`은 오너를 `hasOwnerSuccessorOrDisband: false`로
+ * 항상 앱 레이어에서 막지만, 그건 이중화일 뿐이다. 직접 REST로 우회하면(실측: 오너 본인 JWT로
+ * 자기 자신을 `active→left`로 전환 시도) `crew_memberships_guard_self_transition`이 "오너는
+ * 이양·해산 없이 탈퇴할 수 없다(FR-026 E1)"를 던지고, 예전엔 `throw error`가 그대로 전파됐다 —
+ * `transferCrewOwnership`과 같은 패턴(`err("forbidden", …)`)으로 맞춘다. 조건부 UPDATE 자체가
+ * 만드는 "이미 비활성"(0행) 케이스는 종전대로 `err("conflict", …)`다.
  */
 export async function updateCrewMembershipStatus(
   crewId: Id,
@@ -439,7 +455,12 @@ export async function updateCrewMembershipStatus(
     .eq("status", "active")
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // crew_memberships_guard_self_transition이 여기서 거부될 수 있다(FR-026 E1 "오너는 이양·
+    // 해산 없이 탈퇴 불가", FR-027 E1 "임원은 일반 크루원만 강퇴 가능" 등) — D-030 ③에 따라
+    // 예외를 던지지 않고 도메인 오류로 표현한다.
+    return err("forbidden", error.message);
+  }
   if (!data) {
     return err("conflict", `crew ${crewId} 의 멤버십(${profileId})은 활성 상태가 아니다.`);
   }

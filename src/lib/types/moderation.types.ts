@@ -9,6 +9,14 @@ export type ReportTargetType = "post" | "comment" | "chat_message" | "profile";
  */
 export type ReportStatus = "pending" | "resolved" | "dismissed";
 
+/**
+ * 관리자 콘솔 상태 필터 값(I-077, 26일차) — `ReportStatus` 3종 + 전체 보기 sentinel `"all"`.
+ * `admin_list_reports` RPC의 `p_status`는 SQL `null`로 전체 상태를 받지만, URL 쿼리스트링·문자열
+ * 딕셔너리 키에는 `null`을 표현할 수 없어(빈 값과 구분되지 않는다) UI 경계에서만 이 sentinel을
+ * 쓴다 — `listReports` 호출 직전(`AdminReportsContainer`)에 `"all" → null`로 변환한다.
+ */
+export type ReportStatusFilter = ReportStatus | "all";
+
 /** FR-080, v0.2 대상 — 데이터 모델만 선반영. */
 export interface Report {
   id: Id;

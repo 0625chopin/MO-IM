@@ -861,6 +861,10 @@ export const ko = {
     postType: {
       free: "자유글",
       proposal: "모임 제안",
+      /** I-079/FR-065 AC2(26일차) — `meetup_reschedule_proposal` 전용 배지. `proposal`("모임
+       *  제안")과 같은 자리를 공유하지 않는다 — "구분되게"(팀장 지시) 요구가 게시판 목록·상세
+       *  배지에도 적용돼야 하기 때문이다. `meetup.reschedule.pageTitle`과 같은 문구를 쓴다. */
+      reschedule: "일정 변경 제안",
     },
     // 목록의 투표 상태 배지는 별도 문구 세트를 두지 않고 `vote.status`를 그대로 재사용한다.
     // 예전엔 board.voteStatusBadge로 따로 뒀는데, closed_invalid 하나를 두고 "무효"/"정족수 미달"로
@@ -1045,6 +1049,20 @@ export const ko = {
         noResponse: "미응답",
         empty: "아직 없어요",
       },
+      /** I-079/FR-065 AC2(26일차) — 조회자 본인의 참석 응답이 일정 변경으로 무효화됐을 때의
+       *  안내 배너. 무효화가 조용히 일어나면 사용자는 자신이 여전히 참석자인 줄 안다 —
+       *  팀장 결정("재확인을 요구한다")의 UI 반영이 이 문구다. */
+      attendanceInvalidatedNotice: "모임 일정이 변경돼 참석 응답이 초기화됐어요. 다시 응답해 주세요.",
+      /** I-079/FR-065 AC2 — "일정 변경 이력" 표시(AC2 "이력이 남는다"). 빈 상태(이력 없음)는
+       *  `empty`. `changedAtLabel`은 `board/format-post-date.ts`의 절대 날짜 포맷을 그대로
+       *  쓴다(별도 문자열 없음). */
+      scheduleHistory: {
+        title: "일정 변경 이력",
+        empty: "아직 일정 변경 이력이 없어요",
+        /** "8월 14일 금요일 07:00 → 8월 21일 금요일 19:00" 형태. 시각이 없으면 그 조각을
+         *  생략한다(FR-064 AC1과 같은 원칙, 컴포넌트 쪽 책임). */
+        change: "{previousDate} → {newDate}",
+      },
     },
     attendance: {
       attend: "참석",
@@ -1067,25 +1085,56 @@ export const ko = {
       },
     },
     cancelled: "취소된 모임입니다",
-    /** FR-065(Task 041) — 취소·일정 변경. D-003이 날짜 변경에 재투표를 요구해 "일정 변경"은
-     *  즉시 저장이 아니라 취소 + 새 제안글 작성 안내다(`community-expansion-041.md` §3). */
+    /** FR-065(Task 041 → 26일차 BOARD, I-079) — 취소. **"일정 변경"은 더 이상 이 액션(취소)을
+     *  거치지 않는다** — 21일차엔 D-003(재투표 요구) 때문에 "취소 + 새 제안글 작성 안내"라는
+     *  임시 경로였지만(`community-expansion-041.md` §3), 26일차 CORE가 "기존 확정 Meetup을
+     *  UPDATE하는 재투표"를 스키마 레벨에서 가능하게 만들면서(I-079) 그 임시 경로를
+     *  `meetup.reschedule.*`(전용 진입점)로 대체했다. 이 자리(`lifecycle`)에는 이제 취소만
+     *  남는다. */
     lifecycle: {
       cancelTrigger: "모임 취소",
       cancelConfirmTitle: "이 모임을 취소할까요?",
       cancelConfirmDescription: "취소하면 캘린더에서 취소 표시로 바뀌고 크루원에게 알림이 가요. 되돌릴 수 없어요.",
       cancelConfirmAction: "취소하기",
-      rescheduleTrigger: "일정 변경",
-      rescheduleConfirmTitle: "일정을 변경할까요?",
-      rescheduleConfirmDescription:
-        "이 모임은 취소되고, 새 날짜로 다시 제안하는 글쓰기 화면으로 이동해요. 재투표를 거쳐야 확정돼요.",
-      rescheduleConfirmAction: "취소하고 새로 제안하기",
+      /** I-079 — "일정 변경 제안" 전용 화면(`getMeetupRescheduleHref`)으로 이동하는 링크
+       *  버튼의 라벨. 취소와 달리 확인 Dialog가 없다 — 즉시 취소하는 게 아니라 글쓰기 화면으로
+       *  이동만 하므로(파괴적 동작이 아니다), `PostWriteContainer`로 가는 "글쓰기" 버튼과 같은
+       *  성격이다. */
+      rescheduleTrigger: "일정 변경 제안",
       cancelAction: "닫기",
       pending: "처리하는 중…",
       errors: {
         submitFailed: "처리하지 못했어요. 다시 시도해 주세요",
-        forbidden: "취소·변경 권한이 없어요",
+        forbidden: "취소 권한이 없어요",
         notFound: "모임을 찾을 수 없어요",
         conflict: "이미 취소됐거나 예정일이 지난 모임이에요",
+      },
+    },
+    /**
+     * I-079/FR-065 AC2(26일차) — "일정 변경 제안" 전용 글쓰기 화면(`MeetupRescheduleForm`).
+     * 일반 FR-034 제안(`board.write.*`)과 필드 구성이 같아 제목·설명·투표 마감·시작 시각·
+     * 장소·정원 라벨과 검증 문구는 `board.write.fields`·`board.write.validation`을 그대로
+     * 재사용한다(§4 "같은 개념은 문구를 공유한다") — 이 자리에는 이 화면 고유의 문구만 둔다.
+     */
+    reschedule: {
+      pageTitle: "일정 변경 제안",
+      description:
+        "새 일정으로 재투표를 진행해요. 가결되면 이 모임의 날짜·시각·장소·정원이 바뀌고, 기존 참석 응답은 모두 초기화돼요.",
+      currentScheduleLabel: "현재 일정",
+      capacityLabel: "정원 {capacity}명",
+      noCapacityLabel: "정원 제한 없음",
+      invalidationWarning:
+        "제안이 가결되면 참석자 전원의 응답이 초기화돼요 — 다들 새 일정에 다시 응답해야 해요.",
+      submit: "제안 등록",
+      submitPending: "등록하는 중…",
+      errors: {
+        /** `CreatePostActionResult`의 `kind:"denied"` 세 코드에 대응한다(`create-post.ts`
+         *  참고, BOARD가 새 `kind`를 만들지 않고 기존 코드 유니온에 `conflict`만 얹기로 판단한
+         *  근거는 그 파일 docstring에 있다). */
+        forbidden: "일정 변경 제안 권한이 없어요",
+        notFound: "대상 모임을 찾을 수 없어요",
+        conflict: "취소됐거나 예정일이 지난 모임이라 일정 변경을 제안할 수 없어요",
+        submitFailed: "제안을 등록하지 못했어요. 다시 시도해 주세요",
       },
     },
   },
@@ -1551,9 +1600,35 @@ export const ko = {
       title: "신고 관리",
       description:
         "접수된 신고를 확인하고 기각·콘텐츠 삭제·계정 제재 중 하나로 처리해요. 처리 결과는 감사 로그에 남아요.",
+      /** 상태 탭 레이블(I-077, 26일차). `statusLabel`(카드 배지)과 어휘가 겹칠 수 있지만
+       *  용도(탭 내비 vs 카드 배지)가 달라 별도 키로 둔다 — 나중에 문구가 갈라져도 서로
+       *  건드리지 않는다. */
+      statusFilter: {
+        all: "전체",
+        pending: "대기 중",
+        resolved: "처리됨",
+        dismissed: "기각됨",
+      },
+      statusFilterLabel: "상태별 보기",
+      /** 빈 상태 문구도 필터별로 다르다(I-077) — 필터를 붙이면 "0건"이 정상 경로가 되므로
+       *  "대기 중인 신고가 없어요" 한 문구로는 처리/기각 탭에서 의미가 어긋난다. */
       empty: {
-        title: "대기 중인 신고가 없어요",
-        description: "새 신고가 접수되면 여기 표시돼요",
+        all: {
+          title: "신고 내역이 없어요",
+          description: "접수된 신고가 아직 없어요",
+        },
+        pending: {
+          title: "대기 중인 신고가 없어요",
+          description: "새 신고가 접수되면 여기 표시돼요",
+        },
+        resolved: {
+          title: "처리한 신고가 없어요",
+          description: "콘텐츠 삭제·계정 제재로 처리한 신고가 여기 쌓여요",
+        },
+        dismissed: {
+          title: "기각한 신고가 없어요",
+          description: "근거 없다고 판단해 기각한 신고가 여기 쌓여요",
+        },
       },
       columns: {
         reporter: "신고자",

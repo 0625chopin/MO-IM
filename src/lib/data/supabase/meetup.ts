@@ -1,10 +1,17 @@
 import "server-only";
 
-import type { AttendanceJoinResult, AttendanceStatus, Id, Meetup, MeetupAttendance } from "@/lib/types";
+import type {
+  AttendanceJoinResult,
+  AttendanceStatus,
+  Id,
+  Meetup,
+  MeetupAttendance,
+  MeetupScheduleChange,
+} from "@/lib/types";
 
 import { type DataResult, err, ok } from "../contracts";
 
-import { toMeetup, toMeetupAttendance } from "./mappers";
+import { toMeetup, toMeetupAttendance, toMeetupScheduleChange } from "./mappers";
 import { createSupabaseServerClient } from "./server";
 
 /**
@@ -221,6 +228,14 @@ export async function respondAttendance(
  * `meetup:cancel_or_update` 권한 매트릭스 행과 정확히 같은 제약이라(Task 032가 이미
  * 만들어 둔 트리거) 별도 RPC 없이 일반 UPDATE로 충분하다. 과거 Meetup 가드(AC3)는 호출자가
  * `isMeetupAttendanceOpen`으로 먼저 판정한다(mock 구현과 동일 원칙).
+ *
+ * **I-124 해소(26일차)** — `cancelMeetupAction`은 `checkPermission("meetup:cancel_or_update")`로
+ * 이미 막지만, 그건 이중화일 뿐이다. RLS는 "소속 크루원이면 이 행에 닿을 수 있다"까지만 넓게
+ * 열어 두므로, 직접 REST로 우회하면(실측: 일반 크루원 본인 JWT로, 임원도 제안자도 아닌 채
+ * status를 cancelled로 전환 시도) `trg_meetups_guard_attendee_scope`가 "only staff/owner/
+ * proposal author may edit meetup fields other than attending_count"를 던지고, 예전엔
+ * `throw error`가 그대로 전파됐다. `transferCrewOwnership`과 같은 패턴(`err("forbidden", …)`)
+ * 으로 맞춘다.
  */
 export async function cancelMeetup(id: Id): Promise<DataResult<Meetup>> {
   const supabase = await createSupabaseServerClient();
@@ -231,7 +246,29 @@ export async function cancelMeetup(id: Id): Promise<DataResult<Meetup>> {
     .eq("status", "confirmed")
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // trg_meetups_guard_attendee_scope가 여기서 거부될 수 있다(임원·오너·제안자만 status
+    // 변경 가능) — D-030 ③에 따라 예외를 던지지 않고 도메인 오류로 표현한다.
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `meetup ${id} 를 찾을 수 없거나 이미 취소됐다.`);
   return ok(toMeetup(data));
+}
+
+/**
+ * I-079/FR-065 AC2(26일차, CORE) — Meetup 일정 변경 이력 조회. 최신 변경이 먼저 오도록
+ * 정렬한다(Meetup 상세 화면의 "일정 변경 이력" 표시가 최근 순으로 보여줄 것을 전제).
+ * `meetup_schedule_changes_select_members` RLS가 그 Meetup이 속한 크루의 활성 크루원에게만
+ * 열려 있다 — 비소속자는 조용히 빈 배열을 받는다(다른 조회 함수들과 같은 관례,
+ * `read-path-realdata-031.md` §5).
+ */
+export async function listMeetupScheduleChanges(meetupId: Id): Promise<MeetupScheduleChange[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("meetup_schedule_changes")
+    .select("*")
+    .eq("meetup_id", meetupId)
+    .order("changed_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(toMeetupScheduleChange);
 }

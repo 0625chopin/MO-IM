@@ -559,18 +559,21 @@ export type Database = {
       }
       meetup_attendances: {
         Row: {
+          invalidated_at: string | null
           meetup_id: string
           profile_id: string
           responded_at: string
           status: string
         }
         Insert: {
+          invalidated_at?: string | null
           meetup_id: string
           profile_id: string
           responded_at?: string
           status: string
         }
         Update: {
+          invalidated_at?: string | null
           meetup_id?: string
           profile_id?: string
           responded_at?: string
@@ -589,6 +592,66 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meetup_schedule_changes: {
+        Row: {
+          changed_at: string
+          id: string
+          meetup_id: string
+          new_capacity: number | null
+          new_date: string
+          new_place: string | null
+          new_start_time: string | null
+          poll_id: string
+          previous_capacity: number | null
+          previous_date: string
+          previous_place: string | null
+          previous_start_time: string | null
+        }
+        Insert: {
+          changed_at?: string
+          id?: string
+          meetup_id: string
+          new_capacity?: number | null
+          new_date: string
+          new_place?: string | null
+          new_start_time?: string | null
+          poll_id: string
+          previous_capacity?: number | null
+          previous_date: string
+          previous_place?: string | null
+          previous_start_time?: string | null
+        }
+        Update: {
+          changed_at?: string
+          id?: string
+          meetup_id?: string
+          new_capacity?: number | null
+          new_date?: string
+          new_place?: string | null
+          new_start_time?: string | null
+          poll_id?: string
+          previous_capacity?: number | null
+          previous_date?: string
+          previous_place?: string | null
+          previous_start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetup_schedule_changes_meetup_id_fkey"
+            columns: ["meetup_id"]
+            isOneToOne: false
+            referencedRelation: "meetups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meetup_schedule_changes_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: true
+            referencedRelation: "polls"
             referencedColumns: ["id"]
           },
         ]
@@ -866,6 +929,7 @@ export type Database = {
           meetup_date: string | null
           place: string | null
           start_time: string | null
+          target_meetup_id: string | null
           title: string
           type: string
         }
@@ -881,6 +945,7 @@ export type Database = {
           meetup_date?: string | null
           place?: string | null
           start_time?: string | null
+          target_meetup_id?: string | null
           title: string
           type: string
         }
@@ -896,6 +961,7 @@ export type Database = {
           meetup_date?: string | null
           place?: string | null
           start_time?: string | null
+          target_meetup_id?: string | null
           title?: string
           type?: string
         }
@@ -912,6 +978,13 @@ export type Database = {
             columns: ["board_id"]
             isOneToOne: false
             referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posts_target_meetup_id_fkey"
+            columns: ["target_meetup_id"]
+            isOneToOne: false
+            referencedRelation: "meetups"
             referencedColumns: ["id"]
           },
         ]
@@ -1323,3 +1396,9 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

@@ -28,9 +28,12 @@ export async function resolvePostLinkCard(
   const board = await getBoardById(post.boardId);
   if (!board || board.crewId !== viewerCrewId) return { kind: "forbidden" };
 
+  // I-079/FR-065 AC2 — 일정 변경 제안도 poll을 갖는 제안글 갈래다(§4.1). 넓히지 않으면
+  // 공유된 카드에서 투표 상태·남은 시간이 조용히 사라진다.
+  const isProposalType = post.type === "meetup_proposal" || post.type === "meetup_reschedule_proposal";
   const [author, poll] = await Promise.all([
     getProfileById(post.authorId),
-    post.type === "meetup_proposal" ? getPollByPostId(post.id) : Promise.resolve(null),
+    isProposalType ? getPollByPostId(post.id) : Promise.resolve(null),
   ]);
 
   const nowIso = new Date().toISOString();

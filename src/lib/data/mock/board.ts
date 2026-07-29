@@ -89,17 +89,25 @@ export interface CreatePostInput {
   type: PostType;
   title: string;
   body: string;
-  /** 아래 4개 필드는 전부 type='meetup_proposal'일 때만 의미 있다(FR-034, D-013). */
+  /**
+   * 아래 4개 필드는 전부 type='meetup_proposal'·'meetup_reschedule_proposal'일 때만 의미
+   * 있다(FR-034, D-013).
+   */
   meetupDate?: string | null;
   startTime?: string | null;
   place?: string | null;
   capacity?: number | null;
+  /** I-079/FR-065 AC2(26일차, CORE) — type='meetup_reschedule_proposal'일 때만 채운다.
+   *  실 DB 구현(`supabase/board.ts`)과 동일 계약(NFR-035) — 여기서는 크루·상태 스코프를
+   *  검증하지 않는다(DB CHECK·트리거가 강제하는 부분을 Mock이 흉내내지 않는다). */
+  targetMeetupId?: Id | null;
 }
 
-/** `general` 게시글은 모임 제안 필드 4종을 전부 null로 고정한다 — 유형별 분기를 호출부(Server
- *  Action)에 흩어 두지 않고 이 함수 하나가 강제한다. */
+/** `general` 게시글은 모임 제안 필드 4종·`targetMeetupId`를 전부 null로 고정한다 — 유형별
+ *  분기를 호출부(Server Action)에 흩어 두지 않고 이 함수 하나가 강제한다. */
 export async function createPost(input: CreatePostInput): Promise<Post> {
-  const isProposal = input.type === "meetup_proposal";
+  const isProposal = input.type === "meetup_proposal" || input.type === "meetup_reschedule_proposal";
+  const isReschedule = input.type === "meetup_reschedule_proposal";
   const post: Post = {
     id: generateId("post"),
     boardId: input.boardId,
@@ -111,6 +119,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
     startTime: isProposal ? (input.startTime ?? null) : null,
     place: isProposal ? (input.place ?? null) : null,
     capacity: isProposal ? (input.capacity ?? null) : null,
+    targetMeetupId: isReschedule ? (input.targetMeetupId ?? null) : null,
     createdAt: new Date().toISOString(),
     editedAt: null,
     deletedAt: null,

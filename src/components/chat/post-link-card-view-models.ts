@@ -20,7 +20,8 @@ export type PostLinkCardViewModel =
       title: string;
       authorDisplayName: string;
       authorAvatarUrl: string | null;
-      /** `postType === "meetup_proposal"`일 때만 값이 있다(FR-052 AC3 "투표 상태와 남은 시간"). */
+      /** `postType === "meetup_proposal"` 또는 `"meetup_reschedule_proposal"`일 때만 값이
+       *  있다(FR-052 AC3 "투표 상태와 남은 시간", I-079/FR-065 AC2로 26일차 확장). */
       poll: {
         status: PollStatus;
         closesAt: ISODateTimeString;

@@ -38,9 +38,13 @@ export async function PostDetailContainer({ crewId, postId }: { crewId: Id; post
     return <PostDeletedNotice crewId={crewId} />;
   }
 
+  // I-079/FR-065 AC2 — 일정 변경 제안도 poll을 갖는 제안글 갈래다. `BoardListContainer`와
+  // 같은 이유로 이 게이트를 넓힌다(넓히지 않으면 pollStatus가 항상 null로 남아 `PostDetail`의
+  // 투표 상태 배지가 조용히 사라진다).
+  const isProposalType = post.type === "meetup_proposal" || post.type === "meetup_reschedule_proposal";
   const [author, poll, blockedProfileIds] = await Promise.all([
     getProfileById(post.authorId),
-    post.type === "meetup_proposal" ? getPollByPostId(post.id) : Promise.resolve(null),
+    isProposalType ? getPollByPostId(post.id) : Promise.resolve(null),
     // FR-081 AC1(Task 042A, 20일차) — BoardListContainer와 같은 패턴.
     listMyBlockedProfileIds(),
   ]);

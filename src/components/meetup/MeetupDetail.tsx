@@ -9,6 +9,7 @@ import type {
 } from "@/components/meetup/meetup-view-models";
 import { MeetupAttendanceActions } from "@/components/meetup/MeetupAttendanceActions";
 import { MeetupLifecycleActions } from "@/components/meetup/MeetupLifecycleActions";
+import { MeetupScheduleHistory } from "@/components/meetup/MeetupScheduleHistory";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,13 @@ export interface MeetupDetailProps {
  * 표현한다 — 두 도메인 오류 모두 `/sample`의 `meetup` 섹션에 별도 항목으로 등록돼 있다
  * (`src/components/sample/sections/meetup.tsx` 참고). 이 docstring이 실제 등록과 어긋나면
  * R-006 재발이니 등록을 바꿀 때 이 문단도 함께 고친다.
+ *
+ * **I-079/FR-065 AC2(26일차, BOARD) 추가** — 참석 응답 무효화 안내(`attendanceInvalidated`)와
+ * "일정 변경 이력"(`MeetupScheduleHistory`, 빈 배열이면 자체적으로 "이력 없음"을 그린다 —
+ * 그래서 이 화면 자체의 "빈" 상태 정의가 하나 늘지는 않는다, 참석자 목록의 "빈"과는 별개
+ * 개념이다). 취소·일정 변경 제안 버튼 노출은 `MeetupLifecycleActions`에 `canCancelOrUpdate`·
+ * `canProposeReschedule` 두 값을 각각 넘겨 그 컴포넌트가 판단한다(더 이상 이 컴포넌트가 단일
+ * 플래그로 그 자식을 통째로 숨기지 않는다).
  */
 export function MeetupDetail({ meetup, participants, attendanceState }: MeetupDetailProps) {
   const timeLabel = formatStartTimeKo(meetup.startTime);
@@ -102,6 +110,14 @@ export function MeetupDetail({ meetup, participants, attendanceState }: MeetupDe
           </Link>
         )}
 
+        {/* I-079/FR-065 AC2 — 조회자 본인의 참석 응답이 일정 변경으로 무효화됐을 때의 안내.
+         *  무효화가 조용히 일어나면 사용자는 자신이 여전히 참석자인 줄 안다(팀장 결정 반영). */}
+        {meetup.attendanceInvalidated && (
+          <p className="rounded-lg border border-dashed border-destructive/40 bg-destructive/5 p-2.5 text-sm text-destructive">
+            {strings.meetup.detail.attendanceInvalidatedNotice}
+          </p>
+        )}
+
         <div className="flex flex-col gap-3">
           <h3 className="text-sm font-medium text-foreground">
             {strings.meetup.detail.participants.title}
@@ -122,19 +138,23 @@ export function MeetupDetail({ meetup, participants, attendanceState }: MeetupDe
             people={participants.noResponse}
           />
         </div>
+
+        {/* I-079/FR-065 AC2 — "이력이 남는다"의 표시 지점. 빈 배열이면 컴포넌트 자신이
+         *  "이력 없음"을 그린다(AC2 빈 상태). */}
+        <MeetupScheduleHistory changes={meetup.scheduleChanges} />
       </CardContent>
 
       <CardFooter className="flex-col items-stretch gap-3 border-t">
         <MeetupAttendanceActions meetupId={meetup.id} state={attendanceState} />
-        {/* FR-065(Task 041) — 취소·일정 변경은 컨테이너가 이미 판정한 `canCancelOrUpdate`
-         *  (임원·오너 또는 제안자 본인, AC3로 과거 Meetup은 이미 false)로만 노출한다. */}
-        {meetup.canCancelOrUpdate && (
-          <MeetupLifecycleActions
-            crewId={meetup.crewId}
-            meetupId={meetup.id}
-            boardWriteHref={meetup.boardWriteHref}
-          />
-        )}
+        {/* FR-065 — 취소는 `canCancelOrUpdate`(제안자 본인·임원·오너, AC3로 과거 Meetup은 이미
+         *  false)로, 일정 변경 제안 진입은 `canProposeReschedule`(활성 크루원 전원)로 각각
+         *  노출 여부가 갈린다 — 컴포넌트 내부에서 둘 다 false면 아무것도 그리지 않는다. */}
+        <MeetupLifecycleActions
+          crewId={meetup.crewId}
+          meetupId={meetup.id}
+          canCancelOrUpdate={meetup.canCancelOrUpdate}
+          canProposeReschedule={meetup.canProposeReschedule}
+        />
       </CardFooter>
     </Card>
   );

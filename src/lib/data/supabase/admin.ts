@@ -27,16 +27,27 @@ import { createSupabaseServerClient } from "./server";
  */
 
 /**
- * `status`는 v0.1 UI가 실제로 쓰는 "pending"이 기본값이다 — RPC 자체는 `p_status`에
- * SQL `null`(전 상태 조회)도 받아들이지만, 처리 이력 화면이 아직 없어(이번 회차 범위 밖)
- * 이 함수의 공개 시그니처에는 아직 열어 두지 않는다. 필요해지면 `status: ReportStatus | null`
- * 로 넓히고 호출부를 갱신한다.
+ * (26일차, I-077 해소) 예전 이름은 `listPendingReports`였고 `status`가 `ReportStatus`
+ * 3종으로만 좁아 있었다 — 대기열 하나만 화면이 있었기 때문이다. 이제 `/admin`에 상태 필터
+ * 탭(전체·대기·처리됨·기각됨)이 생겨 `status: ReportStatus | null`로 넓힌다. RPC
+ * (`admin_list_reports`)는 처음부터 `p_status is null or r.status = p_status` 분기가 있어
+ * `null`을 그대로 넘기면 전체 상태를 반환한다 — 마이그레이션은 필요 없었다. 호출자는
+ * `ReportStatusFilter`("all" sentinel 포함)를 쓰고, `"all" → null` 변환은 호출부
+ * (`AdminReportsContainer`)가 한다 — 이 함수 자체는 SQL이 실제로 받는 `ReportStatus | null`
+ * 타입 그대로 둔다.
  */
-export async function listPendingReports(
-  status: ReportStatus = "pending",
+export async function listReports(
+  status: ReportStatus | null = "pending",
 ): Promise<AdminReportQueueItem[]> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("admin_list_reports", { p_status: status });
+  // `database.types.ts`가 생성한 `Args`는 `{ p_status?: string }`뿐이라 `null`을 타입상
+  // 못 받는 것처럼 보인다 — 생성기가 `p_status text default 'pending'`(DEFAULT는 있지만
+  // NOT NULL은 아니다)의 nullability를 반영하지 못하는 gap이다. 여기서만 좁게 캐스팅한다
+  // (런타임엔 그대로 JSON `null`로 나가고, RPC의 `p_status is null or …` 분기가 그 값을
+  // 받는다 — 이미 프로덕션에서 검증된 SQL 분기, 새 캐스팅은 타입 표현만의 문제다).
+  const { data, error } = await supabase.rpc("admin_list_reports", {
+    p_status: status,
+  } as { p_status?: string });
   if (error) throw error;
 
   return (data ?? []).map((row) => ({

@@ -431,3 +431,79 @@ WARN 0건). 새 이슈로 등재하지 않았다.
 - 이 문서(`docs/decisions/permission-baseline.md`), 신규.
 - DB 변경 없음(자기반증용 GRANT/REVOKE는 즉시 원복, §3 참고). 마이그레이션 미적용.
 - 이슈 등재 없음(§6 — 조사 중 발견한 것은 결함이 아니라고 판단, draft에도 올리지 않음).
+
+## 8. 26일차 첫 정기 대조 — 이 도구의 첫 실전 재사용
+
+- **일자**: 2026-07-29(세션 시각 기준 — 시스템 "오늘"은 2026-07-30이지만 DB 서버 시각은
+  세션 내내 2026-07-29였다, `now()` 결과로 확인) / **담당**: CREW.
+- **전제 변화**: 이번 회차 중 CORE가 `meetup_reschedule_pipeline_079` 마이그레이션
+  (version `20260729152504`, FR-065 AC2 "일정 변경 투표")을 적용했다. 로컬에
+  `docs/decisions/meetup-reschedule-079.md`가 이 세션 시점엔 아직 없어(CORE 작업 진행 중으로
+  추정) 문서 대조 대신 **`supabase_migrations.schema_migrations.statements`로 실제 적용된
+  SQL 원문을 직접 읽어** 대조 기준으로 삼았다 — 이 마이그레이션은 (1) `posts`에
+  `target_meetup_id` 컬럼·CHECK 2개 추가, (2) 신규 트리거 함수
+  `posts_guard_reschedule_target_scope`(+명시적 REVOKE 포함, D-074 요건 충족) 및 트리거
+  `trg_posts_guard_reschedule_target_scope`(INSERT+UPDATE 2종 이벤트), (3) `polls_insert_
+  proposal_author` 정책 DROP+CREATE(허용 타입에 `meetup_reschedule_proposal` 추가), (4) 신규
+  테이블 `meetup_schedule_changes`(RLS 활성화 + SELECT 정책 1개 + 클라이언트 쓰기 전부
+  REVOKE), (5) `private.respond_meetup_attendance`·`public.finalize_closed_poll`·
+  `public.run_poll_auto_close_job` 3개 함수 본문 교체(시그니처 불변)로 구성된다.
+- **재현 절차 준수**: `list_tables`로 대상이 MO-IM(26개→27개 테이블, ref
+  `damruradpliktkrlkakl`)임을 먼저 확인했다. 쿼리 8개를 문서 그대로 재실행했다.
+
+### 쿼리별 대조 — 원시 출력에서 직접 센 숫자만 적는다
+
+| # | 최초 기준선(25일차) | 오늘(26일차) | 판정 |
+| --- | --- | --- | --- |
+| 1 (RLS 활성화) | 26개 테이블 | **27개**(+`meetup_schedule_changes`, `rls_enabled=true`·`rls_forced=false`) | **정당한 변경** — CORE 마이그레이션 ④. 그 외 26개는 값 불변 |
+| 2 (RLS 정책 전문) | 60개 | **61개**(원시 출력에서 테이블별로 다시 세어 합산 확인 — 오탈 방지) | **정당한 변경** — `meetup_schedule_changes_select_members` 신규 +1. 추가로 `polls_insert_proposal_author`의 `with_check` 텍스트가 `p.type = 'meetup_proposal'` → `p.type = ANY (ARRAY['meetup_proposal','meetup_reschedule_proposal'])`로 바뀜(정책 개수는 DROP+CREATE라 불변, 텍스트만 변경) — 마이그레이션 ③과 정확히 일치. 그 외 정책 텍스트(예시로 재확인한 `crew_memberships_insert_self_request`·`invitations_insert_staff_or_owner`·`crews_select_anon_public`) 전부 바이트 단위 불변 |
+| 3 (테이블 권한) | 26개 테이블×anon/authenticated, TRUNCATE 0건 | **27개 테이블**(+`meetup_schedule_changes`: 양쪽 롤 모두 `REFERENCES,SELECT,TRIGGER` — `meetup_attendances`와 동일 패턴). **TRUNCATE 여전히 0건** | **정당한 변경**(신규 테이블) + **회귀 없음 확인**(I-111 축) |
+| 4 (함수 EXECUTE 그랜티) | private 20 / public 49 | private **20**(불변) / public **50**(+1) | **정당한 변경** — 신규 `posts_guard_reschedule_target_scope`가 `postgres,service_role`만 가짐(D-074 요건대로 같은 마이그레이션 안에서 REVOKE 포함 확인). 기존 3개 교체 함수(`respond_meetup_attendance`·`finalize_closed_poll`·`run_poll_auto_close_job`)의 그랜티는 `CREATE OR REPLACE`에도 불구하고 **불변**(자기반증 통과 — D-074가 우려한 "교체 시 grant 유실" 없음). 문서가 명시적으로 짚어둔 두 함수(`crew_memberships_guard_self_insert_request`·`poll_eligible_voters_guard_insert_scope`)도 `postgres,service_role`만으로 불변 확인 |
+| 5 (default privileges) | `public` 스키마 `S`/`f`/`r` 3행 | **바이트 단위 완전 일치**(`r`: `anon=arwdxtm`·TRUNCATE 없음 그대로, `f`: `anon=X` 그대로 — D-074 원복 상태 계속 유지) | **회귀 없음** |
+| 6 (함수 인벤토리) | private 20 / public 49, 예외 없는 `search_path`, 2건만 `search_path=public` | private 20(불변) / public **50**(+1, 신규 함수도 `search_path=""` 정상 — 예외 아님, 여전히 2건만 `public`: `chat_messages_broadcast`·`join_requests_stamp_decided_at`) | **정당한 변경** — `body_hash` 변경은 마이그레이션이 명시한 3개 함수(`respond_meetup_attendance`·`finalize_closed_poll`·`run_poll_auto_close_job`)로 전부 설명됨. `result_signature`는 이 3개 모두 **불변**(`TABLE(ok,changed,reason)`·`void`·`bigint`) — 시그니처 드리프트 없음 |
+| 7 (트리거) | 정의 29개 / 행 32개 | 정의 **30개**(+1) / 행 **34개**(+2) | **정당한 변경** — `trg_posts_guard_reschedule_target_scope`가 INSERT+UPDATE 2개 이벤트에 걸려 정의 1개가 행 2개를 만든다(기존 3개 2행-트리거와 같은 패턴). 나머지 29개 정의·32행은 이름·타이밍·연결 함수 전부 불변 |
+| 8 (Realtime publication) | 0행 | **0행** | **회귀 없음** — D-030 ②/CON-12 전제 유지 |
+
+### 3분류 요약
+
+- **정당한 변경**: 쿼리 1·2·3·4·6·7 — 전부 `meetup_reschedule_pipeline_079`(I-079, FR-065 AC2)
+  하나로 완전히 설명된다. 숫자·텍스트 델타가 마이그레이션 원문과 한 글자도 어긋나지 않았다.
+- **가짜 diff(도구 결함)**: **0건.** 이번 대조는 최초 기준선과 달리 집계 오류를 만들지
+  않았다 — 표에 적은 숫자는 전부 원시 JSON 출력을 육안으로 다시 세어 합산한 값이다(산문을
+  베끼지 않았다, 팀장 지시 준수).
+- **실제 회귀**: **0건.** 쿼리 5·8은 바이트/행 단위로 완전 불변. 쿼리 3의 TRUNCATE(I-111 축)도
+  0건 유지.
+
+### 관찰(회귀는 아니다) — 새 트리거 함수의 EXECUTE 관례 이탈
+
+`posts_guard_reschedule_target_scope`는 `security_definer=false`(다른 BEFORE 가드 트리거
+함수들과 동일)인데도 CORE가 `public,anon,authenticated`의 EXECUTE를 명시적으로 REVOKE했다.
+기존 관례(§6, 25일차)는 "트리거 함수는 Postgres가 직접 호출을 막고 INVOKER라 권한 상승도
+없으므로 `PUBLIC` EXECUTE를 그대로 둔다"였다 — `chat_messages_guard_delete_only`·
+`meetups_guard_attendee_scope` 등 11개가 여전히 `PUBLIC,anon,authenticated,postgres,
+service_role`로 열려 있다. 이번 REVOKE는 **더 엄격한 방향의 이탈**이라 결함이 아니고
+새 이슈로 올리지 않는다 — 다만 "가드 트리거 함수는 EXECUTE를 안 잠가도 된다"는 관례와
+"새 함수는 REVOKE"라는 D-074 관례가 서로 다른 함수에 다르게 적용된 사례로 남는다.
+
+### BOARD 한계 6번(`result_signature`) 재검증 — 실제로 작동함을 재확인
+
+25일차 이후 이 세션에서 직접 재현했다(스크래치 함수, 즉시 DROP로 정리): `RETURNS
+TABLE(participant_count int, other_count int)`을 본문 변경 없이 `RETURNS
+TABLE(participants_count int, other_count int)`으로 컬럼명만 바꾸자 —
+`body_hash`는 두 버전 모두 `b2df11a5d04bb76fd0af48b4e2d47ff4`로 **동일**(예상대로 못 잡음),
+`result_signature`는 `TABLE(participant_count integer, ...)` → `TABLE(participants_count
+integer, ...)`로 **정확히 달라짐**. 25일차 BOARD가 추가한 이 컬럼이 의도한 대로 작동한다.
+
+### 한계(이번 대조에서 드러난 것)
+
+- **문서 §2가 요구하는 "원시 출력과 줄 단위 대조"를 문자 그대로는 못 했다** — 25일차 문서에는
+  쿼리 6·4의 전체 원시 출력(함수 70개 각각의 body_hash)이 보존돼 있지 않고 "원시 출력에
+  있다(분량상 생략)"로만 적혀 있어, 이번 세션은 그 원시 출력에 접근할 수 없었다. 대신
+  (1) 문서가 명시적으로 인용한 개별 값(정책 텍스트 3건, 함수 그랜티 2건)은 바이트 단위로
+  재확인했고, (2) 카운트 델타는 CORE 마이그레이션의 실제 SQL 원문과 대조해 "설명 가능한
+  변경"임을 구조적으로 검증했다. 완전한 회귀 감지(모든 함수의 이전 해시와의 전수 diff)는
+  **다음 회차부터 이 문서에 원시 카운트 스냅샷을 그대로 첨부해 두어야** 가능하다 — 이 자체를
+  새 이슈로 draft에 남긴다.
+- `docs/decisions/meetup-reschedule-079.md`가 이 세션 시점엔 없어 CORE의 1차 문서와
+  대조하지 못했다(대신 실제 적용된 SQL 원문으로 대조) — 문서가 이후 생기면 내용이 이번 절과
+  어긋나지 않는지 한 번 더 확인이 필요하다(미확인으로 남김).

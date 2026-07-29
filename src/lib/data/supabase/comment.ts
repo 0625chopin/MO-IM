@@ -66,7 +66,17 @@ export async function createComment(input: CreateCommentInput): Promise<Comment>
 
 export type UpdateCommentInput = Pick<Comment, "body">;
 
-/** 댓글 수정(FR-033). 삭제된 댓글은 `.is("deleted_at", null)`로 걸러 0행이 되면 not_found다. */
+/**
+ * 댓글 수정(FR-033). 삭제된 댓글은 `.is("deleted_at", null)`로 걸러 0행이 되면 not_found다.
+ *
+ * **I-124 해소(26일차)** — `updateCommentAction`은 `isSelf`가 아니면 이 함수 호출 전에 이미
+ * 막지만, 그건 이중화일 뿐이다. `comments_update_author_or_staff_delete` RLS는 본인 또는
+ * 임원 이상까지 이 행에 UPDATE로 닿게 허용하는 반면(강퇴 목적의 소프트 삭제를 위해), 실제
+ * "본문 수정"은 본인만 가능하다는 세부 규칙은 `comments_guard_non_author_delete_only` 트리거가
+ * 강제한다 — 직접 REST로 우회하면(실측: 임원 본인 JWT로 타인 댓글의 `body`를 수정 시도)
+ * "only the author may edit comment content"를 던지고, 예전엔 `throw error`가 그대로
+ * 전파됐다. `transferCrewOwnership`과 같은 패턴(`err("forbidden", …)`)으로 맞춘다.
+ */
 export async function updateComment(id: Id, patch: UpdateCommentInput): Promise<DataResult<Comment>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -76,7 +86,11 @@ export async function updateComment(id: Id, patch: UpdateCommentInput): Promise<
     .is("deleted_at", null)
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // comments_guard_non_author_delete_only가 여기서 거부될 수 있다(본문 수정은 작성자만) —
+    // D-030 ③에 따라 예외를 던지지 않고 도메인 오류로 표현한다.
+    return err("forbidden", error.message);
+  }
   if (!data) return err("not_found", `comment ${id} 를 찾을 수 없다.`);
   return ok(toComment(data));
 }
