@@ -31,6 +31,21 @@ export async function getInvitationById(id: Id): Promise<Invitation | null> {
   return data ? toInvitation(data) : null;
 }
 
+/**
+ * **D-073 (I-030)**: 초대 만료는 상태 전이가 아니라 **조회 필터링**으로 다룬다.
+ * `invitations.status`는 만료돼도 절대 `'pending'`에서 스스로 바뀌지 않는다(배치·트리거
+ * 없음 — 24일차 실측). 그래서 `"pending"` 조회에서는 `expires_at > now()` 조건을 얹어 이미
+ * 지난 초대를 결과에서 뺀다 — "받은 초대함"이 몇 달 지난 초대를 방금 온 것과 구분 없이
+ * 영원히 보여주던 문제(I-030 §4)가 여기서 없어진다.
+ *
+ * 이 필터를 `status === "pending"`일 때만 적용하는 이유: 이미 응답이 끝난 상태
+ * (`accepted`/`declined`)를 조회할 때까지 `expires_at`으로 걸러내면, 정상적으로 수락된
+ * 과거 이력(초대 당시엔 유효했고 실제로 수락까지 됐지만 지금 시각 기준으로는 `expiresAt`이
+ * 지난 행)이 조회에서 사라져 이력을 왜곡한다 — "지금 응답 가능한가"만 만료가 좌우해야
+ * 하고, "과거에 무슨 일이 있었는가"는 만료와 무관해야 한다. `status` 미지정(전체 조회) 시에도
+ * 같은 이유로 필터를 걸지 않는다 — 현재 호출부는 `"pending"` 하나뿐이라(`InvitationInboxContainer`)
+ * 실질적인 차이는 없지만, 의미를 명확히 남겨 둔다.
+ */
 export async function listInvitationsForProfile(
   inviteeId: Id,
   status?: InvitationStatus,
@@ -38,6 +53,7 @@ export async function listInvitationsForProfile(
   const supabase = await createSupabaseServerClient();
   let query = supabase.from("invitations").select("*").eq("invitee_id", inviteeId);
   if (status) query = query.eq("status", status);
+  if (status === "pending") query = query.gt("expires_at", new Date().toISOString());
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(toInvitation);
@@ -104,6 +120,18 @@ export async function createInvitation(
 /**
  * 초대 수락·거절(FR-021). 조건부 UPDATE(`.eq("status","pending")`)로 이미 응답했거나 만료된
  * 초대는 conflict — 동시에 두 번 응답하는 경쟁도 이 조건으로 막힌다(D-019와 같은 원리).
+ *
+ * **DESIGN 교차검증 발견(25일차) 해소** — `trg_invitations_guard_response_transition`
+ * (BEFORE UPDATE, I-091)이 `old.expires_at <= now()`를 **DB 시각 기준**으로 독립 강제한다.
+ * Server Action(`respond-to-invitation.ts`)은 UPDATE 전에 `evaluateInvitationResponseEligibility`
+ * 로 **앱(JS) 시각** 기준 만료를 먼저 걸러내므로 정상 경로에서는 이 트리거에 도달하지
+ * 않지만, 앱-DB 클럭 편차나 만료 경계와 정확히 겹치는 좁은 레이스에서는 JS 사전 검사를
+ * 통과한 뒤에도 이 UPDATE 시점엔 DB `now()`가 이미 만료를 넘겨 트리거가 `P0001` 예외를
+ * 던질 수 있다. 예전엔 `if (error) throw error`라 이 예외가 처리되지 않은 채
+ * `respondToInvitationAction`까지 그대로 올라갔다 — `updateCrewInfo`/`updateCrewVisibility`
+ * (I-070)와 같은 패턴으로 `err("conflict", ...)`로 감싼다. 호출자는 이미 `!result.ok`를
+ * `strings.invitation.inbox.errors.failed`로 범용 처리하므로(I-070과 동일한 이유) 이
+ * 파일 밖은 손대지 않아도 된다.
  */
 export async function respondToInvitation(
   id: Id,
@@ -117,7 +145,7 @@ export async function respondToInvitation(
     .eq("status", "pending")
     .select("*")
     .maybeSingle();
-  if (error) throw error;
+  if (error) return err("conflict", error.message);
   if (!data) return err("conflict", `invitation ${id} 는 이미 처리됐거나 존재하지 않는다.`);
   return ok(toInvitation(data));
 }

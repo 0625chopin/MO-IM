@@ -31,12 +31,24 @@ export async function getInvitationById(id: Id): Promise<Invitation | null> {
   return store.invitations.find((i) => i.id === id) ?? null;
 }
 
+/**
+ * **D-073 (I-030)**: 초대 만료는 상태 전이가 아니라 **조회 필터링**으로 다룬다 — Supabase
+ * 구현(`lib/data/supabase/invitation.ts`)과 동일한 규칙(D-030 "조회부만 교체" 원칙, 두
+ * 구현이 갈리면 안 된다). `status === "pending"` 조회에서만 `expiresAt`이 지난 초대를
+ * 제외한다 — 이미 응답이 끝난 상태를 조회할 때 만료로 걸러내면 과거 이력이 왜곡된다(이유는
+ * Supabase 구현 쪽 주석 참고). ISO 8601 문자열은 사전식 비교가 시각 순서와 일치한다
+ * (`invitation-response-eligibility.ts`와 같은 관례).
+ */
 export async function listInvitationsForProfile(
   inviteeId: Id,
   status?: InvitationStatus,
 ): Promise<Invitation[]> {
+  const nowIso = new Date().toISOString();
   return store.invitations.filter(
-    (i) => i.inviteeId === inviteeId && (!status || i.status === status),
+    (i) =>
+      i.inviteeId === inviteeId &&
+      (!status || i.status === status) &&
+      (status !== "pending" || i.expiresAt > nowIso),
   );
 }
 

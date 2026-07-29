@@ -58,4 +58,7 @@ export interface PostDetailViewModel {
    *  이 `true`면 본문(`CardContent`)만 `BlockedContentNotice`로 감싼다 — 제목·작성자 표기는
    *  목록에서 이미 봤을 정보라 그대로 둔다. */
   isAuthorBlocked: boolean;
+  /** FR-080(I-117 해소, 25일차) — `report:create` 판정 결과 AND 본인 글이 아님. `PostActions`에
+   *  그대로 내려가 신고 버튼 노출 여부를 결정한다. */
+  canReport: boolean;
 }

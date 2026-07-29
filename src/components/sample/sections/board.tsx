@@ -101,6 +101,8 @@ const SAMPLE_POST_DETAIL: PostDetailViewModel = {
   canDelete: true,
   meetupDateLocked: true,
   isAuthorBlocked: false,
+  // 본인 글(canEditTitleBody·canDelete가 true인 것과 같은 전제) — 신고 버튼을 보여주지 않는다.
+  canReport: false,
 };
 
 /** FR-081 AC1(Task 042A, 20일차) 데모용 — 차단한 사용자의 게시글 상세(본문만 접힘, 제목·작성자는
@@ -110,6 +112,8 @@ const SAMPLE_POST_DETAIL_BLOCKED: PostDetailViewModel = {
   id: "sample-demo-post-blocked",
   authorDisplayName: "차단된사용자",
   isAuthorBlocked: true,
+  // 차단한 사용자는 본인일 수 없다 — 신고 버튼이 보인다(FR-080, I-117 해소).
+  canReport: true,
 };
 
 /** FR-033(Task 041) 데모용 — 최상위 댓글 2건(그중 하나는 답글 1건), 삭제된 댓글 아래 답글이
@@ -129,6 +133,8 @@ const SAMPLE_COMMENTS: CommentSectionViewModel = {
       canEdit: false,
       canDelete: false,
       canReply: true,
+      // 박민준의 댓글 — 뷰어 본인이 아니므로 신고 가능(FR-080, I-117 해소).
+      canReport: true,
       replies: [
         {
           id: "sample-comment-1-reply-1",
@@ -141,6 +147,8 @@ const SAMPLE_COMMENTS: CommentSectionViewModel = {
           canDelete: true,
           // 답글에는 다시 답글을 달 수 없다(depth 1, canReplyToComment).
           canReply: false,
+          // canEdit·canDelete가 true인 것과 같은 전제(본인 댓글) — 신고 버튼을 보여주지 않는다.
+          canReport: false,
           replies: [],
         },
       ],
@@ -156,6 +164,8 @@ const SAMPLE_COMMENTS: CommentSectionViewModel = {
       canEdit: false,
       canDelete: false,
       canReply: true,
+      // 삭제된 댓글은 신고할 본문이 없다.
+      canReport: false,
       replies: [
         {
           id: "sample-comment-2-reply-1",
@@ -167,6 +177,7 @@ const SAMPLE_COMMENTS: CommentSectionViewModel = {
           canEdit: false,
           canDelete: false,
           canReply: false,
+          canReport: true,
           replies: [],
         },
       ],
@@ -191,6 +202,7 @@ const SAMPLE_COMMENTS_WITH_BLOCKED: CommentSectionViewModel = {
       canEdit: false,
       canDelete: false,
       canReply: true,
+      canReport: true,
       replies: [],
     },
     ...SAMPLE_COMMENTS.comments,
@@ -350,7 +362,7 @@ export const boardSection = defineSection({
     })),
     {
       name: "게시글 상세 (PostDetail)",
-      note: "모임 제안글 예시 — 유형 배지 + 투표 상태 배지(Task 019가 만들 투표 참여 UI는 여기 들어가지 않습니다) + 잠긴 모임 예정일(D-035) + 작성자 본인 기준 수정·삭제 액션.",
+      note: "모임 제안글 예시 — 유형 배지 + 투표 상태 배지(Task 019가 만들 투표 참여 UI는 여기 들어가지 않습니다) + 잠긴 모임 예정일(D-035) + 작성자 본인 기준 수정·삭제 액션. 이 예시는 본인 글이라(canEditTitleBody·canDelete=true) canReport=false — 신고 버튼은 아래 '타인 글 조회' 항목에서 확인하세요(FR-080, I-117 해소).",
       panels: {
         default: (
           <PreviewFrame height={460}>
@@ -376,15 +388,15 @@ export const boardSection = defineSection({
       },
     },
     {
-      name: "게시글 상세 — 타인 글 조회 (수정·삭제 버튼 없음)",
-      note: "post:update_own·post:delete_own·post:delete_any가 전부 거부된 경우 — PostActions가 아무것도 렌더하지 않는다(null).",
+      name: "게시글 상세 — 타인 글 조회 (수정·삭제 버튼 없음, 신고 버튼만 남음)",
+      note: "post:update_own·post:delete_own·post:delete_any가 전부 거부된 경우 — 수정·삭제 버튼은 사라지지만 report:create는 로그인 회원 전체에 allow라 신고 버튼은 남는다(FR-080, I-117 해소, 25일차). 셋 다 거부되고 신고 권한도 없는(canReport=false) 경우에만 PostActions가 아무것도 렌더하지 않는다(null) — 예: 게스트 세션.",
       panels: {
         default: (
           <PreviewFrame height={420}>
             <div className="p-4">
               <PostDetail
                 crewId="crew-1"
-                post={{ ...SAMPLE_POST_DETAIL, canEditTitleBody: false, canDelete: false }}
+                post={{ ...SAMPLE_POST_DETAIL, canEditTitleBody: false, canDelete: false, canReport: true }}
               />
             </div>
           </PreviewFrame>
@@ -432,7 +444,7 @@ export const boardSection = defineSection({
     },
     {
       name: "댓글 (CommentList, FR-033)",
-      note: "최상위 댓글 2건 — 하나는 답글 1건이 달렸고, 다른 하나는 삭제된 부모 아래 답글이 그대로 유지되는 AC3 사례입니다(depth 1 제한 — 답글에는 '답글' 버튼이 없습니다). 작성 폼은 실제 CommentComposer/createCommentAction입니다 — postId가 실재하지 않는 값(sample-demo-post)이라 등록을 눌러도 'not_found' 오류만 안전하게 보여줍니다.",
+      note: "최상위 댓글 2건 — 하나는 답글 1건이 달렸고, 다른 하나는 삭제된 부모 아래 답글이 그대로 유지되는 AC3 사례입니다(depth 1 제한 — 답글에는 '답글' 버튼이 없습니다). 작성 폼은 실제 CommentComposer/createCommentAction입니다 — postId가 실재하지 않는 값(sample-demo-post)이라 등록을 눌러도 'not_found' 오류만 안전하게 보여줍니다. 박민준·서지훈의 댓글에는 '신고' 텍스트 링크가 붙습니다(FR-080, I-117 해소, 25일차) — 본인 댓글(김유나 답글)과 삭제된 댓글에는 뜨지 않습니다.",
       panels: {
         default: (
           <PreviewFrame height={520}>

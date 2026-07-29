@@ -34,9 +34,17 @@ const SAMPLE_BLOCKED_USERS = [
  * FR-080·081 신고·차단(Task 042A). 실제 사용처는 `MemberList`(크루원 목록 행별 신고·차단
  * 버튼)와 `/settings`(차단한 사용자 관리, `BlockedUsersListContainer`)다.
  *
- * **`BlockedContentNotice`는 아직 게시판·채팅에 배선되지 않았다** — `docs/decisions/
- * report-block-042a.md`가 정한 범위 밖 항목이라, 이 컴포넌트를 실제로 확인할 수 있는 곳은
- * 현재 이 섹션뿐이다.
+ * **`BlockedContentNotice`는 Task 041(21일차)에 게시판·댓글·채팅에 배선됐다** — `board.tsx`·
+ * `chat.tsx`의 "차단한 사용자" 항목들 참고. 이 섹션에는 컴포넌트 자체의 최소 동작 확인용
+ * 데모(펼치기/접기)만 남겨 둔다.
+ *
+ * **`ReportDialog`는 25일차(I-117 해소)에 `PostActions`(게시글)·`CommentItem`(댓글)·
+ * `MessageBubble`(채팅 메시지, `triggerVariant="icon"`)에 실제로 배선됐다** — 이전에는
+ * 컴포넌트 자체는 4종(post·comment·chat_message·profile)을 지원했지만 렌더하는 호출부가
+ * `MemberList` 하나뿐이었다(백엔드 4종은 이미 완비, 순수 UI 배선 누락). 이 섹션은 여전히
+ * `ReportDialog` 자신의 기본·로딩·오류 3상태를 대표로 보여준다 — 다른 세 호출부는 같은
+ * 컴포넌트를 재사용하므로 상태를 여기서 한 번만 자세히 보여주고, `board.tsx`·`chat.tsx`
+ * 쪽에는 "이 화면에도 신고 버튼이 있다"는 배선 확인만 남긴다(중복 등록 회피).
  *
  * **`ReportDialog`·`BlockButton`은 게스트 세션에서 제출하면 `sessionExpired`/`notAllowed`류
  * 폼 오류로 안전하게 막힌다** — `InviteMemberDialog`와 같은 근거(`checkPermission`이 실제로
@@ -51,7 +59,7 @@ export const moderationSection = defineSection({
   items: [
     {
       name: "ReportDialog",
-      note: "실제 컴포넌트입니다. targetType·targetId만 넘기면 post·comment·chat_message·profile 어디서든 재사용됩니다. '오류' 패널은 create_report RPC의 reason_code 3종을 나란히 보여줍니다.",
+      note: "실제 컴포넌트입니다. targetType·targetId만 넘기면 post·comment·chat_message·profile 어디서든 재사용됩니다(25일차부터 넷 다 실제로 배선 — board.tsx의 PostActions(post)·CommentItem(comment), chat.tsx의 MessageBubble(chat_message), MemberList(profile, 아래 참고)). 아래 데모는 profile 대상입니다. '오류' 패널은 create_report RPC의 reason_code 3종을 나란히 보여줍니다.",
       panels: {
         default: (
           <PreviewFrame height={140}>

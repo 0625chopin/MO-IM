@@ -171,6 +171,15 @@
 > 자진 재신청(FR-022) 대상에서는 여전히 제외된다**(FR-022 E3/FR-027 AC2) — 강퇴자는
 > 아래 "오너의 강퇴 해제" 또는 "재초대" 전이로만 돌아올 수 있다.
 
+> **25일차 추가(D-073, I-030)**: `invited`에서 나가는 화살표가 아래 둘(수락·거절)뿐이고
+> "만료"로 나가는 화살표가 없는 것은 **공백이 아니라 의도다.** 초대 만료는 상태 전이로
+> 다루지 않는다 — `invited` 행은 만료 후에도 DB에 그대로 남고, 대신 조회 쿼리
+> (`listInvitationsForProfile`, `expires_at > now()`)가 만료된 초대를 결과에서 걸러 "받은
+> 초대함"에서만 사라지게 한다. 가입 자체는 이미 DB 레벨에서 막혀 있다(`invited→active`
+> self-PATCH가 `private.has_valid_pending_invitation()`으로 만료를 검사, I-114) — 그래서
+> `invited` 행이 남아 있어도 권한상 무해하다. 알려진 한계(멤버십 집계에 `invited` 유령 인원이
+> 잡힐 가능성)는 `docs/decisions/invitation-expiry-i030.md` 참고.
+
 ```mermaid
 stateDiagram-v2
     [*] --> invited: 오너/임원이 초대 (FR-020)

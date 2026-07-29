@@ -81,6 +81,7 @@ export function PostDetail({ crewId, post }: { crewId: Id; post: PostDetailViewM
           initialBody={post.body}
           canEdit={post.canEditTitleBody}
           canDelete={post.canDelete}
+          canReport={post.canReport}
         />
       </CardFooter>
     </Card>

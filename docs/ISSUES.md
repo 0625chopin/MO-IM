@@ -2,7 +2,9 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-123** (등재할 때마다 이 줄을 갱신한다. **여러 사람이 동시에 등재하는 회차에는 이 줄만 믿지 말고** 등재 직전에 `grep -n "^### I-" docs/ISSUES.md | tail`로 실제 최댓값을 확인한다 — 7일차에 네 명이 동시에 작업하며 이 줄이 실제와 어긋난 적이 있다. **24일차엔 팀장이 I-120을 지시했으나 그 사이 다른 팀원이 이미 I-120을 선점해 BOARD가 I-121로 등재했고, 곧이어 BOARD가 이 줄을 I-122로 갱신한 사이 다른 팀원이 그 I-122마저 선점해 다시 I-123으로 고쳤다** — 지시받은 번호도, 방금 자신이 갱신한 번호도 등재 직전 재확인이 필요하다는 사례로 남긴다.)
+- **다음 이슈 번호: I-129** (등재할 때마다 이 줄을 갱신한다.)
+- **25일차부터 등재 창구가 팀장 단일화됐다.** 팀원은 이 파일에 직접 append하지 않고 `docs/ISSUES.draft.<NAME>.md`에 **번호 없이** 제목·심각도·본문만 쓰고, 번호 부여와 병합은 팀장이 회차 말에 단독으로 한다(기존 항목의 상태 갱신은 append가 아니라 블록 수정이라 팀원이 직접 해도 된다). **이 규칙이 생긴 이유**: 24일차에 네 명이 같은 파일 끝에 동시 append하며 번호 충돌이 **네 번** 났다(I-111 두 번·I-115 두 번·I-120·I-122). 팀장이 지시한 번호조차 그 사이 선점돼 낡아 있었고, 방금 자신이 갱신한 "다음 번호" 줄마저 다시 선점됐다. **grep과 쓰기 사이의 간격이 원인이므로 "등재 직전 재확인"으로는 막을 수 없다** — 동시 쓰기 구조 자체를 없애야 했다. 25일차엔 이 방식으로 충돌 0건이었다.
+- **I-116은 결번이다**(24일차, 팀장 정리). 아래 항목 참고.
 - **I-116은 결번이다**(24일차, 팀장 정리). 그날 CORE·DESIGN이 거의 동시에 `I-115`를 등재해 헤더가 중복됐고, DESIGN이 자기 두 건을 `I-117`·`I-118`로 재번호해 충돌을 풀면서 I-116이 비었다. **이미 등재된 번호를 다시 당기면 다른 문서의 상호 참조가 깨지므로 메우지 않는다.** 결번은 오류가 아니다.
 - 확정된 **결정**은 여기가 아니라 [`prioritization-and-risks.md`](./prioritization-and-risks.md) 6.3절 결정 기록(D-\*)에 쓴다. 결정과 미결을 같은 곳에 두지 않는다.
 - 이슈는 **누구나 제보**한다. 등재할 때 형식(아래 "기록 형식")을 지키고 "다음 이슈 번호" 줄을 함께 갱신한다.
@@ -300,14 +302,24 @@
 
 ### I-030 · 초대(Invitation) 만료 시 짝을 이루는 CrewMembership 행의 다음 상태가 정의돼 있지 않다
 
-- **상태**: **해결됨 — 결정 완료(24일차, 2026-07-29, 사용자 결정 → D-073)**. CREW가 팀장
-  배정으로 실 DB 동작을 실측하고 설계 후보 3종(A/B/C)을 정리했고, **DESIGN이 교차검증에서
-  네 번째 축(조회 쿼리 필터링)을 추가**했다. 팀장이 이를 사용자에게 올려 **네 번째 축으로
-  확정**됐다 — `crew_memberships`의 `invited` 행은 그대로 두고 `listInvitationsForProfile`
-  쿼리에 `expires_at > now()`를 넣는다. **상태 전이는 도입하지 않는다.** 근거·한계 2건은
-  **D-073**에 있다. **구현은 다음 회차 CREW 배정**(24일차엔 팀원 종료 후 결정이 나왔다).
-  실측 중 발견한 **별개의 보안 우회(I-114)는 즉시 수정 완료**했다(아래 참고).
-  전문: `docs/decisions/invitation-expiry-i030.md`.
+- **상태**: **해결됨 — 구현 완료(25일차, 2026-07-29, CREW)**. 24일차에 CREW가 실 DB 동작을
+  실측하고 설계 후보 3종(A/B/C)을 정리했고, **DESIGN이 교차검증에서 네 번째 축(조회 쿼리
+  필터링)을 추가**했다. 팀장이 이를 사용자에게 올려 **네 번째 축으로 확정**됐다(D-073) —
+  `crew_memberships`의 `invited` 행은 그대로 두고 `listInvitationsForProfile` 쿼리에
+  `expires_at > now()`를 넣는다. **상태 전이는 도입하지 않는다.**
+  **25일차에 구현까지 완료**: `src/lib/data/supabase/invitation.ts`(`status==="pending"`일
+  때만 `.gt("expires_at", now)`)·`src/lib/data/mock/invitation.ts`(동일 규칙, D-030 "조회부만
+  교체" 원칙 유지)·`requirements.md` §2.4(만료가 상태 전이가 아니라 조회 필터링임을 명시하는
+  주석). **실 REST로 검증**: 만료된 `pending` 초대 1건을 만들어 필터 없는 조회에서는 보이고
+  (`200`, 행 노출) 필터를 추가한 조회에서는 사라짐(`200`, `[]`)을 확인 — 테스트 데이터는
+  직접 DELETE로 정리해 원복(`invitations=9`·`crew_memberships=54`). **D-073 한계 1(멤버십
+  집계 유령 인원)을 실측**: 멤버 수를 세는 호출부 7곳(`crew_directory_summary` RPC·
+  `CrewHomeContainer`·`CrewMembersContainer`·`fetch-crew-cards.ts`·`disband-crew.ts`·
+  `cancel-meetup.ts`·`create-post.ts`) 전부 `isActiveMembership`/`status==='active'`로
+  이미 명시적으로 필터링해 **오늘 시점엔 이 한계가 실제로 나타나는 화면·쿼리가 0건**이다
+  (구조적으로 강제된 것은 아니라 향후 새 집계 코드가 필터를 빠뜨리면 실현될 수 있는 잠재
+  리스크로만 남는다 — 새 이슈로 등재하지 않음). 실측 중 발견한 **별개의 보안 우회(I-114)는
+  24일차에 즉시 수정 완료**했다(아래 참고). 전문: `docs/decisions/invitation-expiry-i030.md`.
 - **영역**: 데이터 / 요구사항
 - **제보**: CREW (2026-07-24, Task 010 Mock 시드 생성)
 - **내용**: `requirements.md` 2.4절 "Crew 멤버십 상태" 다이어그램은 `invited`에서 나가는 화살표를 `accept_invitation`(→ active)·`decline_invitation`(→ declined) 둘로만 정의한다(`src/lib/rules/crew-membership-transition.ts`의 `TRANSITIONS.invited`도 이 둘뿐이다). 그런데 `Invitation`에는 `expiresAt`(발급 후 14일)이 있고 `InvitationStatus`에 `"expired"` 값도 있다 — 즉 **Invitation은 스스로 만료를 표현할 수 있는데, 그 시점에 이미 만들어져 있는 `invited` 상태 `CrewMembership` 행이 어떻게 되는지는 다이어그램에 없다.**
@@ -2534,6 +2546,39 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
 - **후속**: `listPendingReports`의 시그니처를 `status: ReportStatus | null`로 넓히고 `/admin`
   에 상태 필터(탭 등)를 추가하면 닫힌다 — RPC·RLS는 이미 준비돼 있다(추가 마이그레이션
   불필요).
+- **25일차 조사(DESIGN, 구현은 하지 않음 — I-115 처리 여력으로 범위 확인만)**: 착수에
+  필요한 조각을 훑어 다음 회차가 바로 구현에 들어갈 수 있는지 확인했다. **결론: 셋 다
+  이미 준비돼 있다, 남은 일은 얇다.**
+  1. **RPC**(`admin_list_reports(p_status text default 'pending')`,
+     `20260725142344_admin_console_042b_report_resolution_rpcs.sql`)는 이미
+     `p_status is null or r.status = p_status` 분기가 있어 `null`을 넘기면 전체 상태를
+     반환한다 — **마이그레이션 불필요**, 클라이언트 쪽만 바꾸면 된다.
+  2. **`listPendingReports`**(`src/lib/data/supabase/admin.ts`)의 시그니처를
+     `status: ReportStatus | null = "pending"`으로 넓히고 `rpc("admin_list_reports",
+     { p_status: status })`를 그대로 두면 된다(이미 `status`를 그대로 넘기고 있어 타입만
+     느슨해지면 됨). 함수명은 그대로 둬도 되고(`status=null` 호출도 "목록 조회"라는 의미는
+     유지된다) `listReports`로 개명해도 된다 — 개명하면 `@/lib/data` 배럴과
+     `AdminReportsContainer` import 갱신이 딸려온다.
+  3. **`AdminReportQueue`**(표현 컴포넌트, `src/components/admin/AdminReportQueue.tsx`)는
+     **수정이 거의 필요 없다** — `getAvailableResolutionActions(targetType, status)`가
+     이미 `status !== "pending"`이면 빈 배열(액션 버튼 없음)을 반환해 처리된 신고를 읽기
+     전용 카드로 자연스럽게 그린다(`src/lib/rules/report-resolution.ts:20`). `statusLabel`
+     문자열도 `pending`·`resolved`·`dismissed` 3종 전부 이미 있다(`strings.admin.reports.
+     statusLabel`, `ko.ts` 1573행).
+  4. **부족한 건 필터 UI뿐**이다 — `/admin/page.tsx`에 상태 탭(전체/대기/처리됨/기각됨)을
+     추가해야 하는데, `Tabs`(shadcn, `src/components/ui/tabs.tsx`)가 이미 설치돼 있어
+     새로 만들 컴포넌트는 없다. Next 16 `searchParams`는 비동기(`await`)이므로
+     `AdminReportsPage`를 `async`로 바꾸고 `?status=` 쿼리로 필터를 표현하는 편이
+     `/crews`의 기존 필터 패턴과 일관될 것으로 보인다(직접 대조는 안 함, 다음 회차가
+     확인). 탭 레이블 문자열(전체·처리 이력 등)은 신설해야 한다 — `statusLabel`은
+     카드 배지용이라 탭 레이블과 어휘가 겹치지 않을 수 있다.
+  5. **컨테이너 쪽 주의**: `AdminReportsContainer`가 이번 회차(I-115)에 `getAuthSession`·
+     `isAuthenticated`·`isSystemAdmin` 조기 반환을 갖게 됐다 — 필터 인자를 받도록 바꿀 때
+     이 가드 코드는 그대로 유지해야 한다(같은 파일).
+  - **후속 추정 공수**: 위 4가지 남은 일(시그니처 확장 1 + 페이지 필터 UI·쿼리 배선
+    2~3 + 탭 문자열 신설) 규모로 볼 때 **S 이하**로 보이나, 담당자가 실제 착수 전
+    `docs/CONVENTIONS.md`·`/crews` 필터 패턴을 직접 대조해 산정해야 한다(이번 조사는
+    "막힌 것이 없는지" 확인이 목적이었지 공수 산정이 목적이 아니다).
 
 ### I-078 · 신고 하나를 "콘텐츠 삭제 + 계정 제재" 복합 처리할 수 없다
 
@@ -4732,7 +4777,32 @@ DEFINER`로 만들었다.
 
 ### I-115 · `/admin`에서 `AdminReportsContainer`가 게이트와 독립적으로 병렬 렌더링되며 게스트 상태로도 `admin_list_reports` RPC를 호출해 `42501` 권한 오류가 서버 콘솔에 남는다 — I-095와 같은 구조, 관리자 콘솔은 소관 밖이라 이번엔 미수정
 
-- **상태**: 열림 — 조사만 완료, 수정은 다음 회차(DESIGN, 관리자 콘솔 소관)로 이월
+- **상태**: **닫힘(25일차, 2026-07-29, DESIGN)**. 아래 "후속(제안)"이 이미 정확히 짚었던
+  대로 `AdminReportsContainer`에 I-095와 같은 `if (!isAuthenticated(session) ||
+  !session.isSystemAdmin) return null;` 조기 반환을 추가했다(`getAuthSession`·
+  `isAuthenticated` 재사용, 새 패턴 발명하지 않음 — `src/components/shell/auth-session.ts`
+  docstring과 9개 기존 호출부와 동일 패턴). `isSystemAdmin`까지 함께 확인해 인증된
+  비관리자 요청에서도 `admin_list_reports` RPC 호출 자체를 생략한다(레이아웃 최종 판정과
+  이중 안전, 최종 강제는 여전히 RPC 내부 `profiles.is_system_admin` 재확인).
+  **음성 대조(수정 전)**: 프로덕션 빌드(포트 3242, 24일차 세션이 남긴 서버, `.next` 최신
+  빌드는 아니었으나 이 컨테이너는 그날 이후 변경이 없어 유효)에 게스트 쿠키 없이
+  `GET /admin`을 3회 보내 매번 서버 표준출력에 `⨯ Error: {"code":"42501",...,"message":
+  "permission denied for function admin_list_reports"}`가 새로 찍히는 것을 실측(로그
+  원문 확보, `/proc/<pid>/fd/1`로 직접 확인).
+  **양성 대조(수정 후)**: `npm run build`(flock) → `PORT=3251 npm start` 새 프로세스에서
+  같은 게스트 요청을 반복 — 서버 로그에 `42501` **0건**(`grep -c` 확인).
+  **회귀 확인(Playwright, 실 계정 2개, host-only 쿠키 트릭으로 한 브라우저에서 동시
+  로그인)**: 비관리자 `chopin0625@gmail.com`으로 `/admin` 접근 → **HTTP 404**(일반 404와
+  구분 불가, `AdminGateLayout`의 `notFound()` 그대로 — 회귀 없음). 관리자
+  `0625chopin@gmail.com`으로 `/admin` 접근 → **정상 렌더**("신고 관리" 제목 + 대기열
+  UI, 이 시점 대기 신고 0건이라 빈 상태 문구 "대기 중인 신고가 없어요" 표시, 브라우저
+  콘솔 오류 0건). `npx tsc --noEmit`·`npm run lint` 0 errors.
+  **환경 잡음(내 수정과 무관, 기록만)**: 검증 도중 `.next`가 공유 디렉터리라 다른 세션의
+  동시 빌드로 한 차례 "React Client Manifest" 불일치 오류가 서버 로그에 섞였다 — 재빌드
+  + 서버 재시작으로 해소, 이번 회차 수정 대상과 무관함을 확인(관련 로그에 `42501` 없음).
+  또한 반복 로그인 테스트로 Supabase Auth `429 rate limit` 로그가 남았다 — 이 역시 내 수정과
+  무관한 테스트 부작용.
+  이전 상태(24일차, 조사만): 아래 그대로 보존.
 - **영역**: 라우팅 / 관측성 / 관리자 콘솔
 - **제보**: CORE(2026-07-29, 24일차 — I-095 수정 검증 중 `/admin`을 게스트로 재현하다 자체
   발견. 원 I-095 조사(22일차)는 이 라우트를 포함하지 않았다 — 5개 라우트에 `/admin`이
@@ -4772,7 +4842,25 @@ DEFINER`로 만들었다.
 
 ### I-117 · MAJOR — 게시글·댓글·채팅 메시지에 대한 신고(FR-080) UI 진입점이 없다 — `ReportDialog`는 `profile` 대상 하나(`MemberList`)에만 연결돼 있다
 
-- **상태**: 열림
+- **상태**: **해결됨(25일차, 2026-07-29, BOARD)**. `PostActions.tsx`(post)·`CommentItem.tsx`
+  (comment)·`MessageBubble.tsx`(chat_message, `triggerVariant="icon"`)에 `ReportDialog`를
+  배선했다 — 후속 절이 지시한 그대로다, 백엔드 변경 없음. **자기신고 UI 정책**: `create_report`
+  RPC는 `profile` 대상만 자기신고를 CHECK 제약으로 막는다(콘텐츠 3종은 막지 않는다, 실측
+  확인) — UI에서는 셋 다 본인 콘텐츠에는 신고 버튼을 아예 렌더하지 않는다
+  (`PostDetailContainer`·`CommentListContainer`가 `!isSelf`로 판정해 `canReport` 플래그를
+  내려주고, `MessageBubble`은 이미 있던 `isOwn`을 재사용 — `MemberList`의
+  `canReportOrBlock: !isSelf`와 같은 원칙, DB 최종 방어선이 아니라 렌더 판정일 뿐이다).
+  **실 브라우저로 3종 전부 접수 확인**(격리된 자체 Chromium, `node_modules/playwright` 직접
+  구동 — MCP playwright가 다른 세션에 점유돼 `--isolated` 없이 못 씀, Task 033/037/043A
+  전례와 동일 이유): 실 계정 `chopin0625@gmail.com`으로 로그인해 크루 "주말 러닝 클럽"
+  (`21fb8c31-…`)에서 다른 계정(`chopin_0625`) 명의로 미리 심어 둔 임시 게시글·댓글·채팅
+  메시지 각각을 실제 클릭(신고 버튼 → 사유 입력 → 신고 접수 → "신고가 접수됐어요" 확인)으로
+  신고해 `reports` 행 3건이 실제로 생성됨을 SQL로 대조 확인했다(원시 값은 아래 "재현" 갱신
+  참고). 테스트 데이터(임시 게시글·댓글·채팅 메시지·`reports` 3행)는 검증 직후 전부 DELETE로
+  원복(재확인 완료). `/sample`(`board.tsx`·`chat.tsx`·`moderation.tsx`)에 배선 결과를
+  등록했다 — `ReportDialog` 자신의 기본·로딩·오류 3상태는 여전히 `moderation.tsx`가 대표로
+  보여준다(중복 등록 회피). `npx tsc --noEmit`·`npm run lint`·`npm test`·`npm run build`
+  전부 클린. 근거는 이 항목 자체(전문 갱신) — 별도 결정 문서를 새로 만들지 않았다.
 - **영역**: UI / 신고·차단 (FR-080, Task 042A)
 - **제보**: DESIGN, 24일차 — Task 042B(관리자 콘솔) 브라우저 E2E를 준비하며 I-076(post_removed
   감사 로그 미실측) 재현 시나리오를 만들려고 게시글에 "신고" 버튼을 찾다가 발견
@@ -4794,8 +4882,10 @@ admin-console-042b.md` §4 표 11~14행). 그런데 실제로 `<ReportDialog tar
   없다** — "사용자(프로필) 신고"만 가능하다. 관리자 콘솔(`/admin`)의 "콘텐츠 삭제" 액션
   자체는 정상 동작하지만(이번 회차 I-076으로 실측 확인), 그 액션을 트리거할 신고가 애초에 UI로
   들어올 길이 없어 실질적으로 죽은 기능이다.
-- **재현**: `grep -rln "ReportDialog" src/components` — 3개 파일만 매치, `PostDetail.tsx`·
-  `CommentItem.tsx`·`MessageBubble.tsx`는 매치 없음(2026-07-29, 24일차 실측).
+- **재현(해소 전, 24일차 실측)**: `grep -rln "ReportDialog" src/components` — 3개 파일만
+  매치, `PostDetail.tsx`·`CommentItem.tsx`·`MessageBubble.tsx`는 매치 없음.
+  **해소 후(25일차) 같은 명령**: `PostActions.tsx`(`PostDetail.tsx`가 아니라 그 자식인 이
+  파일이 실제 렌더 지점)·`CommentItem.tsx`·`MessageBubble.tsx` 3개가 추가로 매치된다.
 - **참고**: 이번 회차 Task042B E2E(I-076 실측)는 이 gap 때문에 UI로 게시글 신고를 만들 수
   없어, `reports` 행을 SQL로 직접 INSERT해 "신고 접수 이후" 구간(대기열 조회→콘텐츠
   삭제/기각 처리→감사 로그)만 실 브라우저로 검증했다 — 신고 접수 자체의 UI 검증은 profile
@@ -4806,7 +4896,22 @@ admin-console-042b.md` §4 표 11~14행). 그런데 실제로 `<ReportDialog tar
 
 ### I-118 · MAJOR — 채팅 메시지 목록이 내부 스크롤 컨테이너로 동작하지 않고 페이지 전체가 스크롤된다 — `AppShell` 루트의 `min-h-full`이 `MessageList`의 `flex-1 min-h-0 overflow-y-auto`에 높이 제약을 물려주지 못한다
 
-- **상태**: 열림
+- **상태**: **해소(2026-07-29, 25일차, CORE)** — 원 구현자(day-21)가 직접 수정. `AppShell.tsx`
+  루트 `div`·`(shell)/layout.tsx`의 `<body>`를 `min-h-full` → `h-full`로, `AppShell.tsx`의
+  `#main-content` 래퍼에 `min-h-0`을 추가해 `html`→`body`→`AppShell`→`#main-content`까지 확정
+  높이 체인을 이었다. 채팅 트리(`page.tsx`·`MessageRoomContainer`·`MessageList`)는 애초에
+  `min-h-0 flex-1 overflow-y-auto` 패턴으로 올바르게 짜여 있었다 — 결함은 그 위 셸 계층뿐이었다.
+  `overflow`는 어디서도 `hidden`/`auto`로 바꾸지 않아 채팅 외 18개 라우트는 오늘과 동일하게
+  문서 스크롤에 의존한다(실측으로 확인, 아래 근거 문서 4절). 실측: 짧은 방(11건)에서
+  `documentScrollHeight === innerHeight`(915=915)·클리핑 스크롤 컨테이너 1개(개편 전 0개) 확인.
+  `npx tsc --noEmit`·`npm run lint`·`npm run build` 전부 클린. **I-122도 같은 수정으로 함께
+  해소** — 근거는 `docs/decisions/appshell-height-chain-118-122.md`. **25일차 2차 보완(팀장
+  지시)**: top sentinel(위로 이어 로드, FR-051 AC3, `MessageList.tsx` 195~203행)도 같은
+  `root: scrollRef.current`를 쓴다는 이유만으로 "아마 같이 고쳐졌을 것"이라 추정했다가 반려돼
+  원시값으로 재확인 — 격리된 프로덕션 빌드(공용 dev 서버는 동시 편집 HMR 잡음이 있어 배제)에서
+  음성 대조(스크롤 없이 4초, 로드 0건)·양성 대조(위로 스크롤 → 남은 61건이 2회에 걸쳐 로드,
+  최종 DOM 개수 111이 DB 총량과 일치) 둘 다 통과. "개편 전" 직접 대조는 `git worktree`
+  시도가 Turbopack의 워크트리 밖 심링크 거부로 막혀 못 했다(§3.5). 근거 동일 문서 §3.5.
 - **영역**: 레이아웃 / 채팅 (I-098·I-099와 같은 "day 21 모바일 프레임 도입" 후유증 계열)
 - **제보**: DESIGN, 24일차 — FR-055 AC2(하단 sentinel `IntersectionObserver`) 실측 중 발견
 
@@ -4909,7 +5014,20 @@ min-h-0`)이 아무리 콘텐츠가 길어도 조상 체인 어디서도 실제�
 
 ### I-120 · MINOR — `crew_memberships_guard_self_insert_request` 트리거가 `new.status`를 확인하지 않아, "가입 신청(FR-022) 전용"이라는 전제가 RLS 정책의 `with_check`에만 암묵적으로 의존한다
 
-- **상태**: 열림(관측만, 현재 방어선 정상 — 회귀 소지 기록)
+- **상태**: **해결됨(25일차, 2026-07-29, CREW)**. `crew_memberships_guard_self_insert_request`
+  함수에 `if new.status <> 'requested' then raise exception ...`을 명시 추가하는 마이그레이션
+  (`i120_crew_memberships_guard_self_insert_request_check_status`)을 적용했다 — RLS
+  `with_check`만 표현하던 "가입 신청 전용" 전제를 트리거 자체도 독립적으로 강제한다.
+  `pg_trigger_depth() > 1`(오너 부트스트랩·초대 프로비저닝 신뢰 경로) 분기는 그대로 둬 영향
+  없음. **실 REST로 3가지 시나리오 검증**(실 로그인 토큰, 임시 테스트 크루 1개 생성 후 검증
+  완료 즉시 직접 DELETE로 정리 — `crews=14`·`memberships=54`로 원복 확인): ① 위조
+  `status='active'` 자기-INSERT → `400 P0001`(신규 메시지로 거부) ② 위조 `status='invited'`
+  자기-INSERT(I-120 원 시나리오 그대로) → `400 P0001`(동일 거부) ③ **정당 경로**
+  `status='requested'` 정상 가입 신청 → `201`(정상 성공, 회귀 없음 확인 — 24일차 자신이
+  헬퍼 EXECUTE 회수로 정당 경로를 막은 회귀를 낸 전례가 있어 이번엔 위조 검증과 정당 경로
+  검증을 반드시 함께 했다). `get_advisors(security)` 재확인 결과 신규 WARN 0건(기존
+  `auth_leaked_password_protection` 1건만 남음), EXECUTE 권한도 `anon`/`authenticated`에는
+  여전히 없음(`service_role`·`postgres`만, `CREATE OR REPLACE` 후에도 유지됨을 확인).
 - **영역**: 데이터 / 크루·멤버십 (24일차 CORE·CREW 교차검증 중 DESIGN 자체 발견)
 - **제보**: DESIGN, 24일차 — I-114(CREW) 회귀 재검증을 위해 `crew_memberships`에 `status=
   'invited'`인 행을 직접 INSERT로 만들려다 발견(테스트 목적, `begin…rollback`으로 무피해
@@ -4940,8 +5058,30 @@ min-h-0`)이 아무리 콘텐츠가 길어도 조상 체인 어디서도 실제�
 
 ### I-121 · MINOR — D-072(vitest 최소 도입)의 범위가 순수 함수 3개 모듈뿐이라, I-119(참여자 수 표시 결함)의 실제 진원지였던 데이터 레이어 매핑(`getPollTally`)은 같은 결함이 재발해도 자동 테스트로 잡히지 않는다
 
-- **상태**: 열림 — 관측만, 수정 없음(D-052/D-072가 이미 그은 범위의 결과라 이번 회차
-  범위 밖). 후속 판단은 다음 테스트 인프라 확장 시점으로 이월
+- **상태**: **해결됨(25일차, 2026-07-29, BOARD — 사용자 결정으로 범위 확장, D-074 승격
+  예정)**. `vitest.config.ts`의 `include`에 `src/lib/data/supabase/**/*.test.ts`를 추가하고
+  `src/lib/data/supabase/poll.test.ts`(7개 케이스)로 `getPollTally`·`getPollTallyForDecision`
+  의 RPC row → `PollTally` 매핑을 고정했다. `import "server-only"`(Next.js 빌드 시점 가상
+  모듈이라 Vitest엔 실제 패키지가 없다)는 `resolve.alias`로 빈 스텁(`vitest.server-only-stub.ts`)
+  에 매핑해 해결, `createSupabaseServerClient`는 각 테스트가 `vi.mock`으로 얇은 페이크
+  `.rpc()`로 교체한다(전역 mock 아님 — 테스트마다 RPC 응답을 다르게 통제).
+  **픽스처는 상상하지 않았다** — `mcp__supabase__execute_sql`로 `pg_proc`을 직접 조회해
+  `poll_vote_tally`·`poll_vote_tally_for_decision` 두 RPC의 실제 반환 타입(컬럼명·타입)을
+  확인한 뒤 그 스키마 그대로 픽스처를 채웠다(조회 원문·조회 일자는 `poll.test.ts` 상단
+  docstring에 남겼다). 열려 있는 poll이 0건이라 RPC를 실행해 행 하나를 직접 받아오지는
+  못했다는 한계도 같은 docstring에 정직하게 적었다 — "스키마는 실측, 행 내용은 손으로
+  채움"이다.
+  **자기반증**: `getPollTally`를 I-119 이전 구현(`participant_count`를 버리고
+  `for_count+against_count+abstain_count`로 재계산)으로 임시로 되돌려
+  `npx vitest run src/lib/data/supabase/poll.test.ts`를 실행 → "D-031 숨김 상태 —
+  participantCount는 RPC의 participant_count를 그대로 쓴다(I-119 회귀 방지)" 케이스가
+  정확히 `expected +0 to be 4`로 FAIL함을 확인한 뒤 원상복구(`git diff`로 잔여 변경 0건
+  재확인). **덮은 범위**: `getPollTally`·`getPollTallyForDecision` 둘뿐이다(같은 RPC row
+  형태를 공유하는 투표 집계 계열, "회귀 위험이 실증된 곳부터"라는 지시대로 범위를 넓히지
+  않았다). **남은 범위**: 이 회차가 새로 확장하지 않은 다른 `src/lib/data/supabase/**`
+  매핑 함수 전부(`toPoll`·`toPollVote` 등 `mappers.ts`의 나머지, `poll.ts`의 쓰기 경로,
+  다른 도메인 모듈)는 여전히 자동 테스트가 없다 — 이번 확장은 "무한정 넓히지 말라"는 지시를
+  그대로 지켰다. `npm test`는 34/34(기존 27 + 신규 7) 클린.
 - **영역**: 테스트 / 데이터 레이어 / 회귀 방지
 - **제보**: BOARD(2026-07-29, 24일차 — 팀장 지시로 CORE의 vitest 도입(D-072)을
   교차검증하다 발견. "테스트가 결함을 실제로 잡는가"를 추론이 아니라 실측으로 확인하는
@@ -4973,20 +5113,33 @@ min-h-0`)이 아무리 콘텐츠가 길어도 조상 체인 어디서도 실제�
   수단이 없다"를 명시적으로 반복해 적어 뒀다 — 범위를 숨기거나 "테스트가 생겼다"는
   착시를 주는 서술이 아니다. 이 이슈는 그 명시된 경계선이 **정확히 이번 회차에 실제로
   결함이 났던 자리와 겹쳤다**는 사실만 기록으로 남긴다.
-- **해소 후보(제안, 이번 회차엔 하지 않음)**: `getPollTally`(그리고 짝인
+- **해소 후보 → 25일차에 실행됨**: 아래 원 제안 그대로 `getPollTally`·
+  `getPollTallyForDecision`을 `vi.mock`(얇은 페이크 `.rpc()` 응답)으로 감싸 통합 테스트로
+  고정했다(위 "상태" 참고) — *(24일차 원 서술 보존)* `getPollTally`(그리고 짝인
   `getPollTallyForDecision`)를 대상으로 Supabase 클라이언트를 mock(`vi.mock` 또는 얇은
   페이크 `.rpc()` 응답)하는 통합 테스트를 추가하면, RPC 응답 필드(`participant_count`·
   `for_count`·`abstain_count` 등)가 `PollTally`로 올바르게 매핑되는지를 규칙 함수 테스트와
   별개로 고정할 수 있다. **D-072의 "CI 연동은 별개 결정으로 분리"(D-052 원문)와는
   독립적인 축이다** — CI 유무와 무관하게 로컬 `npm test` 범위를 `src/lib/data/**`로
-  넓히는 문제이므로, CI를 아직 안 붙인 것과 이 갭은 서로 다른 결정이 필요하다. 다음
-  테스트 범위 확장 판단 시점(043B 이후, 또는 CI 도입 논의와 함께)에 D-052/D-072 전례대로
-  새 D-\*로 다루기를 제안한다.
-- **근거**: `docs/decisions/performance-043b.md` §2(I-119 원인·수정), 이번 이슈 등재
-  직전 `quorum.test.ts` 임시 되돌리기 실측(팀장 지시).
+  넓히는 문제이므로, CI를 아직 안 붙인 것과 이 갭은 서로 다른 결정이 필요하다(CI는 여전히
+  없다 — 이번 회차도 로컬 `npm test` 범위만 넓혔다).
+- **근거**: `docs/decisions/performance-043b.md` §2(I-119 원인·수정), 24일차 이슈 등재
+  직전 `quorum.test.ts` 임시 되돌리기 실측(팀장 지시) · 25일차
+  `src/lib/data/supabase/poll.test.ts`(신규, 위 "상태" 참고).
 ### I-122 · MAJOR — I-118(채팅 목록 내부 스크롤 무력화)이 FR-055 AC2("최신까지 스크롤 → 읽음 지점 갱신") 자체를 깨뜨린다 — 메시지가 한 화면을 넘는 모든 실사용 크기에서, 실제로 스크롤하지 않아도 마운트만으로 읽음 처리된다. DESIGN의 24일차 "충족" 판정은 화면에 다 들어가는 짧은 방(9~11건)에서만 우연히 성립했다
 
-- **상태**: 열림
+- **상태**: **해소(2026-07-29, 25일차, CORE)** — I-118과 같은 수정(`AppShell.tsx`·
+  `(shell)/layout.tsx`의 `min-h-full` → `h-full` 높이 체인)으로 함께 해소됐다. **엄밀 대조로
+  재현·확정**: 방에 사전 앵커(`sessionStorage`, FR-053 AC2 복귀 시나리오)를 심어 목록 **중간**
+  으로 복원되게 한 뒤, 컨테이너가 최하단이 아닌 동안(스크롤 없이 4.2초 대기) `chat_room_reads.
+  last_read_at`이 `null`로 불변임을 확인 — 실제로 휠 스크롤을 내려 컨테이너가 최하단
+  (`scrollTop`이 `scrollHeight−clientHeight`)에 닿은 순간에만 값이 채워졌다. `window.scrollY`는
+  세 시나리오 내내 `0`, `document.documentElement.scrollHeight`도 `innerHeight`와 항상 동일해
+  문서는 전혀 스크롤되지 않고 `MessageList` 내부 `scrollTop`만 움직임을 직접 확인했다. 부수
+  확인: 같은 수정으로 §"영향" 1(FR-053 AC2 앵커 저장 리스너 무발화 우려)도 실제로 되살아났다
+  — 짧은 방에서 위로 스크롤하자 `sessionStorage` 앵커가 다른 메시지 id로 갱신됨을 확인.
+  테스트 데이터(임시 메시지 40건·읽음 행)는 전부 원복. 근거·원시 수치 전문은
+  `docs/decisions/appshell-height-chain-118-122.md` §3.
 - **영역**: 채팅 / 관측성(회귀 검증 방법론)
 - **제보**: CORE(2026-07-29, 24일차 — DESIGN의 `docs/decisions/browser-observation-055-072-042b-24.md`
   교차검증 배정 중 자체 재현·확정). DESIGN이 같은 회차에 I-118을 발견하며 "FR-055 AC2 자체는
@@ -5070,3 +5223,175 @@ executablePath 직접 지정 — 공유 MCP 브라우저 프로필이 다른 팀
 프로세스로 띄웠다). DESIGN 원 실측: `docs/decisions/browser-observation-055-072-042b-24.md`
 §1.4.
 
+
+### I-123 · MINOR — `respondToInvitation`이 초대 만료 트리거의 `P0001` 예외를 `DataResult`로 감싸지 못하고 그대로 throw했다 — 만료 경계 레이스에서 우아한 한국어 오류 대신 처리되지 않은 예외로 끝난다
+
+- **상태**: **해결됨(25일차, 2026-07-29 — DESIGN 발견, CREW 수정)**. `src/lib/data/supabase/
+  invitation.ts`의 `respondToInvitation`을 `if (error) throw error;` → `if (error) return
+  err("conflict", error.message);`로 바꿨다. **새 오류 코드·새 방식을 발명하지 않았다** —
+  같은 함수가 이미 쓰던 `err("conflict", ...)`(그 아래 `!data` 분기)와 통일했고,
+  `updateCrewInfo`/`updateCrewVisibility`(I-070)가 쓰는 패턴을 그대로 따랐다. Mock 구현은 DB
+  트리거 개념 자체가 없어 대상이 아니고, Server Action(`respond-to-invitation.ts`)은 이미
+  `!result.ok`를 범용 처리하고 있어 이 파일 하나만 고치면 끝났다.
+  **실측 대조**(실 로그인 토큰, 만료된 `pending` 초대 1건을 신규 테스트 크루에 만들어 검증 후
+  즉시 삭제): 수정 전 로직 → `P0001 invitations: this invitation has expired and can no longer
+  be responded to (FR-021 E1)`가 처리되지 않은 예외로 throw됨. 수정 후 로직 → 예외 없이
+  `{"ok":false,"error":{"code":"conflict","message":"…"}}` 반환. 같은 요청·같은 DB 상태에서
+  코드 변경 하나로 throw→graceful 전환이 실증됐다. `invitations=9`·`crew_memberships=54`·
+  `crews=14`로 원복 확인.
+- **영역**: 데이터 / 초대 (FR-021 E1)
+- **제보**: DESIGN, 25일차 — CREW의 I-030/D-073 구현을 교차검증하며 `now()`의 출처를 추적하다
+  발견. **D-073 자체의 결함은 아니다** — D-073이 새로 건드린 `listInvitationsForProfile`이
+  아니라 기존부터 있던 `respondToInvitation` 쪽이다.
+- **내용**: `respondToInvitationAction`은 DB UPDATE 전에 `evaluateInvitationResponseEligibility
+  ({ ..., nowIso: new Date().toISOString() })`로 **앱(JS) 시각** 기준 만료를 먼저 확인해 우아한
+  오류를 낸다. 그런데 실제 UPDATE는 `respondToInvitation`이 실행하고, DB에는
+  `trg_invitations_guard_response_transition`(BEFORE UPDATE, `old.expires_at <= now()`면
+  `P0001`)이 **DB 시각** 기준으로 독립 강제한다. 두 시각 사이에 클럭 편차가 있거나 클릭 순간이
+  만료 경계와 겹치는 좁은 레이스가 나면, JS 사전 검사는 통과시키지만 UPDATE 시점엔 DB `now()`가
+  이미 만료를 넘겨 트리거가 예외를 던진다. 그 예외를 감싸는 분기가 없어 사용자는 정상 에러 문구
+  대신 Next.js 일반 오류 화면을 보게 된다.
+- **영향**: **낮음** — 보안 문제가 아니다. DB 트리거가 만료된 초대의 수락을 정확히 막고 있어
+  FR-021 E1 자체는 지켜진다. 순수하게 "어떤 채널로 실패를 알리는가"의 문제다.
+- **왜 오늘 고쳤나**: 같은 회차에 D-073(만료 초대를 목록에서 숨김)이 들어갔다. 목록에서 숨기는
+  것으로 대부분 가려지지만, **숨기기 전에 이미 화면을 열어 둔 사용자가 정확히 이 경로로 떨어진다**
+  — D-073 구현의 뒷면이라 함께 닫았다.
+
+### I-124 · MINOR — `respondToInvitation`과 같은 계열("BEFORE 트리거 가드가 던지는 예외를 데이터 레이어가 `DataResult`로 감싸지 못하고 raw throw")의 후보 호출부 6그룹 — 정적 스캔만 했고 실측·수정은 하지 않았다
+
+- **상태**: **열림 — 후보 등재만**(25일차, CREW). 팀장 지시로 "고치지 말고 초안에 적어 보고"만
+  했다. 실 REST/`begin…rollback` 재현은 하지 않았다.
+- **영역**: 데이터
+- **제보**: CREW, 25일차 — I-123 수정 직후 팀장 지시("같은 계열의 다른 호출부가 있는지 훑어라")
+- **방법**: 같은 회차에 만든 `docs/decisions/permission-baseline.md` 쿼리 7(트리거 인벤토리)에서
+  **BEFORE 트리거이면서 검증 실패 시 `raise exception`하는**(단순 타임스탬프 기록용 제외) 테이블을
+  뽑고, 각 테이블에 쓰기하는 `src/lib/data/supabase/*.ts` 함수가 그 예외를 `DataResult`로 감싸는지
+  대조했다. **오늘 만든 권한 기준선의 첫 실전 사용 사례다.**
+- **후보(우선순위 높은 순)**:
+  1. **`crew.ts`의 `setCrewMembershipRole`(FR-024)·`updateCrewMembershipStatus`(FR-026·027)** —
+     둘 다 `crew_memberships_guard_self_transition`이 지키는 테이블에 UPDATE하면서 raw throw다.
+     **같은 파일의 `transferCrewOwnership`은 같은 계열 예외를 이미 `err("forbidden", …)`로 감싸고
+     있어 대조적이다** — 세 함수가 한 파일에 있는데 하나만 우아하다. 사용 빈도(임명·탈퇴·강퇴)가
+     낮지 않아 우선순위 최상.
+  2. **`poll.ts`의 `withdrawPoll`(FR-046)·`closePoll`(FR-043·044)** — `polls_guard_decision_
+     integrity`가 지키는 테이블에 UPDATE. **`withdrawPoll`의 기존 주석이 이미 "DB가 던지는
+     예외이므로 그대로 전파한다"고 명시적으로 인정하고 있다** — 오버사이트가 아니라 의식적
+     선택이었으나 D-030 ③에 비춰 재검토 후보다.
+  3. `chat.ts`의 `deleteMessage`·`comment.ts`의 `updateComment`/`deleteComment` — 정상 경로에서는
+     도달하지 않을 가능성이 높으나(허용된 변경만 한다) 좁은 레이스는 이론상 가능.
+  4. `meetup.ts`의 `cancelMeetup` · 5. `notification-preference.ts`의
+     `setGlobalNotificationTypePreference` · 6. `notification.ts`의 `markNotificationRead`.
+- **제외**: `report.ts`(해당 self-service UPDATE 경로가 앱에 아직 없음 — 쓰기 함수가 없으니 후보가
+  아니다), `profile.ts`(Task 039가 이미 RPC `{ok, reason}` 구조화 반환으로 만들어 둠 — 이 계열이
+  아니다).
+- **영향**: 전부 **낮음** — I-123과 같은 성격이다(보안이 아니라 실패 통지 채널의 문제, DB 강제
+  경계는 살아 있다). 다만 1번 두 건은 사용 빈도상 재현 가능성이 상대적으로 높다.
+
+### I-125 · MINOR — `create_report` RPC가 post·comment·chat_message 자기신고를 막지 않는다(`profile`만 CHECK로 막힘) — UI는 4종 모두 숨기지만 DB 최종 방어선은 아니다
+
+- **상태**: **열림 — 실측 재현됨, 실해악 낮음으로 판정해 수정하지 않음**(25일차).
+- **영역**: 신고(FR-080) / 데이터·RLS
+- **제보**: CORE, 25일차 — BOARD의 I-117 교차검증 중 팀장 지시로 실측. **CREW도 DB 관점 검증에서
+  독립 재현해 같은 판정에 도달했다.**
+- **내용**: `reports_no_self_profile_report` CHECK와 `create_report` RPC 본문의 자기신고 검사는
+  **`target_type='profile'`에만** 적용된다. `post`·`comment`·`chat_message`는 테이블 CHECK에도 RPC
+  본문에도 이 검사가 없다 — **Task 042A(21일차)부터 그렇게 설계됐고, BOARD가 이번에 만든 결함이
+  아니다.** BOARD의 UI 배선은 4종 모두 `!isSelf`로 버튼을 숨기지만 그건 렌더 판정일 뿐이다.
+- **실측**(실 계정 access token으로 UI 우회 직접 호출, 서비스 롤 아님): 본인 post·comment·
+  chat_message 신고 → **셋 다 `{"ok":true}` 성공**. 대조군 본인 profile 신고 → `{"ok":false,
+  "reason_code":"cannot_report_self"}` 정상 차단. 생성 행은 즉시 삭제 원복.
+- **실해악 평가(냉정하게)**: **낮음.** `reports`는 `admin_resolve_report`(수동 관리자 검토)로만
+  소비되고 **자동 후속 효과가 전혀 없다** — 자동 숨김·평판 점수·레이트리밋 어디에도 영향을 주지
+  않는다. CREW가 세 축을 각각 확인했다: 레이트리밋(카운터 자체가 없음 → I-126), 집계(신고 건수를
+  세거나 임계치로 트리거하는 코드 앱 전체 **0건**), 감사 로그(`create_report`는 `audit_logs`에
+  아무것도 쓰지 않는다 — `report.*` 액션 5종은 전부 `admin_resolve_report` 시점에만 기록되므로
+  자기신고는 감사 로그를 오염시키지 않는다). 최악의 결과는 관리자 대기열의 무해한 잡음 행이다 —
+  권한 상승·데이터 유출·집계 왜곡 없음. **MAJOR로 올릴 근거가 없다.**
+- **BOARD의 "렌더 판정이지 새 백엔드 규칙이 아니다" 판단**: **타당하다고 판정(CORE).**
+  `report-eligibility.ts`의 자기신고 검사가 `profile`에만 scoped된 것은 **RPC와 대칭을 맞춘 의도적
+  설계**이며, 거기 확장했다면 오히려 RPC 실제 허용 범위와 클라이언트 규칙이 어긋나는 새 drift가
+  생겼을 것이다. `OWN_SCOPED_ACTIONS`("본인이면 허용")는 방향이 반대라 재사용 대상이 아니다.
+  R-015가 겨냥하는 것은 투표 판정·권한 매트릭스급 다단계 로직이지 `authorId === viewerId` 한 줄이
+  아니다.
+- **부가 관측(이슈로 올리지 않음)**: `create_report` RPC를 우회해 `/rest/v1/reports`에 직접 INSERT해도
+  성공하지만, CHECK 제약(자기 프로필 신고 금지·빈 사유 금지)은 여전히 강제되고 `blocks` 테이블도
+  같은 구조(RPC + 직접 INSERT 둘 다 허용, CHECK가 최종 방어)라 **이 프로젝트의 기존 패턴과 일치**한다.
+  target_id 존재 여부를 검증하지 않는 것도 `admin_list_reports`의 `target_exists`/`target_removed`
+  컬럼이 이미 완충한다.
+
+### I-126 · MINOR — `create_report`(FR-080)에 레이트 리밋이 없다 — 자기신고(I-125)와 결합하면 관리자 큐를 무제한으로 채울 수 있다
+
+- **상태**: **열림 — 관측만, 우선순위 낮음**(25일차, CREW).
+- **영역**: 데이터 / 신고
+- **제보**: CREW, 25일차 — BOARD의 신고 진입점 3종 확장을 DB 관점에서 교차검증하던 중 발견
+  (CORE가 안 본 각도).
+- **내용**: `auth_attempts`·`handle_search_attempts`·`email_resend_attempts`처럼 이 프로젝트가
+  반복 사용하는 "카운터 테이블 + RPC 내부 검사" 레이트 리밋 패턴이 `create_report`에는 없다. **같은
+  대상**에 대한 중복은 유니크 인덱스로 병합되지만(I-127 참고), **서로 다른 대상**에는 병합이 적용되지
+  않으므로 대상만 바꿔가며 반복 신고하면 `admin_list_reports` 대기열에 무제한으로 pending이 쌓인다.
+- **영향**: **낮음** — 권한 상승이 아니다(근거는 I-125의 실해악 평가와 동일). 최악은 관리자 업무
+  부담이다. `admin_list_reports`가 `target_author_id`를 반환하므로 "신고자==대상 작성자" 패턴은
+  관리자 화면에서 걸러낼 재료가 이미 있다(관리자 UI가 실제로 강조하는지는 미확인, 범위 밖).
+- **후속(제안, 미적용)**: `email_resend_attempts` 패턴 재사용, 또는 더 간단하게 신고자별 pending
+  총량 상한. 우선순위는 낮다 — 악용 유인이 약하고, 사람이 매번 봐야 하는 병목이 이미 자연스러운
+  방어선 역할을 한다.
+
+### I-127 · MINOR — 신고 중복 병합(`merged`) 응답이 Server Action에서 버려져 `strings.report.mergedNotice`가 죽은 문자열이었다
+
+- **상태**: **해결됨(25일차, 2026-07-29, BOARD)**. `CreateReportFormState`에 `merged?: boolean`을
+  추가하고 `createReportAction`이 `result.data.merged`를 그대로 옮기게 했으며, `ReportDialog`가
+  `state.merged`로 `sentNotice`/`mergedNotice`를 분기하게 했다.
+  **실측**(격리 Chromium): 실 계정으로 같은 게시글을 두 번 신고 — 1차 "신고가 접수됐어요",
+  2차 **"이미 신고한 대상이에요. 사유를 갱신했어요."**로 다르게 표시됨을 브라우저에서 확인.
+  DB 대조: `reports` 행이 **1건만 존재**, `id` 불변, `reason`만 2차 사유로 갱신 — 새 행이 생기지
+  않음을 원시값으로 확인. 검증 후 원복.
+- **영역**: UI / 신고·차단 (FR-080 AC1)
+- **제보**: BOARD, 25일차 — I-117 작업 중 `strings.report.mergedNotice`가 정의돼 있는데 어디서도
+  참조되지 않는 것을 발견.
+- **판단이 바뀐 경위(기록해 둘 값어치가 있다)**: BOARD는 처음엔 "사소하다"고 판단해 초안에도 올리지
+  않았다 — `profile` 대상 하나에만 배선돼 있던 상태에서는 같은 대상을 반복 신고할 일이 드물어
+  보였기 때문이다. 팀장이 **"신고 진입점을 3곳으로 늘렸기 때문에 중복 신고가 오늘부로 실사용 경로가
+  됐다 — 네 변경이 이 경로를 만든 것"**이라고 지적해 판단이 뒤집혔다. **배선 범위가 넓어지면 이전엔
+  무시할 만했던 갭도 무시할 수 없어진다**는 사례로 남긴다.
+- **DB 계약 확인(CREW 교차검증)**: 이 병합은 우연이 아니라 **스키마 제약이 보장한다.**
+  `reports_unique_pending_report`(부분 유니크 인덱스, `(reporter_id, target_type, target_id)
+  WHERE status='pending'`)가 있어, **RPC를 아예 우회해 직접 INSERT를 시도해도** `409 23505
+  duplicate key value violates unique constraint "reports_unique_pending_report"`로 막힌다.
+  RPC의 `ON CONFLICT … DO UPDATE … RETURNING (xmax<>0) as merged`는 그 제약을 우아하게 처리해 줄
+  뿐이다.
+
+### I-128 · MINOR(잠정) — `PollPanelContainer`가 `authenticated` 전용 RPC(`poll_vote_tally`)를 세션 확인 전에 호출한다 — I-095·I-115와 같은 구조, **재현은 못 했지만 선제 수정했다**
+
+- **상태**: **해결됨(25일차, 2026-07-29 — CORE 발견, BOARD 선제 수정)**.
+  `src/components/poll/PollPanelContainer.tsx`의 `resolveBoardViewer` 직후, `Promise.all`(→
+  `getPollTally`) **앞에** `if (!isAuthenticated(session)) return null;`을 추가했다 — CORE의 I-095
+  패턴 그대로이며 `AdminReportsContainer`(I-115)와 동일한 모양이라 **세 곳이 같은 형태가 됐다.**
+  docstring에 "재현은 안 됐지만 구조가 같아 선제 수정"이라는 경위를 남겼다.
+  **실측**(격리 Chromium): ① 정상 경로 — 실 계정 로그인 후 poll이 붙은 게시글에서 "정족수 충족 ·
+  찬성 우세로 가결 · 참여 5명 / 대상 5명" 정상 렌더(24일차에 이 팀이 실제로 겪은 "가드가 정당 경로를
+  막는" 실수는 재현되지 않았다). ② 게스트 접근 — HTTP 200(도메인 오류 200 관례), 본문은 게스트 셸만
+  렌더, 서버 로그 `grep -c 42501` **0건**(이건 결함이 사라졌다는 증거가 아니라 회귀가 없다는 확인일
+  뿐이다).
+- **영역**: 라우팅 / 관측성 / 투표
+- **제보**: CORE, 25일차 — DESIGN의 I-115를 교차검증하며 팀장 지시로 **"같은 구조가 또 남아 있는가"**
+  를 `(app)/*`·`/admin` 트리의 `*Container.tsx` 약 20개 전수 스윕하다 발견. (I-095에서 9곳을 고칠 때
+  `admin/*`이 소관 밖이라 빠졌다가 I-115로 돌아온 전례가 이 스윕의 동기였다.)
+- **내용**: `PollPanelContainer`는 `resolveBoardViewer(crewId)`로 세션·역할을 조회하지만, **그 결과를
+  확인하기 전에** `Promise.all` 안에서 `getPollTally(poll.id)`를 무조건 호출한다. `poll_vote_tally`
+  RPC는 마이그레이션에서 **`authenticated`에게만 EXECUTE 권한이 있다**(`anon` 배제). 게이트가 아직
+  판정을 끝내지 않은 병렬 렌더 브랜치에서 이 컨테이너가 게스트 상태로 먼저 실행되면
+  `admin_list_reports`(I-115)와 정확히 같은 모양의 `42501`이 날 수 있다 — 코드·권한 그랜트로는
+  **구조적으로 동일한 결함이 확정된다.**
+- **재현 시도(정직하게 기록)**: 격리 프로덕션 빌드에서 poll이 붙은 게시글에 게스트로 **순차 4회 ·
+  동시 15회(총 19회)** 접근 — **서버 로그에 `42501` 0건.** `AdminReportsContainer`가 수정 전 3/3
+  재현됐던 것과 대조적이다. 원인은 확정하지 못했다 — `/admin`은 `admin/layout.tsx` ↔ `admin/page.tsx`가
+  직접 대응하는 얕은 병렬 쌍인데 이쪽은 `[crewId]/layout.tsx` 아래 `board/[postId]/page.tsx`로 한 단계
+  더 깊어, Next 16 공식 문서가 명시한 "같은 세그먼트의 layout+page 쌍" 병렬 렌더 범위 밖일 수 있다는
+  추정은 했으나 근거가 부족하다(비결정적 타이밍 가능성도 배제 못 함).
+- **재현도 안 된 것을 왜 고쳤나(팀장 판단)**: ① **수정 비용이 사실상 0이다**(가드 위치 이동 한 줄).
+  ② **구조가 동일하다** — 오늘 재현되지 않는 이유가 Next의 렌더 스케줄링에 달려 있다면 그것은 **우리가
+  통제하지 않는 조건**이고, 라우트 구조가 바뀌거나 Next이 올라가면 그날 재현된다. ③ 이 팀은 "완결
+  지점만 막고 진입점은 안 막는" 결함을 같은 축에서 **세 번** 겪었다(I-106 → I-107 → I-114). 재현이
+  안 됐다고 남겨 두면 네 번째가 된다.
+- **기록해 둘 태도**: CORE는 재현 실패를 **부풀리지도 감추지도 않고** "구조는 같은데 못 잡았다"로
+  남겼다. 부풀렸으면 잘못된 심각도가 붙었을 것이고, 감췄으면 다음 회차에 재발로 돌아왔을 것이다.
