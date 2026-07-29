@@ -34,6 +34,10 @@ export async function CommentListContainer({ crewId, postId }: CommentListContai
   const { session, role } = await resolveBoardViewer(crewId);
   const canComment = checkPermission({ role, action: "comment:create" }).allowed;
   const canDeleteAny = checkPermission({ role, action: "comment:delete_any" }).allowed;
+  // FR-080(I-117 해소, 25일차) — `PostDetailContainer`와 같은 원칙. 댓글마다 다시 판정하지
+  // 않는다 — role 판정은 댓글 전체에서 같은 값이고, 남는 축(본인 여부·삭제 여부)만 댓글별로
+  // 갈린다(아래 toView).
+  const canReportPermission = checkPermission({ role, action: "report:create" }).allowed;
 
   const [comments, blockedProfileIds] = await Promise.all([
     listCommentsByPost(postId),
@@ -68,6 +72,7 @@ export async function CommentListContainer({ crewId, postId }: CommentListContai
       canEdit,
       canDelete: !comment.deletedAt && (canDeleteOwn || canDeleteAny),
       canReply: canComment && canReplyToComment(comment),
+      canReport: !comment.deletedAt && !isSelf && canReportPermission,
       replies,
     };
   }

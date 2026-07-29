@@ -101,7 +101,7 @@ export default async function ShellRootLayout({
       suppressHydrationWarning
       className={`${sansKr.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="h-full flex flex-col">
         {/* FOUC 방지: 하이드레이션 이전에 동기 실행돼 저장된 테마(없으면 OS 설정)를 `<html>`
             클래스로 즉시 반영한다. `ThemeProvider`가 mount되기 전 첫 페인트가 반대 테마로
             번쩍이는 것을 막는다(근거·규칙은 `theme-config.ts`). */}

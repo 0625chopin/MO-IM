@@ -4,6 +4,7 @@ import { formatMessageTime } from "@/components/chat/format-message-time";
 import type { ChatTimelineItem } from "@/components/chat/message-view-models";
 import { PostLinkCard } from "@/components/chat/PostLinkCard";
 import { BlockedContentNotice } from "@/components/moderation/BlockedContentNotice";
+import { ReportDialog } from "@/components/moderation/ReportDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,6 +61,11 @@ export interface MessageBubbleProps {
  * `BlockedContentNotice`로 감싼다 — 아바타·이름·시각은 그대로 둔다(`PostDetail`과 같은 원칙:
  * 누구 메시지인지는 계속 보여야 신고·차단 판단이 가능하다). 말풍선이 `<Link>`로 감싸여 있지
  * 않으므로(`BoardListItem`과 달리) 상호작용 요소 중첩 문제가 없다.
+ *
+ * **FR-080(I-117 해소, 25일차)**: 삭제 버튼과 같은 자리(타임스탬프 옆)에 `ReportDialog`
+ * (`triggerVariant="icon"`, `Trash2Icon`과 같은 크기의 `FlagIcon`)를 상대 메시지에만 붙인다.
+ * `create_report` RPC는 `chat_message` 대상의 자기신고를 막지 않지만 `isOwn`이면 애초에
+ * 노출하지 않는다 — `MemberList`의 `canReportOrBlock: !isSelf`와 같은 UI 정책.
  */
 export function MessageBubble({
   message,
@@ -80,6 +86,13 @@ export function MessageBubble({
   const isPending = message.deliveryStatus === "pending";
   const isFailed = message.deliveryStatus === "failed";
   const showDelete = canDelete && !isPending && !isFailed && onDelete;
+  /** FR-080(I-117 해소, 25일차) — 상대 메시지에만 보여준다(자기 자신을 신고할 수 없다,
+   *  `isSenderBlocked`와 같은 이유로 `isOwn`이면 항상 배제). `deliveryStatus`가
+   *  `pending`/`failed`인 메시지는 위 docstring대로 항상 본인 메시지에서만 나타나므로
+   *  `!isOwn`이 이미 그 두 상태를 배제한다 — 별도 prop 없이 컨테이너 게이트(크루원 전용
+   *  채팅방, `report:create`는 로그인 회원 전체 allow)만으로 충분하다(`comment:create` 게이트를
+   *  다시 하지 않는 `CommentListContainer`와 같은 원칙). */
+  const showReport = !isOwn;
 
   return (
     <div
@@ -152,6 +165,9 @@ export function MessageBubble({
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+            )}
+            {showReport && (
+              <ReportDialog targetType="chat_message" targetId={message.id} triggerVariant="icon" />
             )}
           </div>
         </div>

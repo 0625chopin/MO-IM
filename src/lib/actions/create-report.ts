@@ -26,6 +26,15 @@ import type { ReportTargetType } from "@/lib/types";
 export interface CreateReportFormState {
   formError?: string;
   success?: boolean;
+  /** `createReport`(`src/lib/data/supabase/report.ts`)가 돌려주는 `merged`를 그대로 옮긴다 —
+   *  같은 대상을 이미 `pending` 상태로 신고한 적이 있어 `create_report` RPC가 새 행을 만드는
+   *  대신 기존 행의 사유만 갱신했다는 뜻이다(FR-080 AC1 "중복 신고는 1건으로 합쳐진다").
+   *  `ReportDialog`가 이 값으로 `sentNotice`/`mergedNotice` 중 하나를 고른다(25일차 —
+   *  I-117 작업 중 `strings.report.mergedNotice`가 어디서도 쓰이지 않는 죽은 문자열임을
+   *  발견했다가 처음엔 사소하다고 넘겼는데, 신고 진입점이 이번 회차에 1곳→4곳으로 늘어
+   *  중복 신고가 실사용 경로가 되면서 팀장 지시로 마저 배선했다 — `merged`는 데이터 레이어
+   *  까진 이미 있었고 이 Server Action만 버리고 있었다). */
+  merged?: boolean;
 }
 
 export async function createReportAction(
@@ -60,5 +69,5 @@ export async function createReportAction(
   }
 
   refresh();
-  return { success: true };
+  return { success: true, merged: result.data.merged };
 }

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { getBoardListHref } from "@/components/board/board-links";
+import { ReportDialog } from "@/components/moderation/ReportDialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -31,6 +32,12 @@ export interface PostActionsProps {
   initialBody: string;
   canEdit: boolean;
   canDelete: boolean;
+  /** `report:create` 판정 결과 AND 본인 글이 아님(I-117 해소, 25일차) — `PostDetailContainer`가
+   *  미리 계산해 내려준다(D-030 ①, `canEditTitleBody`·`canDelete`와 같은 자리). 본인 글에는
+   *  신고 버튼을 보여주지 않는다(`MemberList`의 `canReportOrBlock: !isSelf`와 같은 원칙 —
+   *  `create_report` RPC 자체는 프로필 대상만 자기신고를 막고 게시글은 막지 않지만, 이 판정은
+   *  DB 최종 방어선이 아니라 렌더 여부만 결정하는 UI 판정이다). */
+  canReport: boolean;
 }
 
 /**
@@ -68,6 +75,7 @@ export function PostActions({
   initialBody,
   canEdit,
   canDelete,
+  canReport,
 }: PostActionsProps) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -76,7 +84,7 @@ export function PostActions({
   const [errorCode, setErrorCode] = useState<ActionErrorCode | null>(null);
   const [pending, startTransition] = useTransition();
 
-  if (!canEdit && !canDelete) {
+  if (!canEdit && !canDelete && !canReport) {
     return null;
   }
 
@@ -182,6 +190,7 @@ export function PostActions({
               </DialogContent>
             </Dialog>
           )}
+          {canReport && <ReportDialog targetType="post" targetId={postId} />}
         </div>
       )}
     </div>

@@ -336,7 +336,7 @@ export const chatSection = defineSection({
     },
     {
       name: "말풍선 변형 (MessageBubble)",
-      note: "본인/상대 · 텍스트/게시글 공유(실제 PostLinkCard, Task 020C) · 삭제된 메시지 · 전송 중(낙관적 렌더) · 전송 실패(재전송 버튼, FR-051 E1) 6가지 모양.",
+      note: "본인/상대 · 텍스트/게시글 공유(실제 PostLinkCard, Task 020C) · 삭제된 메시지 · 전송 중(낙관적 렌더) · 전송 실패(재전송 버튼, FR-051 E1) 6가지 모양. 상대 메시지(isOwn=false) 3건에는 타임스탬프 옆에 삭제 아이콘과 같은 자리(FlagIcon)로 신고 버튼이 붙습니다(FR-080, I-117 해소, 25일차) — 본인 메시지에는 자기 자신을 신고할 수 없어 뜨지 않습니다.",
       content: (
         <PreviewFrame height={420}>
           <MessageBubblePreview
@@ -354,7 +354,7 @@ export const chatSection = defineSection({
     },
     {
       name: "말풍선 — 차단한 사용자의 메시지 (FR-081 AC1, Task 042A)",
-      note: "isSenderBlocked=true인 상대 메시지는 BlockedContentNotice로 감싸져 말풍선 내용만 접힙니다 — 아바타·이름·시각은 그대로 보입니다(누구 메시지인지 알아야 신고·차단 판단이 가능하므로). 본인 메시지(isOwn)는 자기 자신을 차단할 수 없으므로 이 변형이 적용되지 않습니다.",
+      note: "isSenderBlocked=true인 상대 메시지는 BlockedContentNotice로 감싸져 말풍선 내용만 접힙니다 — 아바타·이름·시각은 그대로 보입니다(누구 메시지인지 알아야 신고·차단 판단이 가능하므로). 본인 메시지(isOwn)는 자기 자신을 차단할 수 없으므로 이 변형이 적용되지 않습니다. 접힌 상태에서도 신고 버튼(FlagIcon)은 그대로 보입니다 — 내용을 가려도 '누구의 메시지인지'와 '신고할 수 있는지'는 별개입니다.",
       content: (
         <PreviewFrame height={200}>
           <MessageBubblePreview
@@ -368,7 +368,7 @@ export const chatSection = defineSection({
     },
     {
       name: "말풍선 — 삭제 가능 (FR-054, Task 041)",
-      note: "canDelete=true면 타임스탬프 옆에 삭제 아이콘 버튼이 붙는다 — 본인 메시지는 항상, 타인 메시지는 임원·오너·관리자(chat:delete_any_message)일 때만 MessageList가 이 값을 계산해 내려준다. 클릭하면 확인 다이얼로그(PostActions·CommentItem과 같은 패턴)가 뜬다. 전송 중(pending)·실패(failed) 메시지에는 애초에 삭제 버튼이 뜨지 않는다(MessageBubble.tsx의 showDelete 판정) — 아래 예시엔 그래서 포함하지 않았다.",
+      note: "canDelete=true면 타임스탬프 옆에 삭제 아이콘 버튼이 붙는다 — 본인 메시지는 항상, 타인 메시지는 임원·오너·관리자(chat:delete_any_message)일 때만 MessageList가 이 값을 계산해 내려준다. 클릭하면 확인 다이얼로그(PostActions·CommentItem과 같은 패턴)가 뜬다. 전송 중(pending)·실패(failed) 메시지에는 애초에 삭제 버튼이 뜨지 않는다(MessageBubble.tsx의 showDelete 판정) — 아래 예시엔 그래서 포함하지 않았다. 아래 두 번째(타인 메시지, canDelete=true)는 삭제 아이콘과 신고 아이콘이 나란히 붙는 모습을 보여준다(FR-080·FR-054가 같은 자리를 공유).",
       content: (
         <PreviewFrame height={200}>
           <MessageBubblePreview

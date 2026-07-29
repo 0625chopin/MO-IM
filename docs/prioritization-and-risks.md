@@ -2336,3 +2336,50 @@ R-001 ~ R-009는 **2026-07-23 기준 저장소 실물에서 확인된** 항목�
   CREW(초대·멤버십 소관)에 배정한다.
 - **영향**: I-030(닫힘), `docs/decisions/invitation-expiry-i030.md`(후보 D 추가·결정 반영),
   `requirements.md` §2.4(주석), FR-021 E1.
+
+### D-074 · 함수 기본 EXECUTE 잠금(`ALTER DEFAULT PRIVILEGES ... FROM anon, authenticated`) — **적용 시도 → 무효 확인 → 원복.** 이 환경에서는 이 메커니즘으로 함수 기본권한을 잠글 수 없다. 기존 "함수 생성마다 명시적 REVOKE" 관행을 유지한다
+
+- **일자**: 2026-07-29(25일차) / **결정자**: 팀장(권한 기준선 관찰 §5 관찰에 대한 판단) →
+  **CREW의 자기반증 실측으로 무효 확인 → 팀장 판단 없이 원복(사실 확인 결과 보고 대기 중
+  가역 조치)**
+- **배경**: 25일차 CREW의 권한 기준선(`docs/decisions/permission-baseline.md`)이 "테이블
+  기본권한은 I-111 이후 TRUNCATE가 이미 빠져 있는데, 함수 기본권한은 `anon`/`authenticated`
+  에 EXECUTE가 여전히 기본으로 열려 있다(Postgres/Supabase 표준 기본값)"는 비대칭을
+  관찰만 하고 적용하지 않은 채 결정 후보로 남겼다. 팀장이 "테이블에 이미 같은 조치를 했다·
+  실패 방향이 옳다(잠그면 GRANT 누락이 42501로 시끄럽게 드러나고, 안 잠그면 REVOKE 누락이
+  조용히 새어 나간다, 24일차 I-114가 후자의 실례)·기존 함수엔 영향 없다"는 근거로 **적용을
+  판단**했다.
+- **시도**: `alter default privileges in schema public/private revoke execute on functions
+  from anon, authenticated;`(및 Supabase 공식 문서가 제시하는 정확한 변형 — `for role
+  postgres` 명시, `anon, authenticated, public`을 한 문장에 같이 나열하는 조합 등 5가지
+  이상의 구문을 전부 시도)를 `apply_migration`으로 적용했다.
+- **자기반증(팀장이 명시적으로 요구한 절차)으로 무효를 발견**: "새 테스트 함수를 만들어
+  `anon`/`authenticated`에 EXECUTE가 붙지 않는지 확인하라"는 지시대로 실제로 새 함수를
+  만들어 `pg_proc.proacl`·`information_schema.role_routine_grants`를 직접 조회한 결과,
+  **매번 예외 없이 `PUBLIC`(전체 롤 대상 pseudo-role)에 `EXECUTE`가 자동으로 붙어 있었다**
+  — `pg_default_acl`에는 (기대한 대로) `anon`/`authenticated`가 빠진 행이 잘 저장됐는데도,
+  실제 `CREATE FUNCTION` 시점에는 그 저장된 행과 무관하게 `PUBLIC` 기본 권한이 항상
+  베이스라인으로 깔렸다. 완전히 새로 만든 검증 전용 스키마(`crew_test_scratch`, 이번
+  조사에서만 존재, 검증 후 즉시 `drop schema cascade`로 제거)에서도 동일했다 — 기존 상태의
+  잔재 때문이 아니라 이 환경의 근본 동작이다. 원인은 특정하지 못했다(`public` 스키마 소유자가
+  PostgreSQL 15+의 `pg_database_owner` 유사역할인 점, Supabase의 `postgres` 롤이 실제로는
+  `rolsuper=false`인 점을 후보로 확인했으나 인과관계까지는 확정하지 못했다).
+- **결정**: **적용하지 않는다(원복).** 근거: ① 효과가 없는데 "저장된 기본권한 행에서
+  이름이 빠졌다"는 흔적만 남기면, 다음 회차 권한 기준선 대조에서 "잠긴 것으로 보이지만
+  실제로는 전혀 안 잠긴" 거짓 안도감을 준다 — 없는 방어를 있는 것처럼 기록하는 것이
+  최악이라는 팀 판단(이번 지시의 출발점)과 정확히 같은 이유로, 이번엔 반대 방향(적용
+  결과 자체)에도 같은 원칙을 적용한다. ② 기존 함수 45개는 애초에 이번 변경들의 영향을
+  받지 않았다(기본권한은 미래 객체에만 적용되고, 그 미래-객체 효과 자체가 안 났으므로
+  기존 객체는 처음부터 끝까지 무관 — 실측: 원복 전/후 `crew_directory_summary`·
+  `profile_search` RPC 정상 호출 확인). ③ **이 프로젝트가 지금까지 써 온 "함수를 만들
+  때마다 그 마이그레이션 안에서 명시적으로 `revoke execute ... from anon, authenticated,
+  public`"관행(I-092·I-101~103·I-114·I-120)이 이 환경에서 사실상 유일하게 검증된 차단
+  수단이다** — 계속 그 관행을 지킨다. 새 SECURITY DEFINER 함수를 만들 때마다 EXECUTE
+  회수를 빠뜨리지 않는 것은 여전히 리뷰 체크리스트 항목으로 남는다(자동 강제 장치는 이
+  환경에서 만들 수 없다는 것이 이번 조사의 결론).
+- **원복 내역**: `public` 스키마 함수 기본권한을 원래 값(`postgres,anon,authenticated,
+  service_role` 전부 EXECUTE)으로 재복구, `private` 스키마는 원래 상태(커스텀 기본권한
+  행 없음)로 되돌림 — 둘 다 원본 값과 바이트 단위로 일치 확인.
+- **영향**: `docs/decisions/permission-baseline.md`§5(한계)에 이 결론 반영 필요(다음
+  갱신 시), 새 이슈 등재 없음(회귀가 아니라 "시도했으나 이 환경에서 불가능한 접근법"이라는
+  운영 지식). `get_advisors(security)` 재확인 결과 신규 WARN 0건.

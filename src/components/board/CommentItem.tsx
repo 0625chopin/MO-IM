@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { CommentItemView } from "@/components/board/comment-view-models";
 import { CommentForm } from "@/components/board/CommentForm";
 import { BlockedContentNotice } from "@/components/moderation/BlockedContentNotice";
+import { ReportDialog } from "@/components/moderation/ReportDialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -138,6 +139,9 @@ export function CommentItem({ crewId, postId, comment, isReply = false }: Commen
                 >
                   {strings.board.comment.actions.edit}
                 </button>
+              )}
+              {comment.canReport && (
+                <ReportDialog targetType="comment" targetId={comment.id} triggerVariant="text" />
               )}
               {comment.canDelete && !comment.isDeleted && (
                 <Dialog>

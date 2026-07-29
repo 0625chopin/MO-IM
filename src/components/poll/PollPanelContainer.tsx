@@ -2,6 +2,7 @@ import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
 import type { PollBallotViewer, PollViewModel } from "@/components/poll/poll-view-models";
 import { PollLiveContainer } from "@/components/poll/PollLiveContainer";
 import { PollPanel } from "@/components/poll/PollPanel";
+import { isAuthenticated } from "@/components/shell/auth-session";
 import {
   getCrewMembership,
   getMeetupByPollId,
@@ -36,6 +37,16 @@ export interface PollPanelContainerProps {
  * **세분 권한**(role 매트릭스)과 "이 투표의 대상자 스냅샷에 있는가"는 이 컨테이너가 판정한다
  * (CONVENTIONS.md D-030 ④ — role 세분은 컨테이너 몫으로 남는다).
  *
+ * **단, 미인증(guest) 자체는 이 컨테이너가 직접 막는다(I-115류 재발 방지, 25일차)** — Next.js가
+ * 레이아웃과 페이지를 병렬 렌더하므로(`AdminReportsContainer` I-115와 같은 구조) 위 레이아웃
+ * 게이트가 아직 리다이렉트를 확정하지 않은 병렬 브랜치에서도 이 컨테이너는 독립적으로 실행돼
+ * `getPollTally`(→ `poll_vote_tally` RPC, `authenticated` 전용 EXECUTE)를 호출할 수 있다.
+ * 그래서 `resolveBoardViewer` 직후 `Promise.all` **앞에서** `isAuthenticated(session)`을 먼저
+ * 확인해 조기 반환한다(CORE의 I-095 패턴 그대로, `AdminReportsContainer`와 동일 모양). 실제
+ * 게스트 접근으로 `42501`이 재현되지는 않았지만(CORE 25일차 실측, 원인 미확정) 구조가
+ * 완전히 같아 재현 여부와 무관하게 선제 수정했다 — I-106→I-107→I-114처럼 "진입점을 안 막고
+ * 완결 지점만 막는" 결함이 같은 팀에서 반복되는 것을 막기 위해서다.
+ *
  * **판정은 전부 `lib/rules`를 호출만 한다(NFR-036, R-015)**: 정족수(`computeQuorum`)·정족수
  * 분모(`countQuorumEligibleVoters`)·집계 공개 범위(`shouldShowDetailedTally`)·"결과 집계 중"
  * 여부(`isPollAwaitingClosure`)·남은 시간(`getPollRemainingMs`) 전부 Task 009A의 순수 함수
@@ -48,8 +59,16 @@ export async function PollPanelContainer({ crewId, postId }: PollPanelContainerP
   }
 
   const { session, role } = await resolveBoardViewer(crewId);
-  const membership =
-    session.status === "authenticated" ? await getCrewMembership(crewId, session.profileId) : null;
+  if (!isAuthenticated(session)) {
+    // (app)/crews/[crewId] 레이아웃 게이트가 이미 미인증 분기를 선택했을 병렬 렌더링의 폐기
+    // 브랜치다(I-095·I-115와 같은 구조 — CORE 25일차 `*Container.tsx` 전수 스윕에서 발견,
+    // 게스트로 재현은 안 됐지만 구조가 동일해 선제 수정한다, 팀장 지시). 이 조기 반환이 없으면
+    // 아래 `Promise.all`의 `getPollTally`(→ `poll_vote_tally` RPC, `authenticated` 전용
+    // EXECUTE)가 레이아웃의 리다이렉트보다 먼저 실행될 수 있다 — `AdminReportsContainer`
+    // (I-115)와 정확히 같은 패턴.
+    return null;
+  }
+  const membership = await getCrewMembership(crewId, session.profileId);
 
   const [post, voters, votes, meetup, tally] = await Promise.all([
     getPostById(poll.postId),

@@ -53,6 +53,10 @@ export async function PostDetailContainer({ crewId, postId }: { crewId: Id; post
   }).allowed;
   const canDeleteOwn = checkPermission({ role, action: "post:delete_own", context: { isSelf } }).allowed;
   const canDeleteAny = checkPermission({ role, action: "post:delete_any" }).allowed;
+  // FR-080(I-117 해소, 25일차) — 본인 글에는 신고 버튼을 보여주지 않는다(`MemberList`의
+  // `canReportOrBlock: !isSelf`와 같은 원칙). `report:create`는 로그인한 회원 전체에 allow라
+  // 역할 판정보다 본인 여부가 실질적인 게이트다.
+  const canReport = checkPermission({ role, action: "report:create" }).allowed && !isSelf;
 
   const viewModel: PostDetailViewModel = {
     id: post.id,
@@ -69,6 +73,7 @@ export async function PostDetailContainer({ crewId, postId }: { crewId: Id; post
     canDelete: canDeleteOwn || canDeleteAny,
     meetupDateLocked: hasLockedFields(post.type),
     isAuthorBlocked: blockedProfileIds.includes(post.authorId),
+    canReport,
   };
 
   return <PostDetail crewId={crewId} post={viewModel} />;

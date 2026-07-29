@@ -28,6 +28,9 @@ export interface CommentItemView {
    *  답글은 달 수 있다 — 요구사항이 이를 막지 않는다("삭제된 댓글" 아래 답글이 이미 유지되는
    *  것 자체가 그 자리가 계속 유효한 스레드임을 뜻한다). */
   canReply: boolean;
+  /** FR-080(I-117 해소, 25일차) — `report:create` 판정 결과 AND 본인 댓글이 아님 AND 삭제되지
+   *  않음. `PostDetailViewModel.canReport`와 같은 자리 — 삭제된 댓글은 신고할 본문이 없다. */
+  canReport: boolean;
   replies: CommentItemView[];
 }
 

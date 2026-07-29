@@ -230,8 +230,73 @@ DESIGN이 24일차 CREW 교차검증에서 짚었다. **배치 job 없이 조회
    이므로, 다이어그램에 "만료는 상태 전이가 아니라 조회 필터링으로 다룬다(D-073)"는 주석을
    달아 공백이 아니라 의도임을 명시한다.
 
-### 구현 (다음 회차)
+### 구현 (25일차, CREW) — 완료
 
 **24일차에는 결정만 하고 구현하지 않았다** — 팀원 4명이 종료된 뒤 사용자 결정이 나왔다.
-다음 회차에 **CREW**(초대·멤버십 소관)에 배정한다. 대상은 `listInvitationsForProfile`와
-위 한계 2의 §2.4 주석이다.
+25일차에 CREW가 아래를 구현해 I-030을 닫는다.
+
+#### 1. `listInvitationsForProfile`에 만료 필터 추가
+
+`src/lib/data/supabase/invitation.ts` — `status === "pending"`일 때만
+`.gt("expires_at", new Date().toISOString())`를 추가했다. **`status === "pending"`일
+때만** 적용하는 이유: 이미 응답이 끝난 상태(`accepted`/`declined`)까지 만료로 걸러내면
+"초대 당시엔 유효했고 실제로 수락까지 된" 과거 이력이 조회에서 사라져 이력을 왜곡한다 —
+"지금 응답 가능한가"만 만료가 좌우해야 하고 "과거에 무슨 일이 있었는가"는 만료와 무관해야
+한다.
+
+**Mock 구현(`src/lib/data/mock/invitation.ts`)도 같은 규칙으로 맞췄다** — 두 구현이
+갈리면 D-030 "조회부만 교체" 원칙이 깨진다. ISO 8601 문자열 사전식 비교
+(`invitation-response-eligibility.ts`와 같은 관례)를 그대로 썼다.
+
+**실 REST 재현**(`chopin0625@gmail.com`을 초대자, `0625chopin@gmail.com`을 피초대자로,
+실 로그인 토큰·`begin` 없이 REST로 커밋 후 직접 DELETE 정리 — invitations 9건 → 삽입 1건
+→ 검증 후 삭제 → 9건 복귀 확인):
+
+1. `expires_at`이 하루 지난 `status='pending'` 초대 1건을 생성(피초대자는 이 크루의
+   비멤버 — provisioning 트리거가 짝 `crew_memberships`(`invited`)도 함께 만듦, 예상대로).
+2. **만료 필터 없이** `GET .../invitations?invitee_id=eq.<B>&status=eq.pending` →
+   `200`, 위 행이 그대로 보임(D-073 이전 동작, 문제 그대로 재현).
+3. **`listInvitationsForProfile`이 실제로 보내는 조건**(`expires_at=gt.<nowIso>`)을 추가한
+   같은 쿼리 → `200`, **결과 배열이 비었음**(`[]`) — 만료된 초대가 "받은 초대함" 조회에서
+   사라짐을 실측으로 확인했다.
+4. 테스트 행(`invitations` 1건·`crew_memberships` 1건)을 직접 DELETE로 정리 — 정리 후
+   `invitations=9`·`crew_memberships=54`로 원복 확인(작업 시작 시점 스냅샷과 동일).
+
+#### 2. `requirements.md` §2.4 주석
+
+다이어그램 바로 위에 "25일차 추가(D-073, I-030)" 콜아웃을 추가해 `invited`에서 만료로
+나가는 화살표가 없는 것이 공백이 아니라 의도임을 명시했다(위 한계 2 반영).
+
+#### 3. 알려진 한계 1(멤버십 집계 유령 인원) 실측 — **현재는 나타나지 않는다**
+
+`invited` 행이 DB에 남아 멤버십 통계·집계에 유령 인원으로 잡힐 수 있다는 한계를, 실제로
+멤버 수를 세는 모든 경로를 추적해 확인했다:
+
+| 호출부 | 필터 |
+| --- | --- |
+| `private.crew_directory_summary`(RPC, `getPublicCrewMemberCount`) | SQL이 직접 `cm.status = 'active'`로 COUNT — 애초에 `invited`를 세지 않는다 |
+| `CrewHomeContainer`(활성 멤버십 분기, `memberCount`) | `members.filter((m) => isActiveMembership(m.status)).length` |
+| `CrewMembersContainer`(멤버 관리 목록) | `listCrewMembers(...).filter((m) => isActiveMembership(m.status))` |
+| `fetch-crew-cards.ts`("가입됨" 배지) | `.filter((m) => isActiveMembership(m.status)).length` |
+| `disband-crew.ts`(해산 시 활성 멤버 통보 대상) | `.filter((m) => isActiveMembership(m.status))` |
+| `cancel-meetup.ts` | `.filter((m) => isActiveMembership(m.status))` |
+| `create-post.ts`(FR-040 투표 대상자 스냅샷) | `members.filter((m) => m.status === "active")` |
+
+`isActiveMembership`(`crew-membership-transition.ts`)은 `status === "active"`만 참을
+반환한다 — `invited`를 포함하지 않는다. **결론: 현재 저장소에서 멤버십 수를 세는 호출부
+7곳 전부가 이미 `active`로 명시적으로 좁혀서 집계하고, `invited`를 그대로 세는 곳은
+0건이다.** 즉 D-073의 한계 1은 **오늘 시점엔 잠재적(latent) 리스크일 뿐 실제로 나타나는
+화면·쿼리가 없다** — 새 이슈로 등재하지 않는다. 다만 이는 "현재 코드가 우연히 전부
+올바르게 필터링하고 있다"는 뜻이지 구조적으로 강제된 것은 아니다 — **앞으로 멤버십 수를
+세는 새 코드가 `crew_memberships.status`를 필터 없이 COUNT/length 하면 이 한계가 그
+자리에서 실현된다.** 리뷰 시 "멤버 수 집계는 `active` 필터를 명시했는가"를 체크리스트에
+남겨 두는 것을 권장한다(강제 장치는 아니다, 참고용).
+
+#### 산출물(25일차)
+
+- `src/lib/data/supabase/invitation.ts`(`listInvitationsForProfile` 만료 필터),
+  `src/lib/data/mock/invitation.ts`(동일 규칙 반영).
+- `docs/requirements/requirements.md` §2.4(D-073 주석).
+- 마이그레이션 없음(D-073 자체가 "DB 상태를 바꾸지 않는다"는 결정이라 이 항목엔 스키마
+  변경이 없다).
+- 이슈: `docs/ISSUES.md` I-030을 "구현 완료"로 갱신.

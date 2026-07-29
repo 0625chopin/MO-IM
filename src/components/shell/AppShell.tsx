@@ -55,6 +55,26 @@ import type { ReactNode } from "react";
  * 페이지를 감싸는 루트 인스턴스(`src/app/layout.tsx`)는 항상 기본값(`true`)을 쓴다. 이 스위치가
  * 없으면 `id="main-content"`가 문서에 중복되고(HTML 표준 위반) 스킵 링크도 두 벌 생겨 키보드
  * 사용자가 Tab 첫 포커스에서 어디로 이동하는지 예측할 수 없다(3일차 교차검증, CREW 실측 지적).
+ *
+ * **높이 체인(I-118·I-122, 25일차 CORE 해소)**: 루트 `div`는 `min-h-full`이 아니라 `h-full`을
+ * 쓴다. `min-height`는 하한만 정하고 상한이 없어 자손이 아무리 길어도 이 요소 어디서도 실제로
+ * "clip"되는 박스가 생기지 않는다 — `MessageList.tsx`의 하단 sentinel
+ * `IntersectionObserver({ root: scrollRef.current })`가 그 컨테이너로 아무것도 클리핑하지
+ * 못해 마운트 즉시(그리고 레이아웃이 재계산될 때마다) "교차 중"으로 오보하는 근본 원인이었다
+ * (FR-055 AC2 자체가 깨졌다, `docs/ISSUES.md` I-122). `h-full`이 실제 높이 제약이 되려면
+ * **체인 전체가 `min-height`가 아니라 확정된 높이**여야 한다 — `html`(`(shell)/layout.tsx`,
+ * 이미 `h-full`)→`body`(같은 파일, `min-h-full`→`h-full`로 함께 고쳤다)→여기(루트 `div`)까지
+ * 셋 다 정의됐을 때만 백분율 높이가 "확정값"으로 전파된다(CSS 퍼센트 높이는 조상이 확정
+ * 높이가 아니면 `auto`로 무너진다). 아래 `#main-content` 래퍼도 `flex-1`만으로는 부족해
+ * `min-h-0`을 더했다 — flex 아이템의 기본 최소 높이는 `auto`(콘텐츠 크기)라, 이게 없으면
+ * 콘텐츠가 배분된 flex-basis보다 길 때 박스가 그만큼 늘어나 버려 체인이 여기서 다시 끊긴다.
+ * **다른 18개 라우트는 영향받지 않는다** — `overflow`는 어디서도 `hidden`/`auto`로 바꾸지
+ * 않았고(기본값 `visible` 유지), 채팅 페이지 외 `<main>`들은 자기 쪽에 `min-h-0`을 선언하지
+ * 않으므로 여전히 콘텐츠만큼 자라 조상 체인을 타고 문서 전체가 스크롤된다(오늘과 동일한
+ * 동작) — 오직 `min-h-0 flex-1 overflow-y-auto`를 명시적으로 선언한 후손(채팅의 `<main>`→
+ * `MessageRoomContainer`→`MessageList`)만 이제 실제로 확정된 높이를 물려받아 자체 스크롤
+ * 컨테이너가 된다. 실측·회귀 확인은 `docs/decisions/appshell-height-chain-118-122.md`(25일차
+ * CORE 산출물) 참고.
  */
 export function AppShell({
   session,
@@ -72,7 +92,7 @@ export function AppShell({
       // 실제로 보일 때만 경계선을 긋는다. `sm:`을 쓸 수 없다 — 재정의된 `sm:`은 프레임
       // 컨테이너 기준인데 컨테이너 쿼리는 **자기 자신을 조회하지 못하고**(조상만 본다),
       // 프레임 폭 430px은 그 임계값(40rem)에 닿지도 않아 영원히 꺼진 채로 남는다.
-      className="@container/appframe mx-auto flex min-h-full w-full max-w-app flex-1 flex-col border-border bg-background min-[26.875rem]:border-x"
+      className="@container/appframe mx-auto flex h-full w-full max-w-app flex-1 flex-col border-border bg-background min-[26.875rem]:border-x"
     >
       {showSkipLink && (
         <a
@@ -95,7 +115,7 @@ export function AppShell({
           개편 전 고정 `pb-16`은 safe-area가 있는 기기에서 마지막 콘텐츠가 탭바에 가렸다. */}
       <div
         id={showSkipLink ? "main-content" : undefined}
-        className="flex flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0"
+        className="flex min-h-0 flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0"
       >
         {children}
       </div>
