@@ -15,6 +15,22 @@ import type { AuthSession } from "./auth-session";
 /**
  * 360px 뷰포트(NFR-026)의 1차 내비게이션. `md` 이상에서는 `HeaderNav`가 같은 정보를 인라인
  * 링크로 이미 보여주므로 숨긴다(`md:hidden`) — 항목을 두 군데서 중복 렌더링하지 않는다.
+ * 그 `md:`는 이제 **뷰포트가 아니라 앱 프레임 폭** 기준이다(`globals.css`의 `@custom-variant`
+ * 블록) — 프레임이 430px로 묶여 있는 한 이 탭바는 넓은 화면에서도 계속 보이고, `HeaderNav`의
+ * 인라인 링크는 계속 숨는다. 즉 대화면에서도 내비게이션은 한 벌만 남는다.
+ *
+ * **`fixed`라서 폭을 직접 프레임에 맞춰야 한다.** `fixed`의 containing block은 뷰포트다. 프레임의
+ * `@container/appframe`이 이걸 바꿔 주지 않는다 — `container-type: inline-size`가 fixed 자손의
+ * containing block이 된다고 기대하기 쉬우나, **그렇지 않다**(1440px 실측: 프레임 안에 넣은
+ * `position:fixed; inset:0` 요소의 폭이 프레임 430px이 아니라 뷰포트 1425px로 나온다). 그래서
+ * `inset-x-0`을 쓰면 탭바만 프레임을 뚫고 여백면 위로 늘어난다.
+ *
+ * `left-1/2` + `-translate-x-1/2` + `max-w-app`으로 뷰포트 중앙에 프레임과 같은 폭으로 세워
+ * 맞춘다 — `AppShell`이 `mx-auto`로 프레임을 중앙에 두므로 두 중심선이 일치한다. 폭 상한을
+ * 프레임과 같은 토큰(`max-w-app`)에서 가져오므로 프레임 폭을 바꾸면 탭바도 함께 따라간다.
+ *
+ * 프레임에 `transform`을 걸어 containing block을 만드는 우회는 **쓰면 안 된다**. 그러면 이 탭바가
+ * 뷰포트가 아니라 프레임에 고정돼, 스크롤할 때 화면에 머무르지 않고 문서와 함께 흘러간다.
  *
  * 게스트는 홈·크루 탐색·로그인·회원가입 4항목, 로그인 사용자는 홈·크루 탐색·캘린더·알림·
  * 계정 설정 5항목이다(계정 메뉴 전체를 담을 팝오버 컴포넌트가 아직 없어 — Task 013 — 계정
@@ -37,7 +53,7 @@ export function MobileTabBar({ session }: { session: AuthSession }) {
     return (
       <nav
         aria-hidden="true"
-        className="fixed inset-x-0 bottom-0 z-40 flex h-14 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed bottom-0 left-1/2 z-40 flex h-14 w-full max-w-app -translate-x-1/2 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="flex flex-1 items-center justify-center">
@@ -58,7 +74,7 @@ export function MobileTabBar({ session }: { session: AuthSession }) {
   return (
     <nav
       aria-label={strings.common.a11y.primaryNav}
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-1/2 z-40 flex w-full max-w-app -translate-x-1/2 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       {items.map((item) => (
         <TabLink key={item.key} item={item} active={pathname === item.href} />

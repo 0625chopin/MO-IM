@@ -6,12 +6,20 @@
  * 앱 토큰 자체가 `.dark`에서 뒤집히므로 캘린더 색도 함께 뒤집힌다. 그래서 Schedule-X의 `isDark`
  * 를 쓰지 않는다(라이트 구조 유지 + 변수만 앱 토큰으로 덮음).
  *
- * 셀렉터를 `.mo-im-sx .sx__calendar`로 둔 이유: 테마 기본값이 `.sx__calendar`(명시도 0,1,0)에
- * 정의돼 있어, 래퍼 클래스를 앞에 붙여 명시도(0,2,0)를 한 단계 높여야 소스 순서와 무관하게
- * 항상 이긴다. 크루 12색(`--crew-*`)은 이벤트 칩의 인라인 스타일로만 들어가므로 여기서 건드리지
- * 않는다(채도=데이터 원칙 그대로).
+ * 셀렉터에 래퍼 클래스(`.mo-im-sx`)를 앞에 붙인 이유: 테마 기본값이 `:root`(명시도 0,1,0)에
+ * 정의돼 있어, 명시도를 한 단계 높여야(0,2,0) 소스 순서와 무관하게 항상 이긴다. 크루 12색
+ * (`--crew-*`)은 이벤트 칩의 인라인 스타일로만 들어가므로 여기서 건드리지 않는다(채도=데이터
+ * 원칙 그대로).
+ *
+ * **`.sx__calendar-wrapper`가 셀렉터에 함께 있어야 한다** — 빠뜨리면 다크모드에서 월 제목
+ * ("7월 2026년")이 검은 배경 위 검은 글자가 되어 사라진다. 그 래퍼는 `.sx__calendar`의 **부모**라
+ * 자식에만 선언한 변수가 닿지 않고, 자기 자신에게 `color: var(--sx-internal-color-text)`를 걸어
+ * `:root` 기본값 `#000`을 그대로 쓴다. `.sx__range-heading`처럼 자체 `color`가 없는 요소는 그
+ * 계산된 검정을 **상속**받으므로, 자식 쪽에서 변수를 아무리 고쳐도 되돌릴 수 없다. 라이트모드는
+ * 배경이 흰색이라 같은 결함이 드러나지 않았다.
  */
 
+.mo-im-sx .sx__calendar-wrapper,
 .mo-im-sx .sx__calendar {
   /* 표면·배경 — 배경은 앱 배경, 캘린더 면은 카드(흰 종이/다크 카드). */
   --sx-color-background: var(--background);
@@ -80,4 +88,17 @@
    theme-default가 `font-family: inherit`이라 래퍼에서 한 번 지정하면 전부 따라온다. */
 .mo-im-sx .sx__calendar {
   font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+/* 월 제목("7월 2026년")은 이 캘린더에서 **날짜의 얼굴**이라 mono + `tabular-nums`로 세운다
+   (`globals.css`의 `--font-mono` 주석: mono는 코드용이 아니라 수·시각의 서체다). 한글 "월"·"년"이
+   섞여 있어 mono만 쓰면 숫자와 한글이 서로 다른 얼굴로 갈리므로(Geist Mono에 한글 글리프가 없다)
+   서체는 sans로 두고 자릿수 정렬만 가져온다 — 같은 주석이 정한 규칙이다.
+
+   상한 폭도 함께 푼다. theme-default의 `max-width: 12.5rem`은 라틴 기준이라 한국어 월 표기가
+   길어지면 말줄임이 되는데, 이 앱의 프레임 폭에서는 그럴 이유가 없다. */
+.mo-im-sx .sx__range-heading {
+  max-width: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }

@@ -70,8 +70,10 @@ function DrawerOverlay({
   return (
     <DrawerPrimitive.Backdrop
       data-slot="drawer-overlay"
+      // 어두워지는 범위를 앱 프레임으로 좁힌다 — 근거는 `dialog.tsx`의 `DialogOverlay` 주석과
+      // 같다. `inset-0`의 좌우만 프레임 폭으로 대체하고(세로는 그대로 화면 전체) 중심선을 맞춘다.
       className={cn(
-        "fixed inset-0 z-50 min-h-dvh bg-black/10 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-xs supports-[-webkit-touch-callout:none]:absolute",
+        "fixed inset-y-0 left-1/2 z-50 min-h-dvh w-full max-w-app -translate-x-1/2 bg-black/10 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-xs supports-[-webkit-touch-callout:none]:absolute",
         className
       )}
       {...props}
@@ -133,7 +135,16 @@ function DrawerContent({
             // Transitions.
             "data-ending-style:transform-(--closed-transform) data-ending-style:opacity-[0.9999] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-nested-drawer-swiping:duration-0 data-ending-style:data-nested-drawer-swiping:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-starting-style:transform-(--closed-transform) data-swiping:duration-0 data-ending-style:data-swiping:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
             // Axis: y.
-            "data-[swipe-axis=y]:inset-x-0 data-[swipe-axis=y]:data-nested-drawer-open:h-(--stack-height)",
+            // 좌우 inset을 `0`이 아니라 **앱 프레임만큼 안쪽**으로 준다. 세로 스와이프 드로어
+            // (바텀 시트)는 폭이 `auto`라 `inset-x-0`이면 뷰포트 전체로 늘어나는데, 이 앱은 넓은
+            // 화면에서 모바일 폭 프레임을 중앙에 놓으므로 시트만 프레임 밖으로 삐져나온다.
+            // `max()`가 화면이 프레임보다 좁을 때(실제 모바일)를 0으로 눌러 기존 동작을 지킨다.
+            // `%`는 fixed의 containing block(뷰포트) 기준이라 세로 스크롤바 폭까지 반영돼,
+            // `mx-auto`로 놓인 프레임과 중심선이 정확히 맞는다(`100vw`는 스크롤바를 포함해 어긋난다).
+            // 폭 제한을 `width`나 `margin`이 아니라 `inset`으로 거는 것은 의도적이다 — 이 요소의
+            // `transform`은 스와이프 애니메이션이 쓰고 있고, `margin` shorthand는 Base UI의
+            // `m-(--drawer-inset,0px)`와 충돌한다.
+            "data-[swipe-axis=y]:inset-x-[max(0px,calc((100%-var(--container-app))/2))] data-[swipe-axis=y]:data-nested-drawer-open:h-(--stack-height)",
             // Axis: x.
             "data-[swipe-axis=x]:inset-y-0 data-[swipe-axis=x]:flex-row",
             // Direction: down.
