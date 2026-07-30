@@ -358,6 +358,13 @@ export async function initiateCrewMembership(
  * 차이가 없으므로 실용적으로 `rejected`(반려)와 같은 종착 상태로 합류시킨다. "누가 왜
  * 끝냈는지"의 실제 기록은 `JoinRequest.status`(`pending`→`withdrawn`, `join-request.ts`)가
  * 이미 구분해 담당한다 — 이 근사가 맞는지는 `docs/ISSUES.md` I-039에 남겼다.
+ *
+ * **I-143 해소(30일차)** — 이전에는 `membership.status = "rejected"`를 직접 대입하고
+ * `if (status !== "requested")` 가드를 손으로 다시 썼다. `rejectCrewMembership`(위)과
+ * 대칭을 맞춰 `transitionCrewMembershipStatus(membership.status, "reject_request")`를
+ * 거치도록 바꿨다 — 대입값(`"rejected"`)과 가드 조건(`"requested"`에서만 허용)은
+ * `TRANSITIONS.requested.reject_request`가 이미 표현하던 것과 동일해 동작은 바뀌지 않는다
+ * (근거: `docs/decisions/i143-withdraw-transitions-passthrough.md`).
  */
 export async function withdrawPendingCrewMembership(
   crewId: Id,
@@ -367,9 +374,10 @@ export async function withdrawPendingCrewMembership(
     (m) => m.crewId === crewId && m.profileId === profileId,
   );
   if (!membership) return err("not_found", `crew ${crewId} 의 멤버십(${profileId})을 찾을 수 없다.`);
-  if (membership.status !== "requested") {
+  const next = transitionCrewMembershipStatus(membership.status, "reject_request");
+  if (!next) {
     return err("conflict", `crew ${crewId} 의 멤버십(${profileId})은 대기 중 신청 상태가 아니다.`);
   }
-  membership.status = "rejected";
+  membership.status = next;
   return ok(membership);
 }

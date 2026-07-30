@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
 import { CrewHome } from "@/components/crews/CrewHome";
 import { CrewIntroPreview } from "@/components/crews/CrewIntroPreview";
 import { PrivateCrewNotice } from "@/components/crews/PrivateCrewNotice";
@@ -29,7 +30,20 @@ import type { Id } from "@/lib/types";
  * `resolve-board-viewer.ts`와 같은 패턴).
  *
  * 크루가 없으면(해산·오타 URL) `notFound()`로 404 처리한다 — private 크루의 "초대 전용"과는
- * 다른 경우다(그건 크루가 *있지만* 못 보는 것, 이건 크루 자체가 없는 것).
+ * 다른 경우다(그건 크루가 *있지만* 못 보는 것, 이건 크루 자체가 없는 것). **해산(`archived`)은
+ * 이 경우가 아니다** — 해산은 `crews` 행을 지우지 않고 `status`만 바꾸므로(FR-013), 소속
+ * 회원에게는 계속 크루 홈이 보여야 한다.
+ *
+ * **I-067 해소(30일차)** — 이 컨테이너는 활성 멤버십 분기에서 `crew.status`를 전혀 읽지
+ * 않아, 해산된 크루의 홈이 일반 크루 홈과 똑같이(설정 버튼 포함) 렌더됐다(브라우저 실측으로
+ * 확인). `(app)/crews/[crewId]/layout.tsx`가 이미 게시판·채팅·멤버 관리·설정 하위 라우트
+ * 전체에 `ArchivedCrewBanner`를 공통으로 띄우고 있었는데(19일차, D-039 "알려라"만 담당하는
+ * 패턴), 정작 그 레이아웃이 대상으로 삼지 않는다고 명시한 크루 홈(`/crews/[crewId]`, `(app)`
+ * 밖)만 이 안내에서 빠져 있었다 — 같은 패턴을 여기도 적용해 빈틈을 닫는다. **쓰기 차단
+ * (설정 폼이 실제로 편집 가능한 채로 남아 있는 문제, I-070)은 이 변경의 대상이 아니다** —
+ * 그 레이아웃과 마찬가지로 이 컨테이너도 "알려라"만 하고, "설정" 버튼 자체는 숨기지 않는다
+ * (숨기면 오너가 크루명이라도 다시 확인할 방법이 없어진다 — 배너로 "이 크루는 해산됐다"를
+ * 먼저 보여주는 것으로 충분하다는 것이 기존 D-039 판단과 같은 결이다).
  */
 export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
   const crew = await getCrewById(crewId);
@@ -48,16 +62,19 @@ export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
     const memberCount = members.filter((m) => isActiveMembership(m.status)).length;
 
     return (
-      <CrewHome
-        crewId={crew.id}
-        name={crew.name}
-        description={crew.description}
-        category={crew.category}
-        colorIndex={crew.colorKey}
-        visibility={crew.visibility}
-        memberCount={memberCount}
-        canManageSettings={canManageSettings}
-      />
+      <>
+        {crew.status === "archived" && <ArchivedCrewBanner />}
+        <CrewHome
+          crewId={crew.id}
+          name={crew.name}
+          description={crew.description}
+          category={crew.category}
+          colorIndex={crew.colorKey}
+          visibility={crew.visibility}
+          memberCount={memberCount}
+          canManageSettings={canManageSettings}
+        />
+      </>
     );
   }
 

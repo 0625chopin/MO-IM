@@ -702,13 +702,18 @@
 - **TypeScript**(strict, 개발 의존성) — 경로 별칭 `@/*` → `./src/*`
 - **Tailwind CSS v4**(개발 의존성) — CSS-first, `tailwind.config.*` 없음. 토큰은 `src/app/globals.css`의 `@theme inline`
 
+**shadcn/ui**(Task 004, 1일차) — 컴포넌트 기반(도입 근거·주의는 `docs/decisions/shadcn-ui-adoption.md`).
+CLI로 구성 파일(`components.json`, 프리미티브 `@base-ui/react`, 스타일 `base-nova`)을 생성하고
+`src/components/ui/`에 원자 컴포넌트 25종을 설치했다 — npm 런타임 의존성이 아니라 CLI가 소스를
+프로젝트에 복사하는 방식이라 위 "다섯 개" 집계와는 별도로 적는다(I-023, 이전에는 §8.2 "도입
+예정"에 있었으나 실제 설치 완료로 이관).
+
 > **`globals.css`에 캘린더 12색 팔레트는 아직 없다.** 현재 토큰은 background/foreground/폰트뿐이다(CON-04 대상, D-026으로 색값 결정 방식만 확정).
 
 ### 8.2 도입 예정 (아직 의존성에 없음)
 
 | 항목 | 용도 | 시점 | 근거 |
 | --- | --- | --- | --- |
-| **shadcn/ui** | 컴포넌트 기반 (MCP는 이미 설정됨) | v0.1 | 공통 기반 48인일 중 10~15인일 단축 여지 |
 | **Resend**(커스텀 SMTP 공급자) | 인증 메일 발송(가입 인증·비밀번호 재설정) | v0.1(Task 030) | **D-021**·**D-042** — 무료 티어 월 3,000통, `smtp.resend.com` 릴레이를 Supabase 대시보드 커스텀 SMTP에 직접 연결. 발송 도메인 SPF/DKIM 인증은 대시보드 수동 조치로 남아 있다 |
 
 ### 8.3 백엔드·인프라
