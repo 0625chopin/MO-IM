@@ -83,12 +83,24 @@ export async function listCrews(opts: ListCrewsQuery = {}): Promise<CursorPage<C
  *
  * **⚠️ 플레이스홀더 필드를 신뢰하지 말 것**: 이 마스킹된 객체는 `CrewHomeContainer`의
  * `crew.visibility === "private"` 비소속 분기(`crew.name`만 읽는다)를 만족시키기 위한 것이지
- * "전체 상세"가 아니다. 오늘 이 폴백을 실제로 타는 소비자는 `CrewHomeContainer`뿐이다 —
- * `getCrewById`의 다른 소비자(`BoardListContainer`·`PostDetailContainer`·`CrewSettingsContainer`
- * 등)는 전부 `(app)/crews/[crewId]/layout.tsx`(활성 멤버십 게이트) 뒤에 있어 원본 select가
- * 항상 성공하므로 이 폴백에 도달하지 않는다. **이 전제가 깨지는 새 소비자**(멤버십 게이트
- * 없이 `getCrewById`를 부르는 코드)를 추가할 때는 이 함수가 private+비소속 조합에서 가짜
- * `description`/`category`/`colorKey`("", "", 0)를 줄 수 있다는 것을 반드시 재확인할 것.
+ * "전체 상세"가 아니다. `getCrewById`의 대다수 소비자(`BoardListContainer`·
+ * `PostDetailContainer`·`CrewSettingsContainer` 등)는 전부 `(app)/crews/[crewId]/layout.tsx`
+ * (활성 멤버십 게이트) 뒤에 있어 원본 select가 항상 성공하므로 이 폴백에 도달하지 않는다.
+ *
+ * **이 전제가 깨진 실제 사례(I-158, 32일차 발견 · 33일차 처분)**: `InvitationInboxContainer`가
+ * 멤버십 게이트 없이 이 함수를 부른다(초대함은 정의상 아직 비소속자에게 보여주는 화면이다) —
+ * 그 결과 `colorKey`의 가짜 `0`이 `CrewColorDot`까지 그대로 렌더됐다. **타입은 고치지 않기로
+ * 했다**(파급 범위가 이 함수 호출부 20곳 전체라 이 건 하나의 영향에 비해 과도하다는 판단,
+ * `docs/DECISIONS.draft.DESIGN.md` 참고) — 대신 `InvitationInboxContainer`가 `ownerId === ""`
+ * (같은 폴백이 채우는 또 다른 플레이스홀더)로 폴백 도달 여부를 직접 판별해 `colorKey`를
+ * 신뢰하지 않는다. **`""`가 안전한 이유는 `owner_id`가 `uuid` 타입이라 빈 문자열이 애초에
+ * 그 컬럼에 담길 수 있는 값이 아니기 때문이다**(`NOT NULL`만으로는 부족하다 — `description`도
+ * NOT NULL이지만 `DEFAULT ''::text`라 정상 크루도 진짜 빈 설명일 수 있어 센티넬로 쓰면 오탐이
+ * 난다, 33일차 CREW 교차검증). **이 방어는 그 파일에만 있고 이 함수 자신은 여전히 아무것도
+ * 강제하지 않는다** — 멤버십 게이트 없이 `getCrewById`를 부르는 다음 소비자를 추가할 때는 이
+ * 함수가 private+비소속 조합에서 가짜
+ * `description`/`category`/`colorKey`/`ownerId`("", "", 0, "")를 줄 수 있다는 것을 반드시
+ * 재확인할 것 — 이 경고를 대조하지 않은 것이 정확히 I-158이 반복된 경위다.
  */
 export async function getCrewById(id: Id): Promise<Crew | null> {
   const supabase = await createSupabaseServerClient();

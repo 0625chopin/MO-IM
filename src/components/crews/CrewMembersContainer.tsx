@@ -41,12 +41,28 @@ const ROLE_RANK: Record<CrewMembershipRole, number> = { owner: 0, staff: 1, memb
  * `CrewSettingsContainer`가 I-070에서 겪은 것과 같은 구조의 결함이다(같은 레이아웃의
  * `ArchivedCrewBanner`가 이유는 안내하지만 이 컨테이너의 쓰기 버튼 노출 여부는 그것과
  * 무관하게 결정됐다). 다만 이 화면은 설정 화면과 달리 **멤버 로스터(읽기)가 archived
- * 크루에서도 의미가 있어** 컨테이너 전체를 막지 않고 로스터는 그대로 둔 채 초대·승인/반려
- * (가입 신청 패널 자체 포함, `CrewSettingsContainer`와 같은 이유로 표시/조작을 함께 막는다)·
+ * 크루에서도 의미가 있어** 컨테이너 전체를 막지 않고 로스터는 그대로 둔 채 초대·승인/반려·
  * 임명·이양·강퇴만 `crew.status === "active"`로 추가로 가둔다 — `BoardListContainer`의
  * `canWrite = permission && crew?.status === "active"` 패턴과 같다(새 패턴 아님). Server
  * Action 쪽 강제 경계는 각 액션 파일에서 같은 회차에 별도로 추가했다(이 UI 변경은 그 위에
  * 얹는 방어). 본인 탈퇴(`leavePermission`)는 self-service라 제외한다(아래 참고).
+ *
+ * **33일차(CREW, I-152 처분) — "가입 신청 패널 자체를 표시/조작과 함께 막는다"는 위 31일차
+ * 판단을 되돌린다.** BOARD가 I-152를 "`/crews/{id}/settings`에서 대기 중 가입 신청을 볼 수
+ * 없다"로 보고했지만, 실제로 그 패널(`JoinRequestPanel`)은 `/settings`(`CrewSettingsContainer`,
+ * 순수 쓰기 폼 3개뿐)가 아니라 **이 컨테이너**(`/members`)에만 있다 — 이슈 위치 서술 자체가
+ * 부정확했다(팀장 인계 자료도 이 오류를 그대로 옮겨 적었다). 위치를 바로잡고 나면 진짜 결함이
+ * 드러난다: 31일차에 "로스터(읽기)는 archived에서도 의미 있다"고 판단해 놓고 바로 옆의
+ * 가입 신청 목록(그 자체도 읽기다 — "누가 신청했는가"는 결정 가능 여부와 무관하게 사실이다)은
+ * 같은 논리를 적용하지 않고 `canApprove`(쓰기 권한) 뒤에 숨겼다. **"쓰기 전용 라우트는 통째로
+ * 막는다"는 19일차 결정을 `/members`처럼 이미 읽기 콘텐츠(로스터)를 가진 화면의 부분 요소에
+ * 잘못 옮겨 적용한 것**이라 이번에 되돌린다. `canViewJoinRequests`(역할만 검사, `crew:
+ * approve_join_request`가 애초에 crew.status를 안 본다)로 열람 자격을 분리하고, `canDecide
+ * JoinRequests`(`canViewJoinRequests && isActive`)만 승인/반려 버튼에 남겨 `JoinRequestPanel`에
+ * 내려보낸다. SELECT RLS(`join_requests_select_requester_or_staff`)도 crew.status를 요구하지
+ * 않아(활성 멤버십 + staff/owner 역할만 확인) archived 크루에서도 조회 자체는 항상 성공한다 —
+ * disband가 `crew_memberships`를 건드리지 않기 때문이다(`docs/decisions/crew-lifecycle-040.md`).
+ * 상세 판정 근거는 `docs/DECISIONS.draft.CREW.md`.
  */
 export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
   const crew = await getCrewById(crewId);
@@ -70,8 +86,14 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
   const isActive = crew.status === "active";
 
   const canInvite = checkPermission({ role: viewerRole, action: "crew:invite_member" }).allowed && isActive;
-  const canApprove =
-    checkPermission({ role: viewerRole, action: "crew:approve_join_request" }).allowed && isActive;
+  // 33일차(CREW, I-152) — "볼 수 있는가"와 "결정할 수 있는가"를 분리한다. `crew:approve_join_request`는
+  // 역할(임원 이상)만 보고 crew.status를 보지 않는 순수 판정이라 그대로 열람 자격으로 쓴다 — SELECT
+  // RLS(`join_requests_select_requester_or_staff`)도 crew.status를 요구하지 않아(멤버십만 확인)
+  // archived 크루에서도 조회 자체는 항상 성공한다(disband가 crew_memberships를 건드리지 않는다,
+  // `docs/decisions/crew-lifecycle-040.md`). "결정(승인/반려)"만 D-089("해산=동결")에 따라
+  // `isActive`를 추가로 곱한다 — 열람 자격이 있어도 archived면 버튼을 못 쓴다.
+  const canViewJoinRequests = checkPermission({ role: viewerRole, action: "crew:approve_join_request" }).allowed;
+  const canDecideJoinRequests = canViewJoinRequests && isActive;
   const canAppoint = checkPermission({ role: viewerRole, action: "crew:appoint_staff" }).allowed && isActive;
   const canTransferOwnership =
     checkPermission({ role: viewerRole, action: "crew:transfer_ownership" }).allowed && isActive;
@@ -124,7 +146,7 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
   let pendingRequests: JoinRequestRowViewModel[] = [];
   let historyRequests: JoinRequestRowViewModel[] = [];
 
-  if (canApprove) {
+  if (canViewJoinRequests) {
     const requests = await listJoinRequestsForCrew(crewId);
     const toViewModel = async (request: JoinRequest): Promise<JoinRequestRowViewModel> => {
       const requester = await getProfileById(request.requesterId);
@@ -158,7 +180,14 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
 
       <MemberList crewId={crewId} crewName={crew.name} members={members} />
 
-      {canApprove && <JoinRequestPanel crewId={crewId} pending={pendingRequests} history={historyRequests} />}
+      {canViewJoinRequests && (
+        <JoinRequestPanel
+          crewId={crewId}
+          pending={pendingRequests}
+          history={historyRequests}
+          canDecide={canDecideJoinRequests}
+        />
+      )}
     </div>
   );
 }

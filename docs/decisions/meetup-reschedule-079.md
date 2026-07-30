@@ -325,3 +325,15 @@ interface MeetupScheduleChange {
   meetups}.ts`(NFR-035 타입 동일성 유지 + `applyMeetupReschedule`/`listMeetupScheduleChanges`
   Mock 구현).
 - 본 문서, `docs/ISSUES.md`(27일차 병합 완료 — I-137·I-138).
+
+## 각주(33일차, CREW) — `applyMeetupReschedule`(Mock) 완전 삭제
+
+위 §5-3과 §6이 설명하는 Mock의 `applyMeetupReschedule`(`/sample` QA 시뮬레이터·수동 호출용으로
+남겨 둔다고 적은 그 함수)는 실제로는 `src/lib/data/index.ts`가 Task 032(18일차)부터 meetup
+도메인도 `./supabase/meetup`만 재노출하고 `./mock/*`는 재노출하지 않아, 도입 시점(26일차)
+이후로 이 함수를 가리키는 import·호출이 저장소 전체에 0건이었다(정의 자체 제외) — "수동
+호출용"이라는 설계 의도가 실제로 소비된 적이 없는 죽은 코드였다. `withdrawPendingCrewMembership`
+(I-144, 31일차 CORE)과 같은 클래스로 팀장이 33일차에 발견해 CREW가 완전 삭제로 처분했다
+(`src/lib/data/mock/meetup.ts`). 본문 §5-3·§6은 **당시 기록을 그대로 두고 고치지 않는다** —
+이 각주가 그 사실 위에 "이후 삭제됐다"만 덧붙인다. 상세: `docs/ISSUES.md`(33일차 CREW 처분,
+제보자 팀장).

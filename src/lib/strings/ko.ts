@@ -421,6 +421,13 @@ export const ko = {
         approveButton: "승인",
         rejectButton: "반려",
         submitPending: "처리하는 중…",
+        /** 33일차(CREW, I-152 처분 — D-089 UX 향상안 `join_requests` 축). archived 크루의
+         *  오너·임원이 `/members`에서 대기 중 가입 신청 목록은 볼 수 있지만(31일차에 되돌린
+         *  과잉 차단, `CrewMembersContainer` 33일차 절 참고) 승인·반려는 할 수 없다 —
+         *  D-089("해산=동결")가 이 신청들을 영원히 결정되지 않은 상태로 둔다는 사실을 오너가
+         *  이 화면에서 정직하게 알 수 있어야 한다(팀장 지시). 아래 `errors.crewArchived`(제출
+         *  시도 실패 문구)와 짝이지만, 이건 시도 전에 상시 보이는 안내라 `errors` 밖에 둔다. */
+        archivedNotice: "이 크루는 해산되어 가입 신청을 승인·반려할 수 없어요. 이 신청은 결정되지 않은 채로 남아요.",
         status: {
           approved: "승인됨",
           rejected: "반려됨",

@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-159** (등재할 때마다 이 줄을 갱신한다. **28일차부터 팀원은 이 파일에
+- **다음 이슈 번호: I-164** (등재할 때마다 이 줄을 갱신한다. **28일차부터 팀원은 이 파일에
   새 `### I-NNN` 헤딩을 직접 붙이지 않는다** — `docs/ISSUES.draft.<NAME>.md`에 번호 없이 쓰고
   회차 마감에 팀장이 번호를 부여해 병합한다. 기존 블록 안의 상태·진행 기록 갱신은 새 번호를
   만들지 않으므로 팀원이 직접 해도 된다. 단일 소스:
@@ -626,11 +626,10 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
 
 ### I-038 · 크루명·소개 글자 수 상한과 금칙어 목록이 요구사항에 없다
 
-- **상태**: 열림 — **부분 확정(2026-07-30, 28일차, D-083)**. 확정된 것: 크루명 상한(30자)·
-  크루 소개 상한(300자)·금칙어 필터의 v1.0 존속과 적용 계층(Server Action, DB 트리거로
-  승격하지 않음). **미결로 남는 것**: 금칙어 목록 내용, 우회 표기(초성·유니코드 치환) 대응
-  정책 — 법무·운영 확인이 필요해 팀이 임의로 확정하지 않았다. 그래서 "해결됨"이 아니라
-  "열림"을 유지한다.
+- **상태**: 열림 — **상한(글자 수)은 완전 확정·적용됨(28일차 D-083 값 확정 → 29일차 DB CHECK
+  마이그레이션 적용 → 33일차 BOARD가 `pg_constraint` 재조회로 재확인, 아래 "33일차 갱신" 참고).
+  금칙어(목록 내용·우회 표기 대응 정책)만 (C) 외부 입력(법무·운영 확인) 대기로 남아 열림을
+  유지한다** — 33일차에 이 둘을 분리하는 제안을 냈다(아래 "33일차 — 분할 제안").
 - **영역**: 데이터 / 요구사항
 - **제보**: CREW (2026-07-24, 7일차 — Task 016B 크루 개설 화면)
 - **내용**: FR-010은 크루 개설 입력 항목으로 크루명·소개·카테고리·공개 범위를 명시하고 "E3
@@ -661,6 +660,28 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   `audit_logs`)을 먼저 지워야 하는 캐스케이드가 필요하다. **이 정리가 향후 DB CHECK
   마이그레이션 착수의 선행조건이다** — D-083에 명시. 근거:
   `docs/decisions/product-value-proposals-28.md` 제안 3, D-083.
+- **29일차 갱신(CREW, 이 문서에 반영 누락돼 있던 것을 33일차에 발견해 채운다)**: 위
+  "DB CHECK는 아직 미적용"은 **이제 사실이 아니다** — 29일차에 선행조건(위 소급 위반 크루
+  캐스케이드 삭제)을 마치고 마이그레이션
+  `20260730033654_product_value_check_constraints_083.sql`로 `crews_name_check`
+  (`char_length(btrim(name)) <= 30`)·`crews_description_check`
+  (`char_length(btrim(description)) <= 300`)를 이미 적용했다(`docs/decisions/
+  product-value-check-constraints-29.md`). **33일차(BOARD) 재확인**: `execute_sql`로
+  `pg_constraint`를 직접 조회해 두 제약이 지금도 살아 있음을 확인했다(`pg_get_constraintdef`
+  출력이 마이그레이션 원문과 일치). 즉 **상한(글자 수) 쪽은 앱 레이어·DB 제약 둘 다 D-083
+  값으로 완전히 확정·적용된 상태다** — 금칙어(목록 내용·우회 표기 정책, 여전히 법무·운영
+  확인 대기, `BANNED_WORDS`는 `crew-name-validation.ts`에 데모 6단어 그대로)만 미결이다.
+- **33일차(BOARD) — 분할 제안.** 배정에 따라 "상한은 D-083 방식(팀 제안→사용자 승인)으로
+  이미 닫힌 후보인가"를 확인했다 — **이미 닫혔다**(28일차 D-083이 값을 확정했고, 29일차가
+  DB CHECK로 실체화했다). 남은 것은 성질이 다른 금칙어 정책(법무 확인 필요, 팀이 임의로
+  못 정한다)뿐이다. 하나의 이슈 번호 아래 "이미 완전히 닫힌 것"과 "여전히 (C) 외부 입력
+  대기인 것"이 섞여 있으면, 다음에 이 번호를 보는 사람이 "상한도 아직 미결인가"를 매번
+  재확인해야 한다 — 이번 배정 자체가 그 재확인 비용의 실례다. **분할 제안(팀장 승인 필요,
+  `docs/DECISIONS.draft.BOARD.md`에 상세)**: 이 번호(I-038)는 **금칙어 정책 전용**으로
+  좁히고(제목을 "크루명·소개 금칙어 목록·우회 표기 정책이 미확정"으로 변경), 상한 부분은
+  **별도 완료 이력**(새 이슈 번호 없이, 이 블록의 "29일차 갱신" 절로 이미 충분)로 남긴다 —
+  즉 새 이슈 번호를 만들자는 제안이 아니라 **이 번호의 제목·상태 요약에서 "상한"을 빼고
+  "금칙어"만 남기자는 제안**이다(번호 신설은 D-082상 팀장 소관이라 여기서는 하지 않는다).
 
 ### I-039 · 권한 매트릭스에 "채팅방 열람" 자체를 가리키는 행이 없다
 
@@ -3171,9 +3192,12 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
     032부터 9개 도메인 전부 `./supabase/*`만 재노출해 Mock이 더 이상 이 배럴을 통해 소비되지
     않는다(`src/lib/data/index.ts` 모듈 docstring 확인).
 
-### I-082 · 로그인 직후 첫 알림 Realtime 구독이 인가 실패로 한 번 끊긴다(새로고침·재탐색으로 자연 회복)
+### I-082 · 로그인 직후 첫 알림 Realtime 구독이 인가 실패로 한 번 끊긴다(**33일차: 제목의 "재탐색으로
+  자연 회복"은 오기로 확인됨 — 하드 리로드만 회복시킨다**)
 
-- **상태**: 열림 — 경미
+- **상태**: **해결됨(2026-07-30, 33일차, BOARD)** — ⓑ(세션 쿠키 전파 경합)를 원인으로 확정하고
+  `broadcast.ts`에 재시도를 추가해 닫는다. 재평가 근거는 아래 33일차 절 참고 — "경미" 판정은
+  기각한다(사용자 체감 영향은 여전히 낮지만 지속 시간·회복 조건이 원래 알려진 것보다 나쁘다).
 - **영역**: 데이터 / 실시간
 - **제보**: DESIGN (2026-07-25, 21일차 — Task 036 통합 테스트, `npm run dev` 브라우저 콘솔 실측)
 - **내용**: `loginAction` 성공 직후 `/home`으로 리다이렉트된 시점에 브라우저 콘솔에
@@ -3272,6 +3296,94 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
     후자로 표현했을 수 있다. **새로고침(하드 리로드)은 모듈을 재생성하므로 확실히 회복되지만,
     "재탐색"(SPA 내비게이션)만으로 회복되는지는 이번에도 확인하지 못했다** — 다음 조사
     항목으로 남긴다.
+- **33일차(BOARD) — 강제 재현, 부수 의문 2개 해소, 수정·회귀 확인.** 배정에 따라 이번 회차
+  과제는 강제 재현이었다. 결과를 요약한다.
+  - **코드 재확인**: `broadcast.ts`의 `getClient()`/`refreshAuth` 구조는 32일차가 확인한 것과
+    동일했다(모듈 최초 초기화 때 `refreshAuth()`를 한 번만 걸고, `token===null`이면 재시도
+    없이 반환 — 수정 전 기준). `use-notification-feed.ts`도 재확인, 변경 없음.
+  - **자연 재현 시도(CDP 네트워크 스로틀링) — 이번에도 실패, 그리고 이 방법 자체가 이
+    dev 환경에서 부적합하다는 것을 확인했다.** Playwright `browser_run_code_unsafe`로
+    CDP 세션을 잡아 `Network.emulateNetworkConditions`(latency 600~1500ms, 하향 20~200kb/s)를
+    로그인 제출 직전에 걸고 3회 반복했다 — **0/3 재현**(21·32일차와 일관). 더 중요한 발견:
+    Turbopack dev 서버의 온디맨드 컴파일·Fast Refresh 지연(최초 방문 시 수 초~17초대)이
+    네트워크 스로틀링보다 훨씬 큰 지연을 만들어, 의도한 "쿠키 전파 대 후속 요청" 경합 창을
+    스로틀링으로 정밀 제어하는 것 자체가 이 dev 환경에서는 사실상 불가능했다 — 스로틀링이
+    켜진 채로 요청이 수십 초씩 걸려 오히려 쿠키가 전파될 시간을 더 벌어준 것으로 보인다.
+    **이 방법은 이 프로젝트의 dev 환경에 적합하지 않다는 것이 이번 회차의 결론이다.**
+  - **강제 재현(코드 임시 주입) — 성공.** `get-realtime-auth-token.ts`의
+    `getRealtimeAuthTokenAction`을 임시로 패치해 **프로세스 최초 호출 1회만** `null`을
+    반환하도록 강제했다(호출 횟수를 세는 카운터, 다른 로직은 그대로). dev 서버를 재시작해
+    카운터를 초기화한 뒤, 쿠키를 지우고 `chopin0625@gmail.com`으로 로그인 → `/home` 리다이렉트
+    한 번만 관찰(다른 탐색 없이) → `browser_console_messages`로 확인. **결과: 문서화된 증상이
+    정확히 재현됐다** — `[notifications] realtime subscription error Realtime 구독 실패
+    (CHANNEL_ERROR) — cause: Unauthorized: You do not have permissions to read from this
+    Channel topic: user:<uuid>:notifications`가 **벨과 토스트 양쪽에서 각각 1줄씩, 총 2줄**
+    떴다(아래 (b) 참고). 임시 패치는 이후 완전히 원복했고 `git diff`로 `get-realtime-auth-
+    token.ts`의 잔존 0을 확인했다(아래 "임시 변경 원복" 참고). **다만 이 방법은 "결과(null
+    토큰)"를 직접 강제한 것이지 "원인(쿠키 전파 타이밍)" 자체를 자연 조건에서 잡은 것은
+    아니다** — 그 경계는 정직하게 남긴다.
+  - **부수 의문 (a) "재탐색(SPA)만으로 실제 회복되는가" — 답: 아니오, 회복되지 않는다
+    (실측 확인).** 강제 재현 직후(에러 2줄 뜬 상태) 벨/토스트가 마운트된 `(shell)` 레이아웃
+    안에서 `/notifications`로 **클릭 기반 SPA 내비게이션**을 했다 — 서버 로그에
+    `getRealtimeAuthTokenAction` 신규 호출이 **없었고**, 콘솔에도 변화가 없었다(깨진 채널이
+    그대로 유지됨을 방증 — `NotificationBellContainer`·`ToastHostContainer`가 `(shell)/
+    layout.tsx`에 상시 마운트라 SPA 내비게이션으로는 재마운트되지 않고, 모듈 싱글턴
+    (`client`/`authReady`/`rooms`)도 그대로 남기 때문이다). 반대로 **하드 리로드**
+    (`page.goto`로 같은 URL 재방문)는 새 `getRealtimeAuthTokenAction` 호출을 만들었고(이번엔
+    실제 토큰 성공) 에러 없이 정상 구독됐다 — "새로고침은 회복시키지만 재탐색은 안 시킨다"가
+    확정됐다. **이슈 제목의 "재탐색으로 자연 회복"은 부정확했다** — 위 제목을 고쳤다.
+  - **부수 의문 (b) "콘솔에 1줄인지 2줄인지" — 답: 2줄(벨 + 토스트) 둘 다 뜬다(실측 확인).**
+    31일차가 세운 "1줄만 뜬다"는 가설은 **I-145 수정 이전 코드**를 근거로 한 것이었다 — 31일차
+    자신이 이미 그 코드가 바뀌었다고 지적했었고, 이번 실측이 그 지적을 확정한다. 현재
+    `broadcast.ts`는 topic당 벤더 `.subscribe()`를 한 번만 부르되 `onError`를 그 topic의
+    **모든 리스너**(`entry.listeners`)에게 팬아웃하므로, 벨과 토스트가 같은 채널을 공유하는
+    한 CHANNEL_ERROR는 항상 양쪽 다에게 간다 — "1줄만 뜬다"는 낡은 코드 기준의 이론이었을 뿐,
+    현재 코드에서는 성립하지 않는다.
+  - **수정**: `broadcast.ts`의 `refreshAuth`에 `retryOnNull` 옵션을 추가했다(새 재시도
+    스케줄을 만들지 않고 **기존** `AUTH_REFRESH_RETRY_DELAYS_MS`(5초·30초·2분)를 그대로
+    재사용 — I-150에서 지킨 절제와 같다). `getClient()`의 **최초 초기화 호출만**
+    `retryOnNull: true`로 건다 — 이 호출의 전제(컨테이너는 서버가 이미 인증을 확인한 뒤에만
+    렌더된다)상 `null`은 거의 항상 "비로그인"이 아니라 "쿠키 전파 중"이라고 판단했다. 주기적
+    갱신(`setInterval`)은 `retryOnNull` 없이 그대로 둬 기존 동작(세션 없으면 즉시 반환, 21일차
+    근거)을 보존했다.
+  - **회귀 확인**: ① 강제 재현 조건에서 수정 적용 후 재실행 — 첫 호출은 여전히 강제로 `null`을
+    반환했지만 ~5.9초 뒤 재시도(2번째 호출, 강제 대상 아님)가 성공해 `setAuth`가 걸렸고
+    **CHANNEL_ERROR 없이 정상 구독됨**을 `browser_console_messages`(전체 0 errors)로 확인했다.
+    ② 임시 패치를 완전히 원복한 **실제 코드**로 `chopin0625@gmail.com` 정상 로그인 → 별도 탭
+    `/sample`의 "ToastHost+NotificationBell 실 데이터 시연" "투표 종료" 버튼으로
+    `poll_closed` 알림을 실제로 발화 → 원래 탭(`/home`, 리로드 없음)에서
+    `document.querySelector('nav').innerText`로 직접 확인 — **"읽지 않음 1건"으로 실시간
+    갱신됨을 확인**(32일차와 같은 절차, 접근성 스냅샷이 아니라 DOM 직접 조회). 테스트로 생성된
+    알림 1건(`id=c5f414d7-...`)은 `execute_sql`로 즉시 삭제해 원복했다. `removeChannel` 참조
+    카운트(I-145)는 이번 수정이 건드리지 않는 `unsubscribe()` 쪽 로직이라 그대로다 — 코드
+    검토로 재확인, 별도 실측은 생략(변경 범위 밖).
+  - **정적 검증**: `npx tsc --noEmit`(dev 서버 완전 정지 상태에서 실행 — I-129 오염 경계
+    지킴, 0 errors) · `npm run lint`(0 errors) · `npm test`(6 files, 41 tests pass).
+  - **"경미" 재평가**: 31일차에 "경미로 두기 어렵다"고 남긴 판단을 이번 실측이 뒷받침한다 —
+    실제 증상은 "구독 재연결 1회 시도"가 아니라 **하드 리로드 전까지 벨·토스트 실시간 갱신이
+    완전히 끊기는 것**이었다(사용자는 알림을 받아도 배지·토스트가 갱신 안 되다가, 다음에
+    브라우저를 새로고침해야만 밀린 알림을 서버 렌더 값으로 받는다). 다만 **발생 조건 자체는
+    여전히 드물다**(쿠키 전파 경합은 로그인 직후 극히 짧은 창에서만 유효, 21·32일차 모두
+    자연 재현 0회)는 점에서 "MAJOR" 승격까지는 과하다고 본다 — 이번 수정으로 닫혔으니
+    재평가 자체가 이제는 사실상 의미가 없어졌지만, 기록으로 남긴다.
+  - **33일차 팀장 교차검증 — 1차 수정의 회귀를 잡아 2차로 고쳤다.** 1차 수정은
+    `retryOnNull` 경로에도 기존 `AUTH_REFRESH_RETRY_DELAYS_MS`(5초·30초·2분)를 그대로
+    재사용했는데, 팀장이 diff 검토로 **토큰이 계속 `null`이면(진짜 쿠키 전파 경합이 아닌
+    다른 이유, 예: 하이드레이션 사이 세션 만료) 최악 155초 동안 `authReady`가 resolve되지
+    않아 벨·토스트·채팅·투표 등 이 모듈을 쓰는 실시간 구독 전체가 막힌다**는 회귀를 찾아냈다
+    — 원 결함(즉시 실패)보다 나쁜 방향이었다. 원인은 "주기적 갱신 실패 복구"(분 단위)와
+    "로그인 직후 쿠키 전파 경합"(ms~수백 ms)의 시간 축이 다른데 하나의 스케줄을 그대로
+    재사용한 것 — **재사용 절제보다 시간 축 정합성이 우선**이라고 판단해 `retryOnNull`
+    전용의 짧은 스케줄(`INITIAL_NULL_RETRY_DELAYS_MS = [150, 400, 800]`, 합계 1.35초)을
+    따로 뒀다. **실측 확인**: ① 정상 로그인(경합 없음) — 서버 로그로 `getRealtimeAuthTokenAction`
+    이 5ms·2ms 만에 1회씩만 호출되고 성공, 재시도 없음(지연 0). ② 토큰이 계속 `null`인
+    조건(임시 패치로 강제, 이후 원복해 `git diff` 0 확인) — 재시도 4회(호출 간격 ~188ms·
+    453ms·838ms)를 거쳐 **총 ~1.5초** 만에 포기하고 구독이 진행됨(`CHANNEL_ERROR` 발생,
+    155초가 아니라 1.5초). ③ 회귀 확인은 위 "33일차(BOARD)" 절의 실 브로드캐스트 절차를
+    이 2차 수정본으로 다시 실행해 동일하게 "읽지 않음 1건" 실시간 갱신을 확인했다.
+  - **남은 리스크**: 자연 조건(진짜 쿠키 전파 지연)에서 이 수정이 실제로 걸리는지는 여전히
+    간접 검증이다(강제 주입으로 결과 경로·타이밍만 확인) — 다만 첫 재시도가 150ms 뒤라
+    ms~수백 ms 규모의 쿠키 전파 지연에는 사실상 한두 번의 재시도 안에 대응할 것으로 판단한다.
 
 ### I-083 · Turbopack dev 서버가 동시 다중 에이전트 파일 쓰기 중 라우트를 일시적으로 404·500으로 오응답한다(재현 조건 특정, 앱 결함 아님)
 
@@ -7192,7 +7304,8 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
 
 ### I-152 · archived 크루 오너가 `/settings`에서 대기 중 가입 신청의 존재 자체를 확인할 수 없다 — I-151과 반대 방향의 gap
 
-- **상태**: 열림 — **(B) 알고 지낼 것.** 의도된 기존 패턴이고 잘못된 정보를 주지는 않는다(정보가 안 보일 뿐).
+- **상태**: **해결됨(33일차, CREW)** — 아래 "33일차 처분" 참고. 원 제보의 화면 위치 서술이
+  부정확했다는 것이 이번 회차에 밝혀졌다(원문은 그대로 남기고 정정만 아래에 덧붙인다).
 - **영역**: UX / 크루·멤버십 (FR-013·FR-023, D-030 ③)
 - **제보**: BOARD (32일차 — I-151 실렌더 확인의 부수 발견, 팀장 지시로 별도 등재)
 - **내용**: archived 크루에 pending 가입 신청이 있는 상태에서 **오너 계정**으로
@@ -7210,10 +7323,52 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   읽기 전용으로라도 신청 목록을 보여준다(단 "쓰기 전용 라우트는 통째로 막는다" 원칙과 충돌
   가능 — 재검토 필요) ② 해산 시점에 오너에게 "대기 중이던 신청 N건은 이제 결정되지 않는다"를
   일회성 고지(알림 등). 착수 여부·설계는 팀장 판단.
+- **33일차 처분(CREW, D-089 UX 향상안 `join_requests` 축 착수)** — **원 제보의 화면 위치가
+  틀렸다.** `CrewSettingsContainer`(`/settings`)를 직접 읽어 실제로 무엇을 렌더하는지
+  전수 확인한 결과 `CrewInfoForm`·`CrewVisibilityForm`·`DisbandCrewForm` **셋 다 순수 쓰기
+  폼**뿐이었다 — "가입 신청 관리 패널이 있는 화면"이라는 원 서술과 달리 `/settings`에는
+  가입 신청 관련 코드가 전혀 없다. `JoinRequestPanel`은 실제로 **`/crews/{id}/members`**
+  (`CrewMembersContainer`)에만 존재한다. 그래서 판정이 갈린다:
+  - **`/settings`는 19일차 결정("쓰기 전용 라우트는 통째로 막는다")이 정확히 적용된 경우다.**
+    3개 폼 모두 쓰기 전용이라 과잉 적용이 아니다 — 이 축은 수정하지 않는다(후속 후보 ①은
+    `/settings`에는 적용하지 않는다).
+  - **진짜 결함은 `/members`(`CrewMembersContainer`)에 있었다.** 31일차(CREW, archived
+    크루 쓰기 표면 감사)가 "로스터(읽기)는 archived에서도 의미 있다"고 판단해 컨테이너
+    전체를 막지 않으면서도, 정확히 같은 논리가 적용돼야 할 가입 신청 **목록**(그 자체는
+    읽기다)을 `canApprove`(쓰기 권한 판정)에 얹어 함께 가려 버렸다 — 19일차 원칙을 `/members`
+    처럼 이미 읽기 콘텐츠를 가진 화면의 부분 요소에 잘못 옮겨 적용한 사례다.
+  - **판정: 후속 후보 ①을 채택 — `join_requests` 축만.** `CrewMembersContainer`에
+    `canViewJoinRequests`(역할만 검사, `crew:approve_join_request`가 애초에 crew.status를
+    보지 않는다)와 `canDecideJoinRequests`(`canViewJoinRequests && isActive`)를 분리해
+    `JoinRequestPanel`에 `canDecide` prop으로 내려보냈다. 목록(열람)은 항상 보이고, 승인·반려
+    버튼만 archived면 감춘 뒤 목록 위에 안내(`strings.crew.members.requests.archivedNotice`,
+    "이 크루는 해산되어 가입 신청을 승인·반려할 수 없어요. 이 신청은 결정되지 않은 채로
+    남아요")를 띄운다(D-089 "영원히 대기"를 오너에게 정직하게 노출). `invitations` 축(트리거
+    신뢰 경계 재설계)은 이번 회차 범위 밖으로 그대로 열어 둔다.
+  - **실측(SQL, `begin`…`rollback`, authenticated 롤 + 실 jwt claims)**: 픽스처
+    `2724533e-…`(archived, 오너 `fb70ff1c-…`=`chopin_0625`). ① 사전 상태 — 이 크루에 pending
+    `join_requests` **0행**(기존 데이터 그대로, 스크래치 삽입 전). ② `seed_owner02`
+    (`fc91323c-…`) 명의로 브랜드뉴 스크래치 pending 신청 1건 삽입. ③ **오너의 authenticated
+    롤 + 실 jwt claims**(`sub=fb70ff1c-…`, service role 아님)로 SELECT →
+    **1행 반환**(`join_requests_select_requester_or_staff` RLS가 애초에 crew.status를 요구하지
+    않음을 실측으로 재확인 — disband가 `crew_memberships`를 건드리지 않기 때문). 트랜잭션을
+    `rollback`해 스크래치 행 소멸 — 종료 후 `join_requests` 총 8건(기준선)으로 원복 확인.
+    RLS·트리거·마이그레이션은 이번 수정에서 **전혀 건드리지 않았다**(순수 앱 레이어 변경).
+  - **산출물**: `src/components/crews/CrewMembersContainer.tsx`(`canApprove` →
+    `canViewJoinRequests`/`canDecideJoinRequests` 분리 + docstring)·
+    `src/components/crews/JoinRequestPanel.tsx`(`canDecide` prop, 미결정 시 버튼 생략 + 안내
+    문구)·`src/lib/strings/ko.ts`(`crew.members.requests.archivedNotice` 신설)·
+    `src/components/sample/sections/crews.tsx`(`/sample`의 JoinRequestPanel 오류 패널에
+    `canDecide={false}` 상태 추가 — D-030 ③ 도메인 오류 포함). `npx tsc --noEmit`·`npm run
+    lint`·`npm test`(6 files, 41 tests) 전부 clean. 브라우저 실클릭은 이번 회차에 하지 않았다
+    (BOARD가 I-082 재현으로 Playwright 1순위 점유, 팀장 조율 지시) — SQL 실측 + 코드 대조로
+    갈음했다. 남은 리스크: 실 브라우저로 탭 전환·배지·안내 문구 렌더 확인은 다음 회차 이월.
 
 ### I-153 · `join_requests` 승인의 archived-크루 차단이 RLS 정책 한 곳에만 의존한다 — 회귀 안전망 없음
 
-- **상태**: 열림 — **(B)**. 오늘은 안전(실측 확인), 방어 이중화 여부는 팀장 판단.
+- **상태**: 처분 완료(33일차) — **후속 (a) 채택.** 수동 SQL 체크리스트를
+  `docs/design/rls-regression-checklist-33/README.md`로 문서화했다. (b)(officer 분기 재설계)는
+  기각(근거: `docs/DECISIONS.draft.CORE.md`). 코드 변경 없음(문서만 추가).
 - **영역**: 스키마 / RLS (NFR-011, FR-013) / `join_requests_update_requester_or_staff` 정책
 - **제보**: CORE (32일차, 중첩 트리거 `pg_trigger_depth` 전수조사 §2-#2 — `docs/design/nested-trigger-audit-32/README.md`)
 - **내용**: `decide-join-request.ts`가 `join_requests` UPDATE → AFTER 트리거
@@ -7234,6 +7389,25 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   문서화(CI가 아직 없다는 게 별개 결정) (b) `crew_memberships_guard_self_transition`의 officer
   분기가 nested 여부와 무관하게 archived를 항상 막도록 재설계 — 단 "정상 승인 흐름까지 막힐
   위험"을 다시 검토해야 하는 트레이드오프가 있다. 처분은 팀장 판단.
+- **처분(33일차, CORE)**: 팀장 결정에 따라 (a) 채택, (b) 기각. 산출물
+  `docs/design/rls-regression-checklist-33/README.md` — `pg_policies` 조회 SQL(§1, `qual`·
+  `with_check` 양쪽 `private.is_crew_active` 확인)과 `begin`…`set local role authenticated`+JWT
+  claims…`rollback` 행동 검증 SQL(§2, 스크래치 크루로 재현 — 기존 archived 픽스처
+  `2724533e-…`는 재사용 불가함을 확인: `crews_guard_archived_immutable`이 archived 행의 모든
+  UPDATE를 무조건 차단해 재활성화로 셋업할 수 없고, `crew_memberships_guard_self_insert_request`가
+  archived 크루에는 애초에 `requested` 멤버십 생성을 막는다). 33일차 재현 결과 `join_request_status_after
+  = "pending"`, `membership_status_after = "requested"`(둘 다 불변, 승인 UPDATE 0행) — I-153이
+  보고한 방어가 33일차 시점에도 그대로 유효함을 재확인했다. `private.is_crew_active`
+  `pg_get_functiondef` 대조 방법과 체크리스트 트리거 조건(§4)도 문서에 포함. **같은 결함 클래스
+  전수 확인**: `crew_memberships_guard_self_transition`의 officer 분기를 건너뛰게 하는 신뢰된
+  nested 호출자는 (32일차 전수조사로 확정된) 정확히 3개 — ① join_requests 승인(RLS 단일 의존,
+  이 이슈의 대상) ② invitations 수락(방어가 RLS가 아니라 `invitations_guard_response_transition`
+  트리거 자체의 단일 지점 — 단 이 경로로의 nested 호출자가 현재 0건이라 우회 시나리오 자체가
+  성립하지 않음. join_requests와의 defense-in-depth 비대칭은 `docs/ISSUES.draft.CORE.md`에 별도
+  기록) ③ 오너 이양(`crews_guard_archived_immutable`이 nested 여부와 무관하게 archived 행 UPDATE
+  자체를 원천 차단 — 갭 없음). **"RLS 정책 한 곳에만 의존하는 nested-UPDATE 우회" 패턴은
+  join_requests 1건뿐**이라는 결론을 표로 남겼다(체크리스트 §5). (b) 기각 근거는
+  `docs/DECISIONS.draft.CORE.md` 참고.
 
 ### I-154 · `getCrewById`가 private+비소속 조회에서 Mock과 Supabase의 행동이 다르다 — 같은 타입, 다른 계약
 
@@ -7260,8 +7434,14 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
 
 ### I-155 · `private` 스키마의 SQL 권한(USAGE·EXECUTE)이 이미 전부 열려 있고, 유일한 방어가 git 밖 대시보드 설정 하나다
 
-- **상태**: 열림 — **(B)**. 오늘은 안전(**REST 실증 완료, 노출 0건**), 방어 이중화는 팀장 판단.
-- **영역**: 스키마 / 권한 (D-028, NFR-011) / `private.*`(26개 함수) 스키마 `USAGE`
+- **상태**: 처분 완료(33일차) — **후속 (a) 미적용, (b) 채택.** REVOKE 적용 가능성을
+  `begin`…`rollback`으로 실증한 결과 대표 RPC 13/13 회귀(전부 SECURITY INVOKER 래퍼) — SQL
+  이중 방어는 구조적으로 불가능함을 확인했다. 대신 배포 검증 체크리스트
+  `docs/design/private-schema-usage-guard-33/README.md`를 만들었다. 코드·SQL 변경 없음.
+- **영역**: 스키마 / 권한 (D-028, NFR-011) / `private.*`(33일차 재조회 **28개** — 32일차 마감
+  DB 델타표(`docs/dailyWorkLog/32_Day.md` 329행, `27→28`)와 동일. 아래 "내용"의 26개는 32일차
+  **회차 중** 축 ③ 조사 시점 스냅숏이라 32일차 마감값과 다르다 — **33일차 증가는 0건**, 팀장
+  교차검증으로 정정) 스키마 `USAGE`
 - **제보**: CORE (32일차, 팀장이 배정한 깊이 파기 축 ③ — `docs/design/nested-trigger-audit-32/README.md` §5)
 - **내용**: `private` 스키마는 `USAGE`가 `anon`·`authenticated`·`service_role` 전부에 명시
   부여돼 있고(`pg_namespace.nspacl` 실측), 그 안 함수 26개도 `authenticated` EXECUTE가 열려
@@ -7284,6 +7464,35 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   INVOKER라 호출자의 `USAGE`가 실제로 필요한지 먼저 확인해야 한다(REVOKE 전 회귀 검증 필수)** —
   이 위험 때문에 32일차에는 **적용하지 않았다.** (b) 이 대시보드 값을 배포 검증 체크리스트에
   넣어 정기 확인. 처분은 팀장 판단.
+- **처분(33일차, CORE, 팀장 교차검증으로 개수 2건 정정 반영)**: 팀장 배정에 따라 (a)의 적용
+  가능성을 먼저 실증했다. **선행 확인**(`pg_proc.prosecdef` 전수조사, `has_function_privilege`로
+  EXECUTE 재확인) — `public`에서 `private.*`를 호출하는 함수는 **정확히 23개**다(최초 보고
+  "19개"는 수기 집계 오류 — 원 쿼리 결과 23행을 옮겨 적으며 `crew_memberships_guard_self_transition`·
+  `run_poll_auto_close_job` 2건을 빠뜨렸다, 팀장이 독립 재조회로 발견). 23개 중 트리거 전용
+  2개(`invitations_guard_response_transition`·`polls_guard_decision_integrity`, `authenticated`
+  EXECUTE 자체 없음)를 제외한 **21개 전부가 SECURITY INVOKER**(최초 보고 "17개"도 같은 오류).
+  팀장이 우려한 조건("INVOKER 래퍼가 하나라도 private.*를 호출하면 호출자에게 USAGE가
+  필요하다")이 예외 없이 성립한다 — **개수 정정이 결론을 약화시키지 않는다(오히려 대상이 더
+  넓다)**: 빠뜨렸던 2개 중 `crew_memberships_guard_self_transition`은 BEFORE UPDATE 트리거로,
+  RPC가 아니라 **테이블 UPDATE 자체**가 이 함수를 (SECURITY INVOKER로) 실행한다 — 추가 실증으로
+  확인(아래). **실증 ①(RPC)**: `begin`…`revoke usage on schema private from anon,
+  authenticated`…`set local role authenticated`+실 사용자 JWT claims…대표 RPC 13개
+  (`crew_directory_summary`·`poll_vote_tally`·`poll_vote_tally_for_decision`·`profile_search`·
+  `meetup_directory_summary`·`create_join_request`·`withdraw_join_request`·
+  `respond_meetup_attendance`·`list_pending_invitations_for_self`·`get_profile_public_by_id`·
+  `disband_crew`·`request_account_deactivation`·`create_poll`) 순차 호출…`rollback`. **결과:
+  13/13 전부 `42501 permission denied for schema private`로 회귀**. **실증 ②(트리거, 정정 과정에서
+  추가)**: 같은 REVOKE 트랜잭션 안에서 실제 오너(`fb70ff1c-…`)가 활성 크루 `729ced18-…`의 staff
+  멤버(`30f44dd9-…`)를 `member`로 강등하는 직접 `UPDATE crew_memberships`를 시도 — FR-024/027이
+  쓰는 이 officer 분기도 **동일하게 `42501 permission denied for schema private`**(트리거 본문
+  `not private.is_crew_active(old.crew_id)` 지점에서 실패) — 즉 REVOKE는 RPC뿐 아니라 임원
+  임명·강퇴 같은 **평범한 테이블 UPDATE 경로**까지 깨뜨린다. 회귀 0건이 아니므로 팀장 지시대로
+  **적용하지 않는다.** 두 실증 모두 `rollback` 후 `pg_namespace.nspacl`·대상 행 재조회로 권한·
+  데이터 원상태(흔적 없음) 확인. (b)로 전환 — 대시보드 "Exposed schemas" 확인 절차(기대값
+  `public, graphql_public`, REST 재현 curl 커맨드, 트리거 조건: 프로젝트 설정 변경 직후·프로젝트
+  복제 직후·`private` 신규 함수 배포 전후·정기 배포 전)를
+  `docs/design/private-schema-usage-guard-33/README.md` §3에 문서화했다. 전문·SQL 원문은 같은
+  문서 참고.
 
 ### I-156 · archived 감사의 "간접 방어" 3건이 주석으로만 명시화돼 있다 — `disband_crew` 조건이 바뀌어도 아무것도 실패하지 않는다
 
@@ -7327,7 +7536,8 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
 
 ### I-158 · private 크루 초대 카드의 색 점이 실제 크루 색이 아니라 index 0으로 표시된다 — `getCrewById` 폴백이 docstring으로 예고했던 그 함정
 
-- **상태**: 열림 — **(B)**. 기존 결함(32일차 수정이 만든 것 아님), 고치지 않는다.
+- **상태**: **해소(33일차, DESIGN)** — 팀장이 32일차 (B) 판정을 재검토 대상으로 올려
+  국소 소비자 처리(아래 갈래)로 고쳤다. 상세는 `docs/DECISIONS.draft.DESIGN.md`.
 - **영역**: UI / 데이터 접근 레이어 경계 / `src/lib/data/supabase/crew.ts` · `InvitationInboxContainer.tsx:58` · `InvitationList.tsx:57`
 - **제보**: 팀장 (32일차, I-151의 앱 경로 배선을 실측 검증하다 발견)
 - **내용**: `getCrewById`의 **폴백 경로**(`crew_directory_summary` RPC 사용)는
@@ -7351,3 +7561,163 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   `/invitations`를 열고 색 점 DOM을 직접 조회했다 — `style="--crew-color:var(--crew-1);..."`.
   팀장의 코드 대조가 실렌더로도 그대로 재현됨을 확인. 테스트 크루·초대는 확인 직후 삭제,
   기준선(crews 14/archived 1·profiles 21·invitations 9·join_requests 8) 원복 확인.
+- **33일차(DESIGN) — 전수 추적 후 처분**: `getCrewById` 호출부 15곳을 전부 grep해 어느
+  소비자가 이 폴백에 실제로 도달할 수 있는지 추적했다. 폴백이 채우는 4개 플레이스홀더
+  (`description`·`category`·`colorKey`·`ownerId`) 중 이 회차 기준 **실제로 화면까지 새는
+  것은 `colorKey` 하나뿐**이었다 — `description`/`category`를 읽는 소비자(`CrewHomeContainer`·
+  `CrewSettingsContainer`)는 전부 활성 멤버십 게이트 뒤에 있거나(`CrewSettingsContainer`)
+  private+비소속 분기에서 `crew.name`만 읽어(`CrewHomeContainer`) 이 폴백에 도달하지
+  않았고, `MeetupDetailContainer`는 `colorKey`를 읽지만 그 앞에 자체 멤버십 게이트
+  (`!isActiveMembership` → `forbidden`)가 있어 도달 전에 걸러졌다. **후속 후보 ①(타입으로
+  드러내기)은 배제했다** — `Crew` 타입 자체를 바꾸면 15개 호출부 전체가 영향을 받는데, 실제
+  누출은 1개 소비자·1개 필드뿐이라 파급이 문제 규모에 비해 과도하다고 판단했다(전체 논거는
+  `docs/DECISIONS.draft.DESIGN.md`). **후속 후보 ②(소비자 명시 처리)를 택해 구현했다** —
+  `InvitationInboxContainer`가 `crew.ownerId === ""`(같은 폴백의 또 다른 플레이스홀더)로
+  폴백 도달을 직접 판별해 `colorKey`를 신뢰하지 않고 `crewColorIndex: null`로 넘긴다.
+  `InvitationRowViewModel.crewColorIndex`를 `number | null`로, `CrewColorDot`을
+  `colorIndex: number | null`로 넓혀 `null`이면 크루색 대신 무채(`bg-muted-foreground/35`)
+  점을 그린다 — `certainty-draft`(점선)는 의도적으로 재사용하지 않았다(`design-language.md`
+  §2에서 이미 "제안·투표 중"이라는 다른 의미를 갖고 있어 재사용하면 오독 위험, 근거는
+  `CrewColorDot.tsx` docstring). `/sample`의 `invitationsSection`에 세 번째 카드(비공개 독서
+  모임, `crewColorIndex: null`)로 이 상태를 등록했다. `getCrewById`(`src/lib/data/supabase/
+  crew.ts`) docstring도 "오늘 이 폴백을 타는 소비자는 CrewHomeContainer뿐"이라는 낡은 문장을
+  이 사례로 갱신했다 — **이 방어는 `InvitationInboxContainer` 한 곳에만 있고 `getCrewById`
+  자신은 여전히 아무것도 강제하지 않는다**(국소 처방의 한계, 다음 새 소비자가 반복할 수 있음).
+- **33일차(CREW 교차검증 → DESIGN 정정)** — 위 문단 두 곳을 바로잡는다. ① **호출부는
+  "15곳"이 아니라 20곳이다**(19개를 나열해 놓고 15로 잘못 집계했다 — `InvitationInboxContainer`
+  자신의 호출도 나열에서 빠져 있었다, CREW가 독립 grep으로 재확인). ② **`ownerId`가
+  안전한 이유가 틀렸다** — "`crews.owner_id`는 NOT NULL이라 진짜 크루는 이 값을 가질 수
+  없다"는 성립하지 않는다(`''`도 NOT NULL을 만족한다). 진짜 근거는 **`owner_id`가 `uuid`
+  타입이라 빈 문자열이 그 컬럼에 애초에 담길 수 있는 값이 아니라는 것**이다
+  (`information_schema.columns`: `data_type=uuid`; `where owner_id=''` →
+  `22P02 invalid input syntax for type uuid`, CREW·팀장 각각 실측). 이 정밀화가 중요한
+  이유: **`description`도 NOT NULL이지만 `DEFAULT ''::text`라 정상 크루도 진짜
+  `description === ""`일 수 있다** — `description`을 센티넬로 골랐다면 설명 없는 정상
+  크루의 색까지 오탐했을 것이다. ③ **전수 추적 자체가 한 분기를 빠뜨렸다** —
+  `CrewHomeContainer`의 **public+비소속 분기(`CrewIntroPreview`)도
+  `description`·`category`·`colorKey`를 읽는다.** 결론(안전하다)은 우연히 맞았다 — public
+  크루는 `crews_select_authenticated`/`crews_select_anon_public` RLS가 direct select를
+  멤버십과 무관하게 항상 허용해 애초에 이 폴백에 도달할 수 없기 때문이다. **이 "public이면
+  도달 불가"가 그 안전성의 유일한 근거**이고, 전제가 깨지면 `description`·`category`까지
+  함께 새는 자리다. 코드 변경(`crew.ts`·`InvitationInboxContainer.tsx`)과 전체 근거는
+  `docs/DECISIONS.draft.DESIGN.md`에 반영했다.
+
+### I-159 · `invitations`의 archived-크루 차단이 RLS가 아니라 트리거 단일 지점에만 의존한다 — `join_requests`와 defense-in-depth 비대칭
+
+- **상태**: 열림 — **(B)**. 오늘은 안전(nested 호출자 0건 실증). 이중화 여부는 팀장 판단.
+- **영역**: 스키마 / RLS·트리거 (NFR-011, FR-013·FR-021) / `invitations_update_invitee_or_staff` 정책, `invitations_guard_response_transition` 트리거
+- **제보**: CORE (33일차, I-153 처분 중 "같은 결함 클래스가 다른 테이블에도 있는지" 전수 확인의 부산물 — `docs/design/rls-regression-checklist-33/README.md` §5)
+- **내용**: `join_requests_update_requester_or_staff` RLS 정책은 USING·WITH CHECK **양쪽**에
+  `private.is_crew_active(crew_id)`를 걸어 archived 승인을 RLS 레이어에서도 막는다(31일차
+  마이그레이션). 반면 `invitations_update_invitee_or_staff`의 `qual`·`with_check`에는
+  `private.is_crew_active`가 **전혀 없다** — archived 크루 초대 수락을 막는 유일한 방어는
+  `invitations_guard_response_transition` 트리거 본문의
+  `new.status='accepted' and not private.is_crew_active(new.crew_id)` 분기 하나뿐이다
+  (33일차 `pg_get_functiondef`·`pg_policies` 직접 조회로 확인).
+- **왜 지금은 안전한가**: 이 트리거는 `pg_trigger_depth() > 1`일 때만 스킵되는데 invitations
+  UPDATE를 유발하는 nested 호출자가 **현재 0건**이다 — 항상 앱의 직접 Server Action 호출이라
+  depth=1이다. **DESIGN이 교차검증에서 독립 재확인했다**(`prosrc ~* 'update\s+invitations'` 0건 ·
+  `information_schema.triggers` 3개 전부 top-level · `cron.job` 5개 전수에 invitations 관련 0건).
+  즉 "nested가 이 방어를 우회한다"는 시나리오 자체가 성립하지 않아 I-153과 같은 급은 아니다.
+- **그래도 기록하는 이유**: join_requests는 트리거+RLS **이중**, invitations는 트리거 **단일**이다 —
+  같은 성격의 방어를 두 테이블에 비대칭 적용한 것에 "왜 한쪽만 이중화했는가"라는 답이 없다.
+  향후 invitations UPDATE에 nested 경로가 생기면 이 비대칭이 곧바로 회귀로 이어질 수 있다.
+- **후속 후보(트레이드오프 있음)**: `invitations_update_invitee_or_staff`의 USING·WITH CHECK에도
+  `private.is_crew_active(crew_id)`를 추가해 이중화한다. **단 RLS는 status로 조건 분기를 할 수
+  없으므로** "거절(declined)은 archived에서도 허용한다"는 기존 규칙까지 함께 막힐 위험이 있다 —
+  트리거만큼 정밀할 수 없다는 것이 이 이중화의 근본 제약이다. 착수 여부·설계는 팀장 판단.
+
+### I-160 · `getRealtimeAuthTokenAction`이 "세션 없음"과 "세션 조회 에러"를 구분하지 않고 둘 다 `null`로 뭉갠다 — `refreshAuth`의 재시도 판단이 그 위에 서 있다
+
+- **상태**: 열림 — **(B)**. 이번 회차에 **의도적으로 고치지 않았다**(아래 근거).
+- **영역**: 실시간 / 인증 (NFR-008) / `src/lib/realtime/get-realtime-auth-token.ts` · `broadcast.ts`의 `refreshAuth`
+- **제보**: CORE (33일차, 팀장이 배정한 BOARD I-082 수정 정적 리뷰 중 발견)
+- **내용**: `getRealtimeAuthTokenAction`은 `if (error || !data.session) return null;`로 **"세션이
+  정말 없다"와 "`getSession()`이 일시적으로 에러를 반환했다"를 같은 `null`로 합친다.** I-082
+  수정의 `retryOnNull` 분기는 "주기적 갱신 중 만나는 `null`은 항상 진짜 로그아웃이라 재시도가
+  무의미하다"를 전제하는데, **그 전제가 이 함수 위에서는 성립하지 않는다.** 오류를 삼키고 정상
+  반환값으로 `null`을 주므로 `refreshAuth`의 `try`/`catch`도 이 경우를 잡지 못한다.
+- **영향**: 20분 주기 갱신 시점에 Auth 서비스가 일시 오류를 내면(세션은 살아있는데) 현재 코드는
+  이를 로그아웃으로 오판해 재시도 없이 그 주기를 포기한다 — 다음 20분까지 realtime 인가 토큰이
+  갱신되지 않는다. **초기화 시점의 쿠키 전파 경합(I-082)과 사실상 같은 성격의 일시적 실패인데,
+  초기화는 재시도로 보호받고 주기적 갱신은 이 케이스를 구분 못 해 무방비다.**
+- **왜 이번 회차에 안 고쳤는가**: 반환 계약을 넓히는 수정(예:
+  `{ token } | { error: true } | { noSession: true }`)이 필요해 **인증 경로 계약 변경**이 된다.
+  회차 마감 직전에 인증 계약을 바꾸는 것은 팀장 판단으로 금지했다 — 같은 회차에 I-082 1차 수정이
+  회귀(최악 155초 블로킹)를 만들었고 그것을 잡은 직후였다. 범위가 I-082 수정보다 넓다.
+- **후속 후보**: 위 반환 계약 확장. 착수 여부는 팀장 판단.
+
+### I-161 · `refreshAuth` docstring이 "주기적 갱신은 재시도하지 않는다"고 단정했으나 다섯 번째 갈래(`setAuth` throw)에는 해당하지 않았다
+
+- **상태**: **해결됨(33일차, BOARD)** — docstring 2건 정정 완료. 아래 "남은 것" 1건은 경미.
+- **영역**: 실시간 / 문서 정확성 / `src/lib/realtime/broadcast.ts`의 `refreshAuth`
+- **제보**: CORE (33일차, 팀장이 지시한 "다섯 번째 갈래가 있는지" 확인 배정)
+- **내용**: `await supabase.realtime.setAuth(token)`이 `getRealtimeAuthTokenAction()` 호출과
+  **같은 `try` 블록 안**에 있어, 토큰은 정상 수신했지만 `setAuth`가 던지면 `catch`로 떨어져
+  **`retryOnNull` 값과 무관하게** 재시도된다. **이 경로는 BOARD의 이번 diff가 만든 것이 아니라
+  원본에도 있었다.** 실제 버그가 아니라 **BOARD의 새 docstring이 부정확했던 것**이 문제였다.
+- **배열 경계는 문제없다**: `isLastAttempt`일 때 이 갈래를 포함한 **5개 갈래 전부**가
+  `delays[length]`(`undefined`) 라인 전에 `return`한다 — CORE가 전수 확인해 팀장의 "도달 불가"
+  판정이 맞음을 확정했다.
+- **해소**: BOARD가 docstring을 정정했다 — ① `setAuth` throw는 `retryOnNull`과 무관하게 재시도됨을
+  명시(*"주기적 갱신은 재시도가 아예 없다가 아니라 `token===null`일 때만 재시도가 없다가 정확한
+  서술이다"*) ② `null`의 의미를 단정하지 않고 I-160(구분 불가)을 가리키게 함 ③ `authReady` 보호가
+  **최초 초기화 1회에만** 적용됨을 `getClient()` 주석에 명시.
+- **남은 것(경미)**: `INITIAL_NULL_RETRY_DELAYS_MS = [150, 400, 800]`의 **값 자체에 실측 근거가
+  없다.** BOARD의 "강제 null 조건에서 5.9초 만에 성공" 측정은 **구 스케줄(5초 백오프) 기준**이라
+  실제 쿠키 전파 시간을 알려주지 않는다 — 임의값이다. `docs/ISSUES.md` I-082 "남은 리스크"에는
+  이 한계가 정직하게 적혀 있으나 **코드 docstring은 확정적 어조**라 두 곳의 어조가 어긋난다
+  (CORE 지적). 다음에 이 파일을 만질 때 docstring에 한 줄 보탠다.
+
+### I-162 · Mock `applyMeetupReschedule`이 도입 시점부터 데이터 배럴에서 한 번도 재노출되지 않은 죽은 코드였다 — 발견 즉시 해소
+
+- **상태**: **해결됨(발견·처분 동일 회차, 33일차)** — 제보 팀장, 처분 CREW. I-144 선례(완전 삭제)를 그대로 따랐다.
+- **영역**: 데이터 접근 레이어 / 정리(cleanup) — meetup 도메인, **원래 BOARD 소관**(도메인 교차: BOARD가 I-082에 매달려 있어 팀장이 CREW에 처분을 맡겼다)
+- **제보**: **팀장** (33일차 — **I-154가 열고 아무도 훑지 않은 Mock/Supabase 계약 축**을 전수 대조하던 중 발견)
+- **내용**: `applyMeetupReschedule`(26일차 CORE, I-079/FR-065 AC2)은 "Mock 쪽 poll 자동 종료가
+  Meetup 갱신을 트리거하지 않으므로 수동 호출용으로 남긴다"는 의도로 만들어졌다. 그러나
+  `src/lib/data/index.ts`는 Task 032(18일차)부터 9개 도메인 전부 `./supabase/<domain>`만
+  재노출한다 — **배럴 정리(18일차)가 이 함수 도입(26일차)보다 먼저였으므로 정의 시점부터 이미
+  죽어 있었다.**
+- **의도적 잔존 5개와의 구분**: `index.ts:22~24`가 명시하는 "crew 도메인에서 사라진 5개 함수"는
+  실 DB 트리거가 대신하게 되며 **호출부 자체를 제거**한 경우이고, `applyMeetupReschedule`은 그
+  목록에 **아예 없다** — 대칭 유지 목적의 의도적 잔존이 아니라 그냥 참조 없는 죽은 export였다.
+  **I-144(`withdrawPendingCrewMembership`, 31일차 완전 삭제로 닫힘)와 정확히 같은 클래스**이며,
+  이번 발견의 값은 **그 "의도적 잔존 목록"이 불완전했다**는 것이다.
+- **실측**: `grep -rn "applyMeetupReschedule\|ApplyMeetupRescheduleInput" src/` — 삭제 전 정의부
+  3줄뿐이고 import·호출 **0건**, 삭제 후 재실행도 코드 참조 **0건**(CREW가 삭제 전·후 두 번 재현).
+- **처분**: `src/lib/data/mock/meetup.ts`에서 완전 삭제. `docs/decisions/meetup-reschedule-079.md`
+  §5-3·§6에는 **본문을 고치지 않고 각주만 덧붙였다**(당시 기록 보존 — 프로젝트의 "원문 보존 + 각주
+  정정" 관례). 삭제 지점에 짧은 주석을 남긴 근거: 바로 위 `listMeetupScheduleChanges`가 "Meetup
+  일정 변경" 개념을 계속 다뤄 다음 사람이 FR-065 AC2를 추적하다 의아해할 자리라는 판단(CREW).
+- **영향**: 실사용자 영향 없음(죽은 코드, 실 DB는 `finalize_closed_poll` 트리거가 대체).
+
+### I-163 · "표시 층 실렌더 감사" 1순위 후보 D-048(`getMeetupById` 폴백)이 실렌더로 확인되지 않은 상태였다 — 같은 회차에 종결
+
+- **상태**: **해결됨(33일차, 팀장 실렌더로 종결)** — **(A) 0건.**
+- **영역**: UI / 데이터 접근 레이어 경계 / `src/lib/data/supabase/meetup.ts` `getMeetupById` · `MeetupDetailContainer` · `MeetupRescheduleContainer` · `cancel-meetup.ts` · `respond-meetup-attendance.ts` · `create-post.ts`
+- **제보**: DESIGN (33일차, "표시 층 실렌더 감사" 절차의 1순위 후보로 선정)
+- **왜 1순위였는가**: `getMeetupById`는 `getCrewById`(I-158의 그 함수)와 **동일한 폴백 패턴**을
+  21일차(D-048)에 이식했다 — 원본 select 0행 → `meetup_directory_summary` RPC 폴백,
+  `title`/`date`/`place`/`pollId`를 빈 값 플레이스홀더로 채운다. **I-158이 그 자매 함수에서
+  정확히 같은 클래스의 결함을 냈으므로 사전 확률이 가장 높았다.** 순위 기준은 "등급"이 아니라
+  **"미확인 결함이 실제로 있을 사전 확률"**이다(DESIGN §3, CREW 교차검증이 자의성 없음 확인).
+- **코드 추적(DESIGN)**: 5개 소비자 전부가 플레이스홀더 필드를 읽기 전에 활성 멤버십 확인을
+  선행한다 — `meetups_select_members` RLS가 "활성 멤버여야 direct select 성공"을 강제하므로
+  "폴백 도달"과 "활성 멤버십 확인 통과"는 같은 트랜잭션에서 동시에 참일 수 없다.
+- **왜 그것으로 끝내지 않았는가**: **이 결론이 정확히 I-158이 21일차에 받았던 것과 같은 종류
+  (코드 대조로 "구조적으로 안전")이고, I-158은 그 결론이 11일 방치되다 32일차에 실제로 뒤집혔다.**
+- **실렌더 결과(33일차 팀장, DESIGN §7 계획 그대로 실행)**: 비소속 계정
+  `0625chopin@gmail.com`(`fb70ff1c-…`)으로 4개 URL 진입 — private 크루("심야 독서 모임") Meetup
+  상세·`/reschedule`, public 대조군("전시 투어 소셜") 상세·`/reschedule`. `browser_evaluate`로
+  **DOM 원시값 직접 조회**: **4개 전부** `"접근 권한이 없어요"`(`strings.error.forbidden.title`) +
+  `"이 크루의 크루원만 볼 수 있어요"`(description)만 렌더, **Meetup 제목 누출 0**,
+  플레이스홀더 오염(`null`·`undefined`·`NaN`·`[object Object]`) **0**, 각 페이지 콘솔 **0 errors**.
+  **참석 취소·참석 응답은 URL이 없어**(Server Action, 버튼이 forbidden 분기 이전에 렌더되지 않음)
+  이 두 화면 확인으로 5개 소비자 전부의 결론이 성립한다(DESIGN §7.3).
+- **이 확인이 막은 가짜 양성 — 절차 교훈**: 브라우저를 열었을 때 이전 세션이 `chopin0625`
+  (`30f44dd9-…`)로 로그인돼 있었고, **그 계정은 대상 크루 2개에 전부 멤버십이 있었다**(각 1건,
+  SQL 확인). DESIGN 계획서가 계정을 **profile UUID까지 특정**해 뒀기 때문에 세션을 의심하고 먼저
+  대조했다 — 안 했으면 결론이 거짓이 됐다. **32일차 교훈 3**(*"재사용한 기존 데이터에 검증 조건과
+  무관한 접근 경로가 섞이면 성공이 가짜일 수 있다"*)이 그대로 적용된 자리다.
+  → **실렌더 절차에 "현재 로그인 세션이 계획서가 지정한 계정인지 먼저 확인한다"를 넣는다.**

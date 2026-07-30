@@ -489,7 +489,7 @@ export const crewsSection = defineSection({
     },
     {
       name: "멤버 관리 — 가입 신청 승인/반려 (JoinRequestPanel)",
-      note: "실제 컴포넌트입니다(FR-023, D-002, Task 017A, I-040 해소). '처리 내역' 탭에서 승인(approved)·반려(rejected)·철회(withdrawn) 세 상태를 서로 다른 배지로 보여줍니다 — I-040이 요구하는 대로 신청자 본인이 철회한 건을 오너·임원이 반려한 건과 구분합니다. '대기 중' 탭의 승인·반려 버튼은 실제 decideJoinRequestAction을 호출합니다(게스트 세션이라 세션 만료 오류로 막힙니다).",
+      note: "실제 컴포넌트입니다(FR-023, D-002, Task 017A, I-040 해소). '처리 내역' 탭에서 승인(approved)·반려(rejected)·철회(withdrawn) 세 상태를 서로 다른 배지로 보여줍니다 — I-040이 요구하는 대로 신청자 본인이 철회한 건을 오너·임원이 반려한 건과 구분합니다. '대기 중' 탭의 승인·반려 버튼은 실제 decideJoinRequestAction을 호출합니다(게스트 세션이라 세션 만료 오류로 막힙니다). 오류 패널은 33일차(I-152 처분)가 추가한 canDecide=false 상태입니다 — archived 크루의 오너·임원에게는 목록(열람)은 그대로 보이고 승인·반려 버튼만 감춰집니다(D-089 '해산=동결'을 화면에서 정직하게 알리는 안내 포함).",
       panels: {
         default: (
           <PreviewFrame height={420}>
@@ -498,6 +498,7 @@ export const crewsSection = defineSection({
                 crewId="crew-1"
                 pending={SAMPLE_PENDING_REQUESTS}
                 history={SAMPLE_HISTORY_REQUESTS}
+                canDecide
               />
             </div>
           </PreviewFrame>
@@ -510,14 +511,20 @@ export const crewsSection = defineSection({
         empty: (
           <PreviewFrame height={200}>
             <div className="p-4">
-              <JoinRequestPanel crewId="crew-1" pending={[]} history={[]} />
+              <JoinRequestPanel crewId="crew-1" pending={[]} history={[]} canDecide />
             </div>
           </PreviewFrame>
         ),
         error: (
-          <PreviewFrame height={140}>
-            <div className="p-4">
+          <PreviewFrame height={520}>
+            <div className="flex flex-col gap-4 p-4">
               <ErrorState title={strings.crew.members.requests.errors.alreadyDecided} />
+              <JoinRequestPanel
+                crewId="crew-1"
+                pending={SAMPLE_PENDING_REQUESTS}
+                history={SAMPLE_HISTORY_REQUESTS}
+                canDecide={false}
+              />
             </div>
           </PreviewFrame>
         ),

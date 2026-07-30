@@ -20,7 +20,12 @@ function LabeledDemo({ label, children }: { label: string; children: ReactNode }
 }
 
 /** `InvitationList` 데모용 고정 데이터(Task 017B) — `CrewInboxContainer`가 만드는 조인 결과
- *  모양을 손으로 채운 것이다(`crews.tsx`의 `SAMPLE_CREW_CARDS`와 같은 패턴). */
+ *  모양을 손으로 채운 것이다(`crews.tsx`의 `SAMPLE_CREW_CARDS`와 같은 패턴).
+ *
+ *  **세 번째 항목(`invitation-3`) — 33일차, I-158 처분.** `crewColorIndex: null`은
+ *  `getCrewById`의 private+비소속 폴백이 실제 크루 색을 모르는 상태(`InvitationInboxContainer`
+ *  docstring 참고)를 재현한다. 이 항목이 없으면 다음 사람이 "크루 색 미확인" 상태를 화면에서
+ *  볼 방법이 없다(팀장 배정 지시). */
 const SAMPLE_INVITATIONS: InvitationRowViewModel[] = [
   {
     id: "invitation-1",
@@ -37,6 +42,14 @@ const SAMPLE_INVITATIONS: InvitationRowViewModel[] = [
     crewColorIndex: 7,
     inviterDisplayName: "김유나",
     expiresAt: "2026-08-01T00:00:00.000Z",
+  },
+  {
+    id: "invitation-3",
+    crewId: "crew-private-unknown-color",
+    crewName: "비공개 독서 모임",
+    crewColorIndex: null,
+    inviterDisplayName: "박서연",
+    expiresAt: "2026-08-10T00:00:00.000Z",
   },
 ];
 
@@ -56,7 +69,7 @@ export const invitationsSection = defineSection({
   label: "받은 초대함",
   title: "받은 초대함",
   description:
-    "FR-021·028(D-002·D-016). 실제 라우트는 /invitations — 크루명·초대자·만료일을 카드로 보여주고, 수락하면 즉시 크루원(active)이 되어 크루 홈으로 이동하며 거절해도 재초대가 가능합니다(InvitationList).",
+    "FR-021·028(D-002·D-016). 실제 라우트는 /invitations — 크루명·초대자·만료일을 카드로 보여주고, 수락하면 즉시 크루원(active)이 되어 크루 홈으로 이동하며 거절해도 재초대가 가능합니다(InvitationList). 세 번째 카드(비공개 독서 모임)는 크루 색을 모를 때(I-158, getCrewById private 폴백)의 중립 표시를 보여줍니다.",
   items: [
     {
       name: "InvitationList",
