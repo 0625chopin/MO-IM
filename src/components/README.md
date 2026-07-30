@@ -78,13 +78,21 @@
 - **대비(NFR-018)**: 이번에 추가한 원자는 새 색을 들이지 않고 개편에서 이미 검증된 토큰만
   참조한다 — 본문·라벨은 `--foreground`/`--muted-foreground`, 오류는 `--destructive`(라이트
   6.15:1), 포커스 링은 `--ring`(라이트 7.43:1, `docs/design/design-language.md` §5). Toast의
-  `destructive` variant도 같은 `--destructive` 토큰을 재사용한다 — 새로 잰 수치는 없다.
+  `destructive` variant도 같은 `--destructive` 토큰을 재사용한다.
+  **28일차(I-032) 후속 — 위 수치는 전부 토큰의 불투명 대비값이고, 실제 유틸리티 클래스는
+  링·일부 다크 보더에 알파를 걸어 렌더한다는 것이 합성 렌더 실측(격리 Chromium)에서
+  드러났다.** `focus-visible:ring-ring/50`(앱 전역 표준 포커스 링)이 실제로는 라이트 2.29:1·
+  다크 2.70:1로 3:1 미달이었고, `aria-invalid` 링·일부 다크 보더도 마찬가지였다. 알파 계수를
+  올려(`ring-ring/70`, `ring-destructive/60`·`/65`, 다크 보더는 불투명 복귀 등) 재실측 결과
+  전부 3:1 이상(3.25~4.19)으로 충족을 확인했다 — 색상 토큰 자체는 바꾸지 않았다. 전체 수치·
+  방법론은 `docs/decisions/composite-render-contrast-i032.md`.
 - **동적 변경 안내(NFR-021)**: `FieldError`·`ErrorState`(`ui/error-state.tsx`)는 `role="alert"`라
   나타나는 즉시 보조기술에 안내된다. Toast는 Base UI의 `priority`가 aria-live 강도를 결정하며,
   이 프로젝트에서는 `variant: "destructive"`일 때만 `priority: "high"`(assertive)를 주고
   나머지는 `low`(polite)로 고정했다(`ui/toast.tsx`의 `show()`) — "파괴적 알림만 assertive"라는
   지시를 호출부가 아니라 이 한 곳에서 강제한다.
 - **라이트·다크(NFR-022)**: 새 토큰을 추가하지 않았으므로 `globals.css`의 `.dark`/`@media` 동기화
-  대상이 아니다. 브라우저 실측(Playwright)은 이번 회차에서 다른 세션이 브라우저 프로필을 점유해
-  수행하지 못했다 — `npx tsc --noEmit`·`npm run lint`·`npm run build` 통과로 정적 검증만
-  확인했고, 실제 라이트·다크 렌더 스크린샷 대조는 다음 접근성 QA 패스(Task 024)로 넘긴다.
+  대상이 아니다. **28일차(I-032)에 격리 Chromium으로 폼 오류 상태·Dialog/Drawer·Toast 3종
+  합성 상태를 라이트·다크 양쪽 실측 완료** — 위 "대비" 항목의 알파 조정과 함께
+  `docs/decisions/composite-render-contrast-i032.md`에 6조합 실측 결과표가 있다. 19개 페이지
+  전수 시각 회귀는 이번 회차 범위 밖이며 Task 024(접근성 QA 패스)로 넘긴다.

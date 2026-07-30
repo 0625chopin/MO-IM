@@ -1,6 +1,6 @@
 # 워크로그 템플릿 — docs/dailyWorkLog/N_Day.md
 
-완료 처리 4-3 단계에서 이 서식으로 `docs/dailyWorkLog/<N>_Day.md`를 만든다.
+완료 처리(4단계)의 **워크로그 작성** 단계에서 이 서식으로 `docs/dailyWorkLog/<N>_Day.md`를 만든다.
 `완료 Task` 목록은 **다음 회차의 완료 집합 판정 근거**이므로 Task 번호를 정확히 적는다.
 문체는 프로젝트 문서와 동일한 단정적 평서체, 날짜는 ISO(YYYY-MM-DD).
 

@@ -10,15 +10,21 @@ import { createSupabaseServerClient } from "./server";
 /**
  * JoinRequest 실데이터 구현 (Task 031 읽기 + Task 032 쓰기, FR-022 가입 신청·FR-023 승인·반려).
  *
- * **`join_requests`에는 `invitations`의 `trg_invitations_provision_membership` 같은 자동
- * 프로비저닝 트리거가 없다**(실측, `rls-policies-029a.md`·`029b.md`에 없음 확인) — 최초 신청
- * 시 `crew_memberships`(status='requested') 행을 이 레이어가 직접 만든다. 승인/반려는
- * `trg_join_requests_sync_membership_on_decision`(AFTER UPDATE)이 자동 동기화하므로 이
- * 레이어가 다시 건드리지 않는다. 철회(자진, FR-022 E4)는 그 트리거의 대상이 아니라서 역시
- * 이 레이어가 직접 되돌린다 — `crew_memberships_guard_self_transition`이 Task 032
- * 마이그레이션(`crew_memberships_extend_self_service_join_request_transitions`)으로
- * `requested→rejected`(자진 철회)·`(declined|rejected|left|removed)→requested`(재신청) 자기
- * 전이를 허용하도록 확장됐다 — 이 확장 없이는 아래 쓰기가 트리거 예외로 막힌다.
+ * **I-054 해소(28일차, CORE)** — `createJoinRequest`는 더 이상 `join_requests` INSERT와
+ * `crew_memberships` INSERT/UPDATE를 별도 PostgREST 호출(=별도 트랜잭션)로 나누지 않는다.
+ * `create_join_request` RPC(029B 2단 구조 — `private.create_join_request` SECURITY DEFINER
+ * 실구현 + `public.create_join_request` SECURITY INVOKER 얇은 래퍼) 하나로 묶여, 두 INSERT가
+ * 단일 DB 트랜잭션 안에서 원자적으로 처리된다. 이 RPC가 이제 유일한 정당 생성 경로라
+ * `join_requests`·`crew_memberships`의 client INSERT GRANT는 회수됐다(D-065 전제 변경,
+ * 마이그레이션 `i054_atomic_join_request_and_poll_creation_rpcs`). 실패는 예외가 아니라
+ * `reason_code`(forbidden·not_found·conflict) 반환값으로 알린다. 자기반증(강제 실패 유도 후
+ * 두 테이블 모두에 부분 커밋이 남지 않음을 SELECT로 직접 확인) 원시 로그는
+ * `docs/decisions/i054-atomic-write-rpcs.md` 참고.
+ *
+ * 승인/반려는 `trg_join_requests_sync_membership_on_decision`(AFTER UPDATE)이 자동
+ * 동기화하므로 `decideJoinRequest`가 다시 건드리지 않는다. 철회(자진, FR-022 E4)는 그
+ * 트리거의 대상이 아니라서 `withdrawJoinRequest`가 직접 되돌린다(여전히 두 개의 UPDATE —
+ * I-054 대상은 INSERT 경로뿐이었다).
  *
  * **FR-023 동시 승인 방지**: `decideJoinRequest`는 `.eq("status","pending")` 조건부 UPDATE를
  * 쓴다 — D-019와 같은 원리(행 락 획득 후 WHERE 재평가)로, 두 임원이 동시에 승인/반려를
@@ -53,67 +59,37 @@ export async function getPendingJoinRequestForRequester(
   return data ? toJoinRequest(data) : null;
 }
 
-const REACTIVATABLE_MEMBERSHIP_STATUSES = ["declined", "rejected", "left", "removed"] as const;
-
 export interface CreateJoinRequestInput {
   crewId: Id;
   requesterId: Id;
   message?: string | null;
 }
 
-/** 같은 크루에 대기 중인 신청이 이미 있으면 conflict — 중복 신청 방지(Mock과 동일 규칙). */
+/**
+ * 같은 크루에 대기 중인 신청이 이미 있으면 conflict — 중복 신청 방지(Mock과 동일 규칙).
+ *
+ * **`requesterId`는 실데이터에서 쓰지 않는다** — `respondAttendance`(meetup.ts)와 같은 이유로
+ * `create_join_request` RPC가 내부에서 `auth.uid()`를 쓴다(호출자가 실제 로그인 사용자와 다른
+ * 값을 넘겨도 결과는 세션 기준으로만 나온다). Mock과의 시그니처 동일성(NFR-034)을 위해 입력
+ * 타입에는 남겨 둔다.
+ */
 export async function createJoinRequest(
   input: CreateJoinRequestInput,
 ): Promise<DataResult<JoinRequest>> {
   const supabase = await createSupabaseServerClient();
-
-  const { data: duplicate, error: duplicateError } = await supabase
-    .from("join_requests")
-    .select("id")
-    .eq("crew_id", input.crewId)
-    .eq("requester_id", input.requesterId)
-    .eq("status", "pending")
-    .maybeSingle();
-  if (duplicateError) throw duplicateError;
-  if (duplicate) {
-    return err("conflict", `crew ${input.crewId} 에 이미 대기 중인 가입 신청이 있다.`);
-  }
-
   const { data, error } = await supabase
-    .from("join_requests")
-    .insert({ crew_id: input.crewId, requester_id: input.requesterId, message: input.message ?? null })
-    .select("*")
+    .rpc("create_join_request", { p_crew_id: input.crewId, p_message: input.message ?? undefined })
     .single();
   if (error) throw error;
 
-  const { data: existingMembership, error: membershipReadError } = await supabase
-    .from("crew_memberships")
-    .select("status")
-    .eq("crew_id", input.crewId)
-    .eq("profile_id", input.requesterId)
-    .maybeSingle();
-  if (membershipReadError) throw membershipReadError;
-
-  if (!existingMembership) {
-    const { error: insertMembershipError } = await supabase
-      .from("crew_memberships")
-      .insert({ crew_id: input.crewId, profile_id: input.requesterId, role: "member", status: "requested" });
-    if (insertMembershipError) throw insertMembershipError;
-  } else if (
-    REACTIVATABLE_MEMBERSHIP_STATUSES.includes(
-      existingMembership.status as (typeof REACTIVATABLE_MEMBERSHIP_STATUSES)[number],
-    )
-  ) {
-    const { error: reactivateError } = await supabase
-      .from("crew_memberships")
-      .update({ role: "member", status: "requested", removed_reason: null })
-      .eq("crew_id", input.crewId)
-      .eq("profile_id", input.requesterId);
-    if (reactivateError) throw reactivateError;
+  if (!data.ok) {
+    if (data.reason_code === "not_found" || data.reason_code === "conflict" || data.reason_code === "forbidden") {
+      return err(data.reason_code, `crew ${input.crewId} 가입 신청이 거부됐다(${data.reason_code}).`);
+    }
+    throw new Error(
+      `create_join_request(${input.crewId})가 예상 밖의 reason_code를 반환했다: ${data.reason_code}`,
+    );
   }
-  // else: 이미 active/invited/requested — 호출자(evaluateJoinRequestEligibility, lib/rules)가
-  // 먼저 걸렀어야 하는 상태다. join_requests 행은 이미 생성됐으니 조용히 건너뛴다.
-
   return ok(toJoinRequest(data));
 }
 

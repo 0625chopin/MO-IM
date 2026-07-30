@@ -1183,6 +1183,41 @@ export type Database = {
           reason_code: string
         }[]
       }
+      create_join_request: {
+        Args: { p_crew_id: string; p_message?: string }
+        Returns: {
+          created_at: string
+          crew_id: string
+          decided_at: string
+          decided_by: string
+          id: string
+          message: string
+          ok: boolean
+          reason_code: string
+          requester_id: string
+          status: string
+        }[]
+      }
+      create_poll: {
+        Args: {
+          p_closes_at: string
+          p_eligible_voter_ids?: Json
+          p_opens_at: string
+          p_post_id: string
+        }
+        Returns: {
+          closed_by: string
+          closes_at: string
+          decided_at: string
+          id: string
+          ok: boolean
+          opens_at: string
+          post_id: string
+          reason_code: string
+          result: string
+          status: string
+        }[]
+      }
       create_report: {
         Args: { p_reason: string; p_target_id: string; p_target_type: string }
         Returns: {

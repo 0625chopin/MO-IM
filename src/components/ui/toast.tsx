@@ -88,7 +88,7 @@ const toastVariants = cva(
     variants: {
       variant: {
         default: "",
-        destructive: "ring-destructive/30 [&_[data-slot=toast-title]]:text-destructive",
+        destructive: "ring-destructive/65 [&_[data-slot=toast-title]]:text-destructive",
       },
     },
     defaultVariants: { variant: "default" },
@@ -168,7 +168,7 @@ function ToastAction({ className, ...props }: ToastPrimitive.Action.Props) {
     <ToastPrimitive.Action
       data-slot="toast-action"
       className={cn(
-        "shrink-0 self-center rounded-md px-2 py-1 text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+        "shrink-0 self-center rounded-md px-2 py-1 text-xs font-medium text-foreground underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/70",
         className,
       )}
       {...props}
