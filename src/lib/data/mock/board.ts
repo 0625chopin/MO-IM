@@ -118,8 +118,12 @@ export interface CreatePostInput {
 }
 
 /** `general` 게시글은 모임 제안 필드 4종·`targetMeetupId`를 전부 null로 고정한다 — 유형별
- *  분기를 호출부(Server Action)에 흩어 두지 않고 이 함수 하나가 강제한다. */
-export async function createPost(input: CreatePostInput): Promise<Post> {
+ *  분기를 호출부(Server Action)에 흩어 두지 않고 이 함수 하나가 강제한다.
+ *
+ * **32일차(I-150 해소, BOARD)** — `./supabase/board.ts`와 시그니처를 맞춘다(`DataResult<Post>`,
+ * `createComment`(I-070 계열)와 같은 패턴). Mock 단계는 실패 경로가 없어 항상 `ok(...)`를
+ * 반환한다. */
+export async function createPost(input: CreatePostInput): Promise<DataResult<Post>> {
   const isProposal = input.type === "meetup_proposal" || input.type === "meetup_reschedule_proposal";
   const isReschedule = input.type === "meetup_reschedule_proposal";
   const post: Post = {
@@ -139,7 +143,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
     deletedAt: null,
   };
   store.posts.push(post);
-  return post;
+  return ok(post);
 }
 
 export type UpdatePostInput = Partial<Pick<Post, "title" | "body">>;

@@ -45,15 +45,67 @@ export async function getInvitationById(id: Id): Promise<Invitation | null> {
  * 하고, "과거에 무슨 일이 있었는가"는 만료와 무관해야 한다. `status` 미지정(전체 조회) 시에도
  * 같은 이유로 필터를 걸지 않는다 — 현재 호출부는 `"pending"` 하나뿐이라(`InvitationInboxContainer`)
  * 실질적인 차이는 없지만, 의미를 명확히 남겨 둔다.
+ *
+ * **D-073 확장(32일차, BOARD 실측 발견 → CREW 수정, 팀장 회귀 지적 후 재수정)**: archived
+ * 크루로 가는 pending 초대도 같은 방식(조회 필터링)으로 거른다. `disband_crew`는
+ * `invitations`를 정리하지 않는다(32일차 결정, `docs/DECISIONS.draft.CREW.md` "해산=동결" —
+ * 데이터는 그대로 둔다) — 그런데 그 "동결"이 조회 계층까지 새지 않아
+ * `/invitations`(`InvitationInboxContainer`)가 archived 크루의 죽은 초대를 완전히 살아있는
+ * 것처럼(활성화된 수락/거절 버튼 포함) 그려서 사용자에게 거짓을 보여주고 있었다(BOARD가
+ * 실계정으로 재현). 데이터 층(동결)과 표시 층(필터링)을 분리한 것이 만료와 정확히 같은
+ * 모양이라 새 패턴을 만들지 않고 이 자리에 조건 하나만 더한다. **거르는 쪽을 택했다**(비활성
+ * 카드로 보여주는 대신) — 이유 셋: ① 만료(D-073)가 이미 "거른다"를 택했으므로 같은
+ * 자리·같은 판단축(자기소개함이 지금 응답 가능한 것만 보여준다)에서 다른 결론을 내면 화면이
+ * 두 가지 규칙을 섞어 쓰게 된다. ② 만료된 초대도 사용자에게 "왜 사라졌는지" 알려주지 않고
+ * 조용히 빠지는 것이 기존 동작이라, archived만 유독 사유를 설명하려면 그 자체가 새 UX
+ * 패턴이 된다. ③ 걸러내면 "거절 버튼이 죽은 초대에 계속 남아 있어야 하는가"(I-147이 지킨
+ * 원칙 — 거절은 항상 가능해야 한다) 질문이 애초에 발생하지 않는다 — 카드 자체가 안 뜨므로.
+ *
+ * **1차 구현(회귀, 폐기)**: 이 함수 안에서 초대 조회 → `crews` 2단계 조회로 archived를
+ * 걸렀다(`listCrewsByProfile`이 임베드 조인 대신 2단계 조회를 쓰는 관례를 재사용한
+ * 것이었다). **팀장이 실데이터로 잡아냈다** — 그 2단계가 **초대받은 사람의 세션으로**
+ * `crews`를 직접 select했는데, `crews_select_authenticated` RLS는
+ * `visibility='public' OR owner_id=auth.uid() OR (활성 멤버)`만 허용한다. 초대받은 사람은
+ * 아직 `crew_memberships.status='invited'`(active 아님)이므로 **private 크루는 무조건
+ * 0행**이 되어 `activeCrewIds`가 비었고, 결과적으로 **활성 private 크루의 멀쩡한 pending
+ * 초대까지 전부 지워졌다** — 원래 결함(죽은 초대가 살아 보임)보다 나쁜 회귀(살아있는 초대가
+ * 안 보임)였다. `listCrewsByProfile`의 관례는 "필터 대상 테이블에 이미 SELECT 권한이 있는"
+ * 경우에만 성립하는데, 여기서는 애초에 그 권한이 없다는 게 문제의 본질이라 같은 관례를
+ * 그대로 옮겨 쓸 수 없었다.
+ *
+ * **2차 구현(현재, 회귀 수정)**: `private.is_crew_active(uuid)`(31일차, CREW가 세 마이그레이션
+ * 에서 이미 재사용한 그 함수)를 재사용하는 SECURITY DEFINER RPC
+ * `list_pending_invitations_for_self`(`public.*` INVOKER 얇은 래퍼 + `private.*` DEFINER 실제
+ * 로직, 029B 2단 구조 — disband_crew·crew_directory_summary와 동일 패턴)로 이 판정을
+ * RLS 밖에서 한다. 매개변수를 받지 않고 내부에서 `auth.uid()`만 쓴다 — 호출자가 다른 사람의
+ * id를 넣어 조회 범위를 넓힐 방법 자체가 없다. `crews_select_authenticated`를 초대받은
+ * 사람에게까지 여는 방향(RLS 확장)은 택하지 않았다 — 비소속 사용자에게 private 크루 행
+ * 전체를 여는 권한 확대이고, 이 프로젝트에서 권한 확대가 반복해서 사고를 낸 축이다(I-102·
+ * I-107). 상세 근거는 마이그레이션
+ * `supabase/migrations/20260730092707_list_pending_invitations_for_self_32.sql` 참고.
+ *
+ * `status !== "pending"`(또는 미지정) 경로는 이 RPC를 쓰지 않는다 — `invitations_select_
+ * participant_or_staff` RLS가 `invitee_id = auth.uid()`를 이미 무조건 허용해서(크루
+ * 멤버십과 무관) 원래도 RLS 문제가 없었다. **주의**: 이 RPC는 `auth.uid()`로만 스코프되므로
+ * `inviteeId` 인자는 `status === "pending"` 경로에서 사실상 무시된다 — 유일한 호출부
+ * (`InvitationInboxContainer`)가 항상 `session.profileId`(= 호출자 자신의 `auth.uid()`)로만
+ * 부르므로 지금은 무해하지만, 방어적으로 반환 행을 `inviteeId`와 대조해 한 번 더 좁힌다(다른
+ * 사람의 id로 잘못 불렸을 때 엉뚱한 사람의 데이터를 "정상"인 것처럼 반환하지 않도록).
  */
 export async function listInvitationsForProfile(
   inviteeId: Id,
   status?: InvitationStatus,
 ): Promise<Invitation[]> {
   const supabase = await createSupabaseServerClient();
+
+  if (status === "pending") {
+    const { data, error } = await supabase.rpc("list_pending_invitations_for_self");
+    if (error) throw error;
+    return (data ?? []).map(toInvitation).filter((i) => i.inviteeId === inviteeId);
+  }
+
   let query = supabase.from("invitations").select("*").eq("invitee_id", inviteeId);
   if (status) query = query.eq("status", status);
-  if (status === "pending") query = query.gt("expires_at", new Date().toISOString());
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map(toInvitation);

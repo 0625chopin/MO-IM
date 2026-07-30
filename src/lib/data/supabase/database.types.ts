@@ -1259,6 +1259,24 @@ export type Database = {
           status: string
         }[]
       }
+      list_pending_invitations_for_self: {
+        Args: never
+        Returns: {
+          created_at: string
+          crew_id: string
+          expires_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       meetup_directory_summary: {
         Args: { p_meetup_id: string }
         Returns: {

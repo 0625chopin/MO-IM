@@ -77,7 +77,8 @@
   했다). Dialog·Drawer·Toast의 닫기 버튼은 `size="icon-sm"`(28px)를 쓴다.
 - **대비(NFR-018)**: 이번에 추가한 원자는 새 색을 들이지 않고 개편에서 이미 검증된 토큰만
   참조한다 — 본문·라벨은 `--foreground`/`--muted-foreground`, 오류는 `--destructive`(라이트
-  6.15:1), 포커스 링은 `--ring`(라이트 7.43:1, `docs/design/design-language.md` §5). Toast의
+  11.66:1 — 32일차 I-029 L 이동 후 수치, 이 문서 작성 당시엔 6.15였다), 포커스 링은
+  `--ring`(라이트 7.43:1, `docs/design/design-language.md` §5). Toast의
   `destructive` variant도 같은 `--destructive` 토큰을 재사용한다.
   **28일차(I-032) 후속 — 위 수치는 전부 토큰의 불투명 대비값이고, 실제 유틸리티 클래스는
   링·일부 다크 보더에 알파를 걸어 렌더한다는 것이 합성 렌더 실측(격리 Chromium)에서

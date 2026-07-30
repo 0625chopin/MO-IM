@@ -83,7 +83,9 @@ mutation이 성공함, 데이터 정합성 문제).
 - **간접 방어**(#19·#22·#24) — 직접 가드는 없지만 `disband_crew`의 부수 효과(채팅 삭제·미래
   Meetup 취소·open 투표 취소) 덕분에 실제로 도달하는 입력이 없다. **위반으로 보지 않지만
   취약하다** — `disband_crew`의 정리 로직이 바뀌면(예: 미래 Meetup 취소 조건이 바뀌거나) 조용히
-  뚫릴 수 있는 암묵적 결합이다. 코드 주석으로만 남기고 이번엔 고치지 않는다.
+  뚫릴 수 있는 암묵적 결합이다. 31일차에는 코드 주석으로만 남기고 고치지 않았으나, **32일차에
+  결합 지점을 실제로 명시화했다**(아래 "결합 지점 명시화(32일차)" 절 참고 — `disband_crew`의
+  세 부수 효과 블록에 결합 주석 추가, 로직 무변경).
 - **해당 없음**: #25(크루 스코프 아님)·#26(archived와 무관하게 유효한 행위).
 
 ## 이번 회차에 고친 파일 (내 도메인만)
@@ -337,3 +339,61 @@ guard_self_transition`은 팀장 지시대로 건드리지 않았다(중첩 호�
   예외를 어떻게 받는지까지는 확인하지 못했다 — 브라우저 실측이 필요하다.
 - 근거는 전부 위 표에 파일·정책·트리거 이름으로 남겼다 — BOARD가 재확인 없이 바로 사용할
   수 있게 했다.
+
+## 결합 지점 명시화(32일차, 축 ② — 간접 방어 3건)
+
+위 "간접 방어"(#19·#22·#24)로 분류한 3건은 `disband_crew`의 부수 효과에 암묵적으로 결합돼
+있을 뿐, 그 결합이 코드 어디에도 명시돼 있지 않았다(이 문서에만 서술) — "`disband_crew`의
+정리 로직이 바뀌면(예: 미래 Meetup 취소 조건이 바뀌거나) 조용히 뚫릴 수 있는 암묵적 결합"이라고
+남긴 리스크를 32일차에 실제로 명시화했다.
+
+**행별 결합 지점(정확한 코드 지점까지 특정)**:
+
+| # | 항목 | `disband_crew`의 결합 지점(정확한 SQL) | 소비자 가드(BOARD 도메인) |
+| --- | --- | --- | --- |
+| 24 | 투표 참여/조기종료/철회 | `update public.polls ... where ... and p.status = 'open'` (private.disband_crew, "FR-013 AC1" 블록) | `cast-vote.ts`·`close-poll.ts`·`withdraw-poll.ts`의 `poll.status !== 'open'` |
+| 22 | 일정 취소/응답 | `update public.meetups set status='cancelled' where crew_id=... and status='confirmed' and date >= current_date` (private.disband_crew, "FR-013 AC2" 블록) | `isMeetupAttendanceOpen`(`src/lib/rules/meetup-attendance-eligibility.ts`)의 `status === 'confirmed' && date >= todayIso` — **조건이 정확히 대칭**(부정 관계) |
+| 19 | 채팅 메시지 삭제 | `delete from public.chat_messages where room_id in (select id from chat_rooms where crew_id=...)` (private.disband_crew, "D-009 후반" 블록, 전량 하드 삭제) | `delete-chat-message.ts`의 `!message`(대상 없음) 분기 — `getMessageById`가 0행을 반환 |
+
+**명시화 수단 판단 — 코드 주석을 택했다(테스트·DB 제약 대신)**:
+
+- **테스트를 배제한 이유**: `npm test`(vitest)의 자동 테스트 범위는 CLAUDE.md가 명시한 대로
+  `quorum.ts`·`poll-decision.ts`·`poll-eligibility.ts` 3개 순수 함수 모듈뿐이다(D-052→D-072).
+  Server Action·데이터 접근 계층·RPC 호출은 **전면적으로 자동 테스트가 없는 상태**(R-002 부분
+  완화)이고, 이 결합 하나만을 위해 그 범위를 넓히는 것은 별도의 테스트 인프라 결정이지 이번
+  UX 감사(간접 방어 3건 명시화) 배정의 범위를 넘어선다.
+- **DB 제약을 배제한 이유**: CHECK 제약은 "다른 함수(BOARD 도메인 TS 코드)의 조건이 이 UPDATE의
+  조건과 일치해야 한다"는 **교차 함수·교차 계층 결합**을 표현할 수 있는 도구가 아니다 — CHECK은
+  한 행의 정적 값 제약이지, "이 SQL 조건이 저 TS 조건과 대칭이어야 한다"는 동작 간 합치 제약이
+  아니다.
+- **코드 주석을 택한 이유**: ① 결합의 생산자 쪽(`private.disband_crew`)은 CREW 소유라 직접
+  갱신할 수 있다. ② 소비자 쪽(`cast-vote.ts`·`close-poll.ts`·`withdraw-poll.ts`·
+  `cancel-meetup.ts`·`respond-meetup-attendance.ts`·`delete-chat-message.ts`)은 전부 BOARD
+  도메인이라 이번 회차에 직접 수정하지 않는다(위 "타 도메인 발견"과 같은 경계 — 조율 없이
+  고치지 않는다). ③ 이 프로젝트는 이미 트리거·RPC 본문 안에 FR 근거 주석을 다는 관례가
+  확립돼 있다(`pg_get_functiondef`로 배포본을 읽으면 그대로 보인다) — 새 패턴이 아니라 기존
+  관례의 연장이다.
+
+**적용**: `supabase/migrations/20260730090512_disband_crew_annotate_indirect_defense_
+coupling_32.sql` — `private.disband_crew`의 세 부수 효과 블록(FR-013 AC1 투표 취소·FR-013 AC2
+Meetup 취소·D-009 채팅 파기) 각각에 위 표와 같은 내용의 결합 주석을 추가했다. 로직은 한 글자도
+바꾸지 않았다(`pg_get_functiondef` 배포본을 그대로 복사 후 주석 3줄만 삽입).
+
+**실측(`begin`…`rollback`, 스크래치 크루, 마이그레이션 적용 전·후 2회)**: 임시 크루에 open
+투표 1건·미래 confirmed Meetup 1건(오늘+7일)·채팅 메시지 1건을 심고 오너로 `disband_crew`를
+호출 — **적용 전**: `cancelled_polls=1`·`cancelled_meetups=1`·`purged_messages=1`,
+`poll.status: open→cancelled`·`meetup.status: confirmed→cancelled`·`chat_messages: 1건→0건`
+(대상 메시지 자체가 사라짐, `delete-chat-message.ts`가 타는 것과 같은 "대상 없음" 상태).
+**적용 후(마이그레이션 검증)**: 동일 시나리오 재실행 — 결과 완전히 동일
+(`ok=true`·`cancelled_polls=1`·`cancelled_meetups=1`·`purged_messages=1`·
+`poll_status_after=cancelled`·`meetup_status_after=cancelled`·`chat_count_after=0`) — 주석
+추가가 로직을 바꾸지 않았음을 재확인. `get_advisors(security)` 신규 WARN 0건(기존
+`auth_leaked_password_protection` 1건만 유지). 롤백 후 `crews=14`(archived 1) 재확인,
+스크래치 크루 잔존물 0건. 두 픽스처 크루(`729ced18-…` active·`2724533e-…` archived) 이름·
+상태·공개범위 불변 확인.
+
+**남은 취약점(의도적으로 고치지 않음)**: 이 주석은 **다음 편집자가 읽는다는 전제**로만
+작동한다 — `disband_crew`의 세 조건을 실제로 바꾸는 편집이 일어나도 컴파일도 테스트도 실패하지
+않는다. 위에서 테스트·DB 제약을 배제한 근거가 그대로 이 잔여 리스크의 근거이기도 하다. 재검토
+조건: BOARD 도메인의 poll·meetup·chat 액션이 자동 테스트 대상으로 편입되거나(vitest 범위 확장
+결정 발생 시), `disband_crew`가 다시 수정될 때 이 주석을 먼저 읽을 것.

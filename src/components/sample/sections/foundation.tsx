@@ -12,7 +12,7 @@ const SEMANTIC_SWATCHES = [
   { token: "muted-foreground", cls: "bg-muted-foreground", note: "보조 문구 5.28:1" },
   { token: "foreground", cls: "bg-foreground", note: "본문 19.41:1" },
   { token: "primary", cls: "bg-primary", note: "주 버튼" },
-  { token: "destructive", cls: "bg-destructive", note: "파괴·오류 6.15:1" },
+  { token: "destructive", cls: "bg-destructive", note: "파괴·오류 11.66:1 (I-029, 32일차 L 이동)" },
   { token: "ring", cls: "bg-ring", note: "포커스 7.43:1" },
 ];
 

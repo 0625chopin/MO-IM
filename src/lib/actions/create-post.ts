@@ -222,7 +222,7 @@ export async function createPostAction(
     return { ok: false, kind: "fields", fieldErrors };
   }
 
-  const post = await createPost({
+  const createResult = await createPost({
     boardId: board.id,
     authorId: session.profileId,
     type: input.type,
@@ -243,6 +243,14 @@ export async function createPostAction(
     // 드러내기 위해 호출부에서도 유형을 한 번 더 좁힌다.
     targetMeetupId: input.type === "meetup_reschedule_proposal" ? input.targetMeetupId : undefined,
   });
+  // 32일차(I-150 해소) — `createComment`가 이미 쓰는 패턴과 같다: `createPost`가 이제
+  // `DataResult<Post>`를 반환하므로(archived 크루 등 `posts_insert_members` RLS 거부 시
+  // `err("forbidden", …)`) 원시 예외 대신 이 액션의 기존 `denied/forbidden` 어휘로 옮겨 담는다
+  // — 새 `kind`·새 오류 코드를 만들지 않는다.
+  if (!createResult.ok) {
+    return { ok: false, kind: "denied", code: "forbidden" };
+  }
+  const post = createResult.data;
 
   if (isProposalType) {
     // FR-040 AC1 — 대상자는 "등록 시각의 active 크루원" 스냅샷(D-025). 강퇴·탈퇴·초대
