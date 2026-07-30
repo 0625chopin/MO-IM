@@ -4,6 +4,7 @@ import type {
   Id,
   Meetup,
   MeetupAttendance,
+  MeetupScheduleChange,
 } from "@/lib/types";
 
 import { type DataResult, err, ok } from "../contracts";
@@ -102,6 +103,11 @@ export interface RespondAttendanceInput {
  * capacity가 있으면 "attending으로 바뀌는 순간"에만 `attendingCount < capacity`를
  * 검사한다 — 실데이터에서는 이 검사와 증가가 단일 조건부 UPDATE로 원자적이어야
  * 하지만(D-019), Mock은 단일 스레드 이벤트 루프라 순차 실행 자체가 동등한 보장을 준다.
+ *
+ * **I-079/FR-065 AC2(26일차, CORE)** — `invalidatedAt`이 채워진 응답은 `status`가 같아도
+ * "이전 응답 없음"과 동일하게 취급한다(재확인 강제, 팀장 결정). 재확인이 성공하면
+ * `invalidatedAt`을 다시 null로 되돌린다 — `private.respond_meetup_attendance`(실 DB, Task
+ * 032 이후 이 함수를 대체)와 동일 계약(NFR-035).
  */
 export async function respondAttendance(
   input: RespondAttendanceInput,
@@ -115,13 +121,14 @@ export async function respondAttendance(
   const existing = store.meetupAttendances.find(
     (a) => a.meetupId === input.meetupId && a.profileId === input.profileId,
   );
+  const wasInvalidated = existing?.invalidatedAt != null;
 
-  if (existing?.status === input.status) {
+  if (existing?.status === input.status && !wasInvalidated) {
     return { success: true, changed: false };
   }
 
   const becomingAttending = input.status === "attending";
-  const wasAttending = existing?.status === "attending";
+  const wasAttending = existing?.status === "attending" && !wasInvalidated;
 
   if (becomingAttending && !wasAttending) {
     if (meetup.capacity !== null && meetup.attendingCount >= meetup.capacity) {
@@ -136,12 +143,14 @@ export async function respondAttendance(
   if (existing) {
     existing.status = input.status;
     existing.respondedAt = respondedAt;
+    existing.invalidatedAt = null;
   } else {
     store.meetupAttendances.push({
       meetupId: input.meetupId,
       profileId: input.profileId,
       status: input.status,
       respondedAt,
+      invalidatedAt: null,
     });
   }
   return { success: true, changed: true };
@@ -165,5 +174,79 @@ export async function cancelMeetup(id: Id): Promise<DataResult<Meetup>> {
     return err("conflict", `meetup ${id} 는 이미 취소됐다.`);
   }
   meetup.status = "cancelled";
+  return ok(meetup);
+}
+
+/** I-079/FR-065 AC2(26일차, CORE) — Meetup 일정 변경 이력 조회. 최신 변경이 먼저 오도록 정렬한다
+ *  (실 DB `listMeetupScheduleChanges`와 동일 계약, NFR-035). */
+export async function listMeetupScheduleChanges(meetupId: Id): Promise<MeetupScheduleChange[]> {
+  return store.meetupScheduleChanges
+    .filter((c) => c.meetupId === meetupId)
+    .sort((a, b) => b.changedAt.localeCompare(a.changedAt));
+}
+
+export interface ApplyMeetupRescheduleInput {
+  meetupId: Id;
+  pollId: Id;
+  date: string;
+  startTime?: string | null;
+  place?: string | null;
+  capacity?: number | null;
+}
+
+/**
+ * I-079/FR-065 AC2(26일차, CORE) — 일정 변경 투표 가결 반영. 실 DB에서는
+ * `finalize_closed_poll`(DB AFTER UPDATE 트리거, SECURITY DEFINER)이 이 역할을 한다 —
+ * Task 034(poll-pipeline-034.md)가 이미 남긴 전례대로 **Mock 쪽 poll 자동 종료
+ * 파이프라인(`lib/actions/poll-auto-close.ts`)은 Meetup 생성/갱신을 자동으로 트리거하지
+ * 않는다**(그 문서가 "createMeetupFromPoll을 아무도 호출하지 않는다"고 명시한 것과 같은
+ * 이유 — 실제 프로덕션 경로는 DB 트리거뿐이다). 이 함수는 `/sample` QA 시뮬레이터나 수동
+ * 호출용으로 남겨 둔다 — poll_id로 멱등(이미 같은 poll_id의 이력이 있으면 재적용하지
+ * 않는다, 실 DB의 `meetup_schedule_changes.poll_id` UNIQUE + 사전 존재 확인과 동일 원칙).
+ *
+ * 새 Meetup INSERT가 아니라 **기존 행을 UPDATE**하고, 이전 값을 이력으로 남기고, 참석
+ * 응답 전부를 무효화하고(팀장 결정), `attendingCount`를 0으로 되돌린다.
+ */
+export async function applyMeetupReschedule(
+  input: ApplyMeetupRescheduleInput,
+): Promise<DataResult<Meetup>> {
+  const meetup = store.meetups.find((m) => m.id === input.meetupId);
+  if (!meetup) return err("not_found", `meetup ${input.meetupId} 를 찾을 수 없다.`);
+  if (meetup.status !== "confirmed") {
+    return err("conflict", `meetup ${input.meetupId} 는 이미 취소됐다.`);
+  }
+  if (store.meetupScheduleChanges.some((c) => c.pollId === input.pollId)) {
+    // 멱등 — 이미 이 투표로 반영된 변경이 있다(재시도 스윕과 같은 상황을 흉내낸다).
+    return ok(meetup);
+  }
+
+  store.meetupScheduleChanges.push({
+    id: generateId("meetup-schedule-change"),
+    meetupId: meetup.id,
+    pollId: input.pollId,
+    previousDate: meetup.date,
+    previousStartTime: meetup.startTime,
+    previousPlace: meetup.place,
+    previousCapacity: meetup.capacity,
+    newDate: input.date,
+    newStartTime: input.startTime ?? null,
+    newPlace: input.place ?? null,
+    newCapacity: input.capacity ?? null,
+    changedAt: new Date().toISOString(),
+  });
+
+  meetup.date = input.date;
+  meetup.startTime = input.startTime ?? null;
+  meetup.place = input.place ?? null;
+  meetup.capacity = input.capacity ?? null;
+  meetup.attendingCount = 0;
+
+  const now = new Date().toISOString();
+  for (const attendance of store.meetupAttendances) {
+    if (attendance.meetupId === meetup.id && attendance.invalidatedAt === null) {
+      attendance.invalidatedAt = now;
+    }
+  }
+
   return ok(meetup);
 }

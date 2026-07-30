@@ -2,8 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { strings } from "@/lib/strings";
 import type { PostType } from "@/lib/types";
 
-/** 일반글/모임 제안 유형 배지(FR-031 AC3). 순수 표현 — props만 받는다(D-030 ①). */
+const LABEL: Record<PostType, string> = {
+  general: strings.board.postType.free,
+  meetup_proposal: strings.board.postType.proposal,
+  // I-079/FR-065 AC2(26일차) — 일반 제안과 구분되는 배지. `variant`도 아래에서 별도로 준다.
+  meetup_reschedule_proposal: strings.board.postType.reschedule,
+};
+
+/** 게시글 유형 배지(FR-031 AC3, I-079/FR-065 AC2). 순수 표현 — props만 받는다(D-030 ①). */
 export function PostTypeBadge({ type }: { type: PostType }) {
-  const label = type === "meetup_proposal" ? strings.board.postType.proposal : strings.board.postType.free;
-  return <Badge variant={type === "meetup_proposal" ? "default" : "secondary"}>{label}</Badge>;
+  const variant = type === "general" ? "secondary" : "default";
+  return <Badge variant={variant}>{LABEL[type]}</Badge>;
 }

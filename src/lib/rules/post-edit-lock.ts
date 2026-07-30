@@ -34,10 +34,12 @@ export type PostEditableField = "title" | "body" | "meetupDate";
 
 /**
  * 유형별로 **잠긴**(수정 불가) 필드 목록. `general` 게시글은 애초에 `meetupDate`가 없으므로
- * 잠글 대상이 없고, `meetup_proposal`은 `meetupDate`가 항상 잠긴다.
+ * 잠글 대상이 없고, `meetup_proposal`·`meetup_reschedule_proposal`은 `meetupDate`가 항상
+ * 잠긴다 — I-079/FR-065 AC2(26일차)가 추가한 후자도 등록과 동시에 poll이 `open`으로 생성되는
+ * 같은 파이프라인을 타므로(§4.1) 위 문단의 근거가 그대로 적용된다.
  */
 export function getLockedPostFields(type: PostType): readonly PostEditableField[] {
-  return type === "meetup_proposal" ? ["meetupDate"] : [];
+  return type === "meetup_proposal" || type === "meetup_reschedule_proposal" ? ["meetupDate"] : [];
 }
 
 /** 특정 필드가 이 유형의 게시글에서 수정 가능한지. */

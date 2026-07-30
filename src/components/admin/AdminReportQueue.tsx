@@ -20,12 +20,15 @@ import { Empty, EmptyDescription, EmptyTitle } from "@/components/ui/empty";
 import { resolveReportAction, type ResolveReportFormState } from "@/lib/actions/resolve-report";
 import { getAvailableResolutionActions } from "@/lib/rules/report-resolution";
 import { strings } from "@/lib/strings";
-import type { AdminReportQueueItem, ReportResolutionAction } from "@/lib/types";
+import type { AdminReportQueueItem, ReportResolutionAction, ReportStatusFilter } from "@/lib/types";
 
 const INITIAL_STATE: ResolveReportFormState = {};
 
 export interface AdminReportQueueProps {
   reports: AdminReportQueueItem[];
+  /** 현재 적용된 상태 필터(I-077, 26일차) — 결과가 0건일 때 어떤 빈 상태 문구를 보여줄지
+   *  고른다(`strings.admin.reports.empty`가 4종 전부 갖고 있다). */
+  statusFilter: ReportStatusFilter;
 }
 
 /**
@@ -37,12 +40,13 @@ export interface AdminReportQueueProps {
  * pending→resolved|dismissed는 편도 전이, report-block-042a.md §6) 확인 다이얼로그를 거친다 —
  * `RemoveMemberDialog`·`TransferOwnershipDialog`와 같은 이유.
  */
-export function AdminReportQueue({ reports }: AdminReportQueueProps) {
+export function AdminReportQueue({ reports, statusFilter }: AdminReportQueueProps) {
   if (reports.length === 0) {
+    const empty = strings.admin.reports.empty[statusFilter];
     return (
       <Empty>
-        <EmptyTitle>{strings.admin.reports.empty.title}</EmptyTitle>
-        <EmptyDescription>{strings.admin.reports.empty.description}</EmptyDescription>
+        <EmptyTitle>{empty.title}</EmptyTitle>
+        <EmptyDescription>{empty.description}</EmptyDescription>
       </Empty>
     );
   }

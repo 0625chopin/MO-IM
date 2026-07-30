@@ -34,10 +34,39 @@ export interface MeetupDetailViewModel {
    *  `isCancelled`거나 과거 Meetup이면 `MeetupDetailContainer`가 이미 false로 계산해 내려준다
    *  (AC3 — 취소·변경 버튼 자체를 숨긴다). */
   canCancelOrUpdate: boolean;
-  /** FR-065 AC2 "일정 변경" CTA가 이동할 글쓰기 경로(`getBoardWriteHref`). D-003이 날짜
-   *  변경에 재투표를 요구해 이 화면에서 날짜를 직접 고치지 않는다 — 새 모임 제안글 작성으로
-   *  안내한다(`docs/decisions/community-expansion-041.md` §3). */
-  boardWriteHref: string;
+  /**
+   * I-079/FR-065 AC2(26일차, BOARD) — "일정 변경 제안" 진입 버튼 노출 여부.
+   * `canCancelOrUpdate`(제안자 본인·임원·오너만)와 **의도적으로 다른 판정**이다 — 일정 변경
+   * 제안은 이제 즉시 상태를 바꾸지 않고 재투표를 거치므로(D-003), `poll:create_proposal`
+   * 권한 매트릭스(활성 크루원 전원 허용)를 그대로 재사용한다. 일반 FR-034 제안글을 아무
+   * 크루원이나 쓸 수 있는 것과 같은 이유다 — 개인이 아니라 크루 투표가 최종 결정권을 갖는다.
+   * `isCancelled`거나 과거 Meetup이면 `isMeetupAttendanceOpen`이 이미 false라 이 값도
+   * false다(AC3와 같은 재사용).
+   */
+  canProposeReschedule: boolean;
+  /** I-079/FR-065 AC2 — 조회자 본인의 참석 응답이 일정 변경으로 무효화됐는지(`invalidatedAt
+   *  !== null`). true면 `MeetupDetail`이 재확인을 요구하는 안내 배너를 보여준다 — 무효화가
+   *  조용히 일어나면 사용자는 자신이 여전히 참석자인 줄 안다. */
+  attendanceInvalidated: boolean;
+  /** I-079/FR-065 AC2 — "일정 변경 이력"(`listMeetupScheduleChanges`) 표시용, 최신순.
+   *  빈 배열이면 이력 없음(AC2 빈 상태). */
+  scheduleChanges: MeetupScheduleChangeView[];
+}
+
+/** `MeetupScheduleChange`(lib/types)의 표시용 가공 — 컨테이너가 날짜·시각 포맷팅을 이미
+ *  끝낸 값만 담는다(D-030 ①, 이 파일의 다른 뷰모델과 같은 원칙). */
+export interface MeetupScheduleChangeView {
+  id: Id;
+  changedAtLabel: string;
+  previousDateLabel: string;
+  previousStartTimeLabel: string | null;
+  previousPlace: string | null;
+  /** null이면 "정원 제한 없음"(과거 정원)이었다는 뜻 — 값이 있으면 그 숫자를 그대로 보여준다. */
+  previousCapacity: number | null;
+  newDateLabel: string;
+  newStartTimeLabel: string | null;
+  newPlace: string | null;
+  newCapacity: number | null;
 }
 
 /** 참석자 3구분 목록(FR-068) 각 행 — `groupMeetupParticipantIds`(lib/rules)의 profileId 결과에

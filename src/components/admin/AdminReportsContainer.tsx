@@ -1,6 +1,7 @@
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { listPendingReports } from "@/lib/data";
+import { listReports } from "@/lib/data";
+import type { ReportStatusFilter } from "@/lib/types";
 
 import { AdminReportQueue } from "./AdminReportQueue";
 
@@ -16,7 +17,7 @@ import { AdminReportQueue } from "./AdminReportQueue";
  * 병렬 브랜치에서도 이 컨테이너는 독립적으로 실행돼 `admin_list_reports`를 호출한다. 이
  * RPC는 **인증된 비관리자**에게는 빈 배열을 정상 반환하지만(`docs/decisions/
  * admin-console-042b.md` §2), **게스트(anon role)에게는 EXECUTE 권한 자체가 없어** Postgres가
- * `42501 permission denied`를 던진다 — `listPendingReports`가 이 오류를 그대로 `throw`하므로
+ * `42501 permission denied`를 던진다 — `listReports`가 이 오류를 그대로 `throw`하므로
  * (`src/lib/data/supabase/admin.ts`) 처리되지 않은 예외로 서버 콘솔에 남는다. 그래서
  * `NotificationCenterContainer`·`MonthCalendarContainer` 등 9개 컨테이너가 24일차에 옮긴 것과
  * 같은 `if (!isAuthenticated(session)) return null;` 조기 반환을 여기도 적용하고,
@@ -26,8 +27,12 @@ import { AdminReportQueue } from "./AdminReportQueue";
  *
  * 조회 실패(네트워크 등)는 여기서 잡지 않는다 — `BlockedUsersListContainer`와 같은 관례로
  * Next.js 라우트 오류 경계(`error.tsx`)에 위임한다(NFR-028).
+ *
+ * **26일차(I-077) — `status` prop 추가.** `/admin/page.tsx`가 `?status=` 쿼리를 파싱해
+ * 넘긴다. `"all"`은 이 함수가 `listReports`를 호출하는 경계에서만 SQL `null`로 바뀐다 —
+ * `ReportStatusFilter` 타입 docstring 참고. 위 인증·관리자 가드는 이번에도 그대로 둔다(I-115).
  */
-export async function AdminReportsContainer() {
+export async function AdminReportsContainer({ status }: { status: ReportStatusFilter }) {
   const session = await getAuthSession();
   if (!isAuthenticated(session) || !session.isSystemAdmin) {
     // (app)/admin 레이아웃 게이트가 이미 미인증·비관리자 분기를 선택했을 병렬 렌더링의
@@ -35,6 +40,6 @@ export async function AdminReportsContainer() {
     return null;
   }
 
-  const reports = await listPendingReports("pending");
-  return <AdminReportQueue reports={reports} />;
+  const reports = await listReports(status === "all" ? null : status);
+  return <AdminReportQueue reports={reports} statusFilter={status} />;
 }

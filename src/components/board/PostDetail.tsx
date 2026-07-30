@@ -24,7 +24,11 @@ import type { Id } from "@/lib/types";
  * 과 달리 상호작용 요소 중첩 문제가 없다.
  */
 export function PostDetail({ crewId, post }: { crewId: Id; post: PostDetailViewModel }) {
-  const showPollBadge = post.type === "meetup_proposal" && post.pollStatus !== null;
+  // I-079/FR-065 AC2(26일차) — 일정 변경 제안도 poll을 갖는 제안글 갈래다(§4.1 "일반 FR-034
+  // 제안과 정확히 같은 2단계"). 이 표시 조건들이 'meetup_proposal'만 보면 일정 변경 제안의
+  // 투표 상태 배지·제안 일정 정보가 조용히 사라진다 — `isProposalType`으로 함께 묶는다.
+  const isProposalType = post.type === "meetup_proposal" || post.type === "meetup_reschedule_proposal";
+  const showPollBadge = isProposalType && post.pollStatus !== null;
 
   return (
     <Card>
@@ -48,7 +52,7 @@ export function PostDetail({ crewId, post }: { crewId: Id; post: PostDetailViewM
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
-        {post.type === "meetup_proposal" && post.meetupDate && (
+        {isProposalType && post.meetupDate && (
           <div className="flex items-center gap-2 rounded-lg border border-dashed border-border p-2.5 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{strings.board.write.fields.scheduledDate}</span>
             <time dateTime={post.meetupDate} className="tnum">

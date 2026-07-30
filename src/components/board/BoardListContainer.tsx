@@ -55,9 +55,12 @@ export async function BoardListContainer({ crewId, page }: { crewId: Id; page: n
   const postsPage = await listPostsByPage(board.id, { page });
   const posts: BoardPostSummary[] = await Promise.all(
     postsPage.items.map(async (post) => {
+      // I-079/FR-065 AC2 — 일정 변경 제안도 poll을 갖는 제안글 갈래다. 넓히지 않으면 목록의
+      // 투표 상태 배지(vote.status 재사용, board.tsx 주석 참고)가 조용히 사라진다.
+      const isProposalType = post.type === "meetup_proposal" || post.type === "meetup_reschedule_proposal";
       const [author, poll] = await Promise.all([
         getProfileById(post.authorId),
-        post.type === "meetup_proposal" ? getPollByPostId(post.id) : Promise.resolve(null),
+        isProposalType ? getPollByPostId(post.id) : Promise.resolve(null),
       ]);
       return {
         id: post.id,

@@ -45,7 +45,8 @@ export interface PostDetailViewModel {
   authorAvatarUrl: string | null;
   createdAt: ISODateTimeString;
   editedAt: ISODateTimeString | null;
-  /** `type === "meetup_proposal"`에서만 값이 있다. */
+  /** `type === "meetup_proposal"` 또는 `"meetup_reschedule_proposal"`에서만 값이 있다
+   *  (I-079/FR-065 AC2, 26일차). */
   meetupDate: ISODateString | null;
   pollStatus: PollStatus | null;
   /** `post:update_own` 판정 결과 — 제목·본문 수정 가능 여부. */

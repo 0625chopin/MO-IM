@@ -32,6 +32,36 @@ export interface MeetupAttendance {
   profileId: Id;
   status: AttendanceStatus;
   respondedAt: ISODateTimeString;
+  /**
+   * I-079/FR-065 AC2, 팀장 결정 — 소속 Meetup의 일정이 변경되면 이 값이 채워져 이 응답이
+   * "무효화"됐음을 뜻한다("7/1에 간다"가 "7/8에 간다"를 의미하지 않으므로 재확인을 요구한다).
+   * `status`는 이전 값 그대로 남지만(이력 목적) 정원(FR-066) 계산에는 반영되지 않는다 —
+   * 무효화 시점에 `Meetup.attendingCount`가 이미 0으로 재계산됐다. 재확인
+   * (`respond_meetup_attendance`)이 성공하면 이 값을 다시 null로 되돌린다. null이면 유효한
+   * 응답이다(일반적인 상태).
+   */
+  invalidatedAt: ISODateTimeString | null;
+}
+
+/**
+ * I-079/FR-065 AC2(26일차, CORE) — 일정 변경 투표 가결로 기존 Meetup 행이 UPDATE될 때 남는
+ * 변경 이력 1건. Meetup 상세 화면의 "일정 변경 이력" 표시(AC2 "변경 이력이 남는다")가 소비
+ * 대상이다. DB에서 `poll_id`가 UNIQUE라 같은 투표가 두 번 반영되지 않는다(멱등).
+ */
+export interface MeetupScheduleChange {
+  id: Id;
+  meetupId: Id;
+  /** 이 변경을 가결시킨 "일정 변경 투표"의 pollId — Meetup을 최초로 만든 poll과는 다른 poll이다. */
+  pollId: Id;
+  previousDate: ISODateString;
+  previousStartTime: string | null;
+  previousPlace: string | null;
+  previousCapacity: number | null;
+  newDate: ISODateString;
+  newStartTime: string | null;
+  newPlace: string | null;
+  newCapacity: number | null;
+  changedAt: ISODateTimeString;
 }
 
 /**

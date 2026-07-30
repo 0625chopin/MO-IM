@@ -71,6 +71,7 @@ export function generateMeetups(
         profileId,
         status,
         respondedAt: poll.decidedAt ?? poll.closesAt,
+        invalidatedAt: null,
       });
     }
 

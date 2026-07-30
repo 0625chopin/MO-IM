@@ -10,6 +10,7 @@ import type {
   JoinRequest,
   Meetup,
   MeetupAttendance,
+  MeetupScheduleChange,
   Notification,
   Poll,
   PollEligibleVoter,
@@ -183,6 +184,7 @@ function createSeed() {
       startTime: null,
       place: null,
       capacity: null,
+      targetMeetupId: null,
       createdAt: "2026-07-20T09:00:00.000Z",
       editedAt: null,
       deletedAt: null,
@@ -198,6 +200,7 @@ function createSeed() {
       startTime: "07:00",
       place: "한강공원 반포지구",
       capacity: null,
+      targetMeetupId: null,
       createdAt: "2026-07-22T10:00:00.000Z",
       editedAt: null,
       deletedAt: null,
@@ -219,6 +222,7 @@ function createSeed() {
       startTime: null,
       place: null,
       capacity: null,
+      targetMeetupId: null,
       createdAt: "2026-07-10T09:00:00.000Z",
       editedAt: null,
       deletedAt: null,
@@ -243,6 +247,7 @@ function createSeed() {
       startTime: null,
       place: null,
       capacity: null,
+      targetMeetupId: null,
       createdAt: "2026-07-21T09:00:00.000Z",
       editedAt: null,
       deletedAt: null,
@@ -329,8 +334,14 @@ function createSeed() {
       profileId: "profile-1",
       status: "attending",
       respondedAt: "2026-07-13T08:00:00.000Z",
+      invalidatedAt: null,
     },
   ];
+
+  // I-079/FR-065 AC2(26일차, CORE) — 손으로 쓴 최소 픽스처에는 일정 변경 이력이 없다(실 DB도
+  // 이 시나리오가 실제로 일어나야 생기는 행이라 0건으로 시작하는 게 맞다, `comments`와 같은
+  // 취급). `/sample` 빈 상태(AC2 "이력 없음")를 그대로 재현한다.
+  const meetupScheduleChanges: MeetupScheduleChange[] = [];
 
   const joinRequests: JoinRequest[] = [
     {
@@ -475,6 +486,7 @@ function createSeed() {
     pollVotes: [...pollVotes, ...bulk.pollVotes],
     meetups: [...meetups, ...bulk.meetups],
     meetupAttendances: [...meetupAttendances, ...bulk.meetupAttendances],
+    meetupScheduleChanges: [...meetupScheduleChanges],
     joinRequests: [...joinRequests, ...bulk.joinRequests],
     invitations: [...invitations, ...bulk.invitations],
     notifications: [...notifications, ...bulk.notifications],
@@ -518,6 +530,7 @@ export function resetFixtures(): void {
   replaceArrayContents(store.pollVotes, seed.pollVotes);
   replaceArrayContents(store.meetups, seed.meetups);
   replaceArrayContents(store.meetupAttendances, seed.meetupAttendances);
+  replaceArrayContents(store.meetupScheduleChanges, seed.meetupScheduleChanges);
   replaceArrayContents(store.joinRequests, seed.joinRequests);
   replaceArrayContents(store.invitations, seed.invitations);
   replaceArrayContents(store.notifications, seed.notifications);

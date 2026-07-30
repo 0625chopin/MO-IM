@@ -146,17 +146,30 @@ export interface CreatePostInput {
   type: PostType;
   title: string;
   body: string;
-  /** 아래 4개 필드는 전부 type='meetup_proposal'일 때만 의미 있다(FR-034, D-013). */
+  /**
+   * 아래 4개 필드는 전부 type='meetup_proposal'·'meetup_reschedule_proposal'일 때만 의미
+   * 있다(FR-034, D-013). 일정 변경 제안에서는 "새로 제안하는" 값이다.
+   */
   meetupDate?: string | null;
   startTime?: string | null;
   place?: string | null;
   capacity?: number | null;
+  /**
+   * I-079/FR-065 AC2(26일차, CORE) — type='meetup_reschedule_proposal'일 때만 채운다.
+   * 이 제안이 가결되면 `finalize_closed_poll`이 새 Meetup을 만드는 대신 이 id가 가리키는
+   * 기존 Meetup을 UPDATE한다. `posts_target_meetup_id_check` CHECK + `posts_guard_
+   * reschedule_target_scope` 트리거(같은 크루·`confirmed` 상태만 허용)가 DB에서 강제한다 —
+   * 여기서 크루·상태를 다시 확인하지 않는다(호출부가 실패하면 그대로 예외가 전파된다).
+   */
+  targetMeetupId?: Id | null;
 }
 
-/** `general` 게시글은 모임 제안 필드 4종을 전부 null로 고정한다(DB CHECK 제약과도 일치). */
+/** `general` 게시글은 모임 제안 필드 4종·`targetMeetupId`를 전부 null로 고정한다(DB CHECK
+ *  제약과도 일치). `meetup_reschedule_proposal`만 `targetMeetupId`를 싣는다. */
 export async function createPost(input: CreatePostInput): Promise<Post> {
   const supabase = await createSupabaseServerClient();
-  const isProposal = input.type === "meetup_proposal";
+  const isProposal = input.type === "meetup_proposal" || input.type === "meetup_reschedule_proposal";
+  const isReschedule = input.type === "meetup_reschedule_proposal";
   const { data, error } = await supabase
     .from("posts")
     .insert({
@@ -169,6 +182,7 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
       start_time: isProposal ? (input.startTime ?? null) : null,
       place: isProposal ? (input.place ?? null) : null,
       capacity: isProposal ? (input.capacity ?? null) : null,
+      target_meetup_id: isReschedule ? (input.targetMeetupId ?? null) : null,
     })
     .select("*")
     .single();

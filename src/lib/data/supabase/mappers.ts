@@ -15,6 +15,7 @@ import type {
   JoinRequestStatus,
   Meetup,
   MeetupAttendance,
+  MeetupScheduleChange,
   Notification,
   NotificationChannel,
   NotificationPreference,
@@ -59,6 +60,7 @@ export function toPost(row: Tables<"posts">): Post {
     startTime: row.start_time,
     place: row.place,
     capacity: row.capacity,
+    targetMeetupId: row.target_meetup_id,
     createdAt: row.created_at,
     editedAt: row.edited_at,
     deletedAt: row.deleted_at,
@@ -167,6 +169,25 @@ export function toMeetupAttendance(row: Tables<"meetup_attendances">): MeetupAtt
     profileId: row.profile_id,
     status: row.status as MeetupAttendance["status"],
     respondedAt: row.responded_at,
+    invalidatedAt: row.invalidated_at,
+  };
+}
+
+/** I-079/FR-065 AC2(26일차, CORE) — Meetup 일정 변경 이력 1건. */
+export function toMeetupScheduleChange(row: Tables<"meetup_schedule_changes">): MeetupScheduleChange {
+  return {
+    id: row.id,
+    meetupId: row.meetup_id,
+    pollId: row.poll_id,
+    previousDate: row.previous_date,
+    previousStartTime: row.previous_start_time,
+    previousPlace: row.previous_place,
+    previousCapacity: row.previous_capacity,
+    newDate: row.new_date,
+    newStartTime: row.new_start_time,
+    newPlace: row.new_place,
+    newCapacity: row.new_capacity,
+    changedAt: row.changed_at,
   };
 }
 

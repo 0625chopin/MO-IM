@@ -1,8 +1,10 @@
 import { AdminReportQueue } from "@/components/admin/AdminReportQueue";
 import { AdminReportQueueSkeleton } from "@/components/admin/AdminReportQueueSkeleton";
+import { AdminReportStatusTabs } from "@/components/admin/AdminReportStatusTabs";
 import { PreviewFrame } from "@/components/sample/PreviewFrame";
 import { defineSection } from "@/components/sample/showcase-types";
 import { ErrorState } from "@/components/ui/error-state";
+import { REPORT_STATUS_FILTERS } from "@/lib/rules/report-resolution";
 import { strings } from "@/lib/strings";
 import type { AdminReportQueueItem } from "@/lib/types";
 
@@ -85,6 +87,47 @@ const SAMPLE_REPORTS: AdminReportQueueItem[] = [
   },
 ];
 
+/** 처리 이력(I-077, 26일차) — "처리됨"·"기각됨" 탭에서 읽기 전용 카드로 그려지는 예시.
+ *  `getAvailableResolutionActions`가 `status !== "pending"`이면 빈 배열을 반환해 두 카드 다
+ *  처리 버튼 없이 렌더된다. */
+const SAMPLE_REPORT_HISTORY: AdminReportQueueItem[] = [
+  {
+    reportId: "sample-report-5",
+    reporterId: "sample-profile-2",
+    reporterHandle: "yuna_book",
+    reporterDisplayName: "김유나",
+    targetType: "post",
+    targetId: "sample-post-2",
+    reason: "다른 크루 홍보 도배예요",
+    status: "resolved",
+    createdAt: "2026-07-20T04:00:00.000Z",
+    targetExists: false,
+    targetRemoved: true,
+    targetPreview: null,
+    targetAuthorId: "sample-profile-9",
+    targetAuthorHandle: "loud_user",
+  },
+  {
+    reportId: "sample-report-6",
+    reporterId: "sample-profile-3",
+    reporterHandle: "minjun",
+    reporterDisplayName: "박민준",
+    targetType: "comment",
+    targetId: "sample-comment-2",
+    reason: "그냥 마음에 안 들어서 신고했어요",
+    status: "dismissed",
+    createdAt: "2026-07-18T13:20:00.000Z",
+    targetExists: true,
+    targetRemoved: false,
+    targetPreview: "저도 같이 가고 싶어요!",
+    targetAuthorId: "sample-profile-4",
+    targetAuthorHandle: "hana_run",
+  },
+];
+
+/** "전체" 탭 데모용 — 대기·처리됨·기각됨이 섞인 목록. */
+const SAMPLE_REPORTS_ALL: AdminReportQueueItem[] = [...SAMPLE_REPORTS, ...SAMPLE_REPORT_HISTORY];
+
 /**
  * FR-082 관리자 콘솔(Task 042B, D-008·D-014, NFR-015). 실제 사용처는 `/admin`
  * (`AdminReportsContainer`) — 관리자(`profiles.is_system_admin`)만 접근할 수 있다(AC2, 일반
@@ -97,22 +140,30 @@ const SAMPLE_REPORTS: AdminReportQueueItem[] = [
  * 샘플과 같은 이유로, 게스트/비관리자 세션에서 제출하면 실제 `notAllowed`/`forbidden` 오류가
  * 표시된다(권한 판정이 실제로 작동한다는 증거). "오류" 패널은 그 외 RPC `reason_code` 6종을
  * 정적으로 나란히 보여준다.
+ *
+ * **26일차(I-077) — 상태 필터 탭(`AdminReportStatusTabs`) 추가.** `admin_list_reports`
+ * RPC는 처음부터 `pending`·`resolved`·`dismissed`·전체(`null`)를 다 받았지만 이 화면은
+ * `pending`만 노출했다 — 관리자가 처리 이력을 확인할 방법이 없었다. 카드 자체
+ * (`AdminReportQueue`)는 거의 손대지 않았다 — `getAvailableResolutionActions`가 이미
+ * `status !== "pending"`이면 빈 액션 배열을 반환해 처리된 신고를 읽기 전용으로 그린다.
+ * 새로 필요했던 건 (1) 필터 탭 UI, (2) 필터별 빈 상태 문구(`strings.admin.reports.empty`가
+ * 4종 — "대기 중인 신고가 없어요"만으로는 "처리됨" 탭이 비었을 때 의미가 안 맞는다).
  */
 export const adminSection = defineSection({
   id: "admin",
   label: "관리자 콘솔",
   title: "관리자 콘솔",
   description:
-    "FR-082(D-008·D-014, NFR-015). 신고 대기열을 확인하고 기각·콘텐츠 삭제·계정 제재 중 하나로 처리합니다(admin_resolve_report RPC, D-050). /admin은 system_admin만 접근할 수 있고 일반 회원은 404를 봅니다(AC2, D-049).",
+    "FR-082(D-008·D-014, NFR-015). 신고 대기열·처리 이력을 상태 탭(전체·대기 중·처리됨·기각됨)으로 확인하고, 대기 중인 신고는 기각·콘텐츠 삭제·계정 제재 중 하나로 처리합니다(admin_resolve_report RPC, D-050). /admin은 system_admin만 접근할 수 있고 일반 회원은 404를 봅니다(AC2, D-049).",
   items: [
     {
       name: "AdminReportQueue",
-      note: "실제 컴포넌트입니다. 처리 버튼은 대상 유형에 따라 달라집니다 — profile 신고는 콘텐츠 삭제를 제공하지 않습니다(getAvailableResolutionActions). 확인 다이얼로그를 열고 제출하면 실제 Server Action이 호출됩니다.",
+      note: "실제 컴포넌트입니다. 처리 버튼은 대상 유형에 따라 달라집니다 — profile 신고는 콘텐츠 삭제를 제공하지 않습니다(getAvailableResolutionActions). 확인 다이얼로그를 열고 제출하면 실제 Server Action이 호출됩니다. status !== \"pending\"인 카드는 액션 버튼이 없습니다(읽기 전용) — 아래 AdminReportStatusTabs 항목의 '처리됨'·'기각됨' 카드가 그 예시입니다.",
       panels: {
         default: (
           <PreviewFrame height={720}>
             <div className="p-4">
-              <AdminReportQueue reports={SAMPLE_REPORTS} />
+              <AdminReportQueue reports={SAMPLE_REPORTS} statusFilter="pending" />
             </div>
           </PreviewFrame>
         ),
@@ -124,9 +175,16 @@ export const adminSection = defineSection({
           </PreviewFrame>
         ),
         empty: (
-          <PreviewFrame height={180}>
-            <div className="p-4">
-              <AdminReportQueue reports={[]} />
+          <PreviewFrame height={520}>
+            <div className="flex flex-col gap-3 p-4">
+              {REPORT_STATUS_FILTERS.map((filter) => (
+                <LabeledDemo
+                  key={filter}
+                  label={`${strings.admin.reports.statusFilter[filter]} 탭 — 0건(I-077, 필터별 빈 상태 문구가 다릅니다)`}
+                >
+                  <AdminReportQueue reports={[]} statusFilter={filter} />
+                </LabeledDemo>
+              ))}
             </div>
           </PreviewFrame>
         ),
@@ -145,6 +203,21 @@ export const adminSection = defineSection({
               <LabeledDemo label="이미 제재된 계정(account_not_suspendable)">
                 <ErrorState title={strings.admin.reports.errors.account_not_suspendable} />
               </LabeledDemo>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "AdminReportStatusTabs",
+      note: "실제 컴포넌트입니다(I-077, 26일차). /crews의 CrewSearchBar와 같은 이유로 탭을 클릭하면 실제 /admin?status=로 이동합니다(실제 네비게이션을 막지 않았습니다) — 여기서는 '전체' 탭을 기본으로 두어 대기(액션 버튼 있음)·처리됨·기각됨(둘 다 읽기 전용) 카드가 한 목록에 섞여 보이는 모습을 보여줍니다. 로딩·빈·오류 상태는 위 AdminReportQueue 항목에서 이미 보여줘 여기서 다시 만들지 않았습니다 — 이 컴포넌트는 그 위에 얹는 얇은 탭 내비게이션일 뿐입니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={780}>
+            <div className="p-4">
+              <AdminReportStatusTabs status="all">
+                <AdminReportQueue reports={SAMPLE_REPORTS_ALL} statusFilter="all" />
+              </AdminReportStatusTabs>
             </div>
           </PreviewFrame>
         ),
