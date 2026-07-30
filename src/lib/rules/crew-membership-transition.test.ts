@@ -4,9 +4,13 @@ import { canTransitionCrewMembership, transitionCrewMembershipStatus } from "./c
 
 /**
  * I-143 해소(30일차) 최소 스펙 테스트. `src/lib/data/mock/crew.ts`의
- * `rejectCrewMembership`(임원 반려)·`withdrawPendingCrewMembership`(본인 자진 철회)이
- * 같은 이벤트(`reject_request`)를 이 모듈 경유로 호출한다 — 두 함수가 우연히 같은 결과값을
- * 내던 것이 아니라 애초에 같은 전이 하나를 공유한다는 사실을 여기서 고정한다.
+ * `rejectCrewMembership`(임원 반려)이 `reject_request` 이벤트를 이 모듈 경유로 호출해
+ * `requested --> rejected`(D-086, 임원 반려·본인 자진 철회 공용 종착 상태)를 만든다는
+ * 사실을 여기서 고정한다.
+ *
+ * **31일차 갱신**: 대칭을 이루던 Mock `withdrawPendingCrewMembership`(본인 자진 철회)은
+ * Task 032(18일차)부터 호출부가 0건이던 죽은 코드로 확인돼 삭제됐다(I-144). 이 테스트가
+ * 고정하는 `reject_request` 전이 자체는 `rejectCrewMembership`을 통해 여전히 살아 있다.
  */
 describe("crew-membership-transition — reject_request (I-143)", () => {
   it("requested --reject_request--> rejected (FR-023 반려 · FR-022 E4 자진 철회 공용)", () => {

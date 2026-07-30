@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-145** (등재할 때마다 이 줄을 갱신한다. **28일차부터 팀원은 이 파일에
+- **다음 이슈 번호: I-151** (등재할 때마다 이 줄을 갱신한다. **28일차부터 팀원은 이 파일에
   새 `### I-NNN` 헤딩을 직접 붙이지 않는다** — `docs/ISSUES.draft.<NAME>.md`에 번호 없이 쓰고
   회차 마감에 팀장이 번호를 부여해 병합한다. 기존 블록 안의 상태·진행 기록 갱신은 새 번호를
   만들지 않으므로 팀원이 직접 해도 된다. 단일 소스:
@@ -90,7 +90,21 @@
 
 ### I-021 · shadcn 프리미티브 선택(Base UI)이 재검토 대상일 수 있다
 
-- **상태**: 열림
+- **상태**: **해결됨(31일차, DESIGN)** — 재검토 완료, Base UI 유지로 확정(전환하지 않는다).
+  "문제가 없으면 무효로 닫는다"는 원래 종료 조건은 **사실이 아니었다**: `git log`·`docs/decisions/`
+  대조 결과 실제 마찰 사례가 최소 2종 있었다 — ① shadcn 레지스트리의 `collapsible` 항목 자체가
+  `radix-ui` 의존이라(이 프로젝트의 다른 모든 `ui/*.tsx`는 `@base-ui/react`) CLI로 그대로 추가하지
+  못하고 `@base-ui/react/collapsible`의 Root/Trigger/Panel을 직접 가져와 손으로 다시 짰다
+  (`docs/decisions/report-block-042a.md` §9.5, 20일차) — 이건 I-021이 예견한 위험의 **정반대
+  방향**("Base UI 전용 컴포넌트가 나올 것"이 아니라 "Radix 전용 레지스트리 항목이 나왔다")이지만
+  같은 종류의 마찰이다. ② `<Button render={<Link/>}>`가 Base UI의 `nativeButton` 기본값(`true`)과
+  충돌해 `BoardList`·`PostDeletedNotice`에서 링크에 button 시맨틱이 덧씌워지는 런타임 경고가
+  **두 곳에서** 났다(I-037, 6~7일차). 그럼에도 **Radix로 전환하자는 판단에는 이르지 않는다** —
+  두 사례 다 Base UI 안에서(라이브러리를 바꾸지 않고) 해소됐고, 이 시점(25종 `ui/*.tsx`, 다수
+  화면이 이미 그 위에 조립됨)에 전환하면 I-021 자신이 예견한 "컴포넌트 수가 늘어난 뒤 전환하면
+  비용이 커진다"가 그대로 실현된다. **판정: 사례는 실재했으나 전환 비용이 이득을 넘어 유지로
+  결정한다.**
+- **(원래 상태)**: 열림
 - **영역**: 기술
 - **제보**: CREW (2026-07-24)
 - **내용**: Task 004에서 shadcn CLI 4.14.1의 현재 기본값인 Base UI(`@base-ui/react`)를 그대로 채택했다(Radix도 `-b radix`로 여전히 완전히 지원됨). 컴포넌트를 2종(Button, Card)만 설치해본 시점이라 문서 부족·특정 컴포넌트 미지원 같은 문제가 실제로 나올지는 아직 확인되지 않았다.
@@ -99,12 +113,28 @@
 
 ### I-022 · shadcn 컴포넌트 추가 설치 시 React Compiler 수동 메모 여부를 매번 확인해야 한다
 
-- **상태**: 열림
+- **상태**: **열림 유지(31일차, DESIGN 재확인)** — "관찰뿐, 사례 0건"이던 원래 근거는 이제
+  사실이 아니다. 실제로 `ui/drawer.tsx`·`ui/field.tsx`는 shadcn 원본에 수동 `useMemo`가 있었고
+  설치자가 직접 소스를 읽고 제거한 뒤 그 근거를 파일 주석에 남겼다(D-029 위반 회피, 실사례
+  2건). Task 043A(22일차) 전수 감사가 그 시점 저장소 전체에서 `useMemo`/`useCallback`/
+  `React.memo` **0건**임을 확인해, 지금까지는 "매번 확인" 수작업이 100% 걸러냈다는 것도 실측으로
+  확인된다. **다만 자동화는 여전히 없다** — 이번에 실제로 검증했다: 이 프로젝트가 이미 쓰는
+  `eslint-plugin-react-hooks@7.1.1`(Next.js 16 `eslint-config-next`가 번들, React Compiler
+  대응 규칙 `react-hooks/use-memo`·`react-hooks/preserve-manual-memoization` 등이 error
+  레벨로 활성)이 shadcn `drawer.tsx` 원본과 동일한 패턴(컨텍스트 값을 `useMemo`로 감싸는 것)을
+  실제로 재현해 린트를 돌려봐도 **아무 것도 잡아내지 못한다**(2026-07-30 실측, 임시 파일로
+  재현 후 삭제) — 이 규칙들은 "훅 사용이 올바른가"를 보지 "컴파일러가 있으니 이 수동 메모가
+  불필요하다"를 보지 않는다. 후속이 제안한 정적 검사 후보(`eslint-plugin-react-compiler`류
+  경고)는 **이미 설치된 패키지로는 충족되지 않는다**는 뜻이라 별도 도구 도입 없이는 여전히
+  사람 확인이 유일한 방어선이다. v0.1 로드맵의 신규 shadcn 컴포넌트 설치는 이제 없어(Task
+  001~045 전량 완료) 위험은 당장은 휴면 상태이고, v1.0+에서 컴포넌트를 더 추가할 때 다시
+  살아난다.
+- **(원래 상태)**: 열림
 - **영역**: 빌드
 - **제보**: CREW (2026-07-24)
 - **내용**: Task 004에서 설치한 Button·Card는 수동 `useMemo`/`useCallback`이 없음을 직접 확인했지만, 폼·리스트 계열 shadcn 컴포넌트는 내부에 수동 메모이제이션이 있을 수 있다. CLAUDE.md는 React Compiler 활성화 환경에서 측정 근거 없는 수동 메모 예외를 허용하지 않는다(D-029).
 - **영향**: 확인 없이 설치하면 컴파일러 최적화와 충돌하거나 D-029 예외 절차를 우회하는 코드가 들어올 수 있다.
-- **후속**: `shadcn add`로 컴포넌트를 추가하는 사람이 매번 소스를 확인한다. 반복되는 수작업이라 사람이 자주 놓치면 정적 검사(예: `eslint-plugin-react-compiler` 경고) 도입을 검토한다.
+- **후속**: `shadcn add`로 컴포넌트를 추가하는 사람이 매번 소스를 확인한다. 반복되는 수작업이라 사람이 자주 놓치면 정적 검사(예: `eslint-plugin-react-compiler` 경고) 도입을 검토한다. **31일차 갱신**: 그 정적 검사 후보가 이미 설치돼 있었지만 실측 결과 이 용도로는 작동하지 않는다 — 다음에 재검토할 사람은 위 실측(임시 파일 재현)부터 다시 하지 않아도 된다.
 
 ### I-023 · PRD §8이 shadcn을 아직 "도입 예정"으로 표기하고 있다
 
@@ -129,6 +159,18 @@
 - **내용**: `src/lib/types/notification.types.ts:32`의 `payload: Record<string, unknown>`는 `NotificationType`(10종) 각각이 실제로는 서로 다른 라우팅·표시 정보를 담는데도 타입이 이를 구분하지 않는다. 예: `poll_closed`는 postId·pollId가, `staff_appointed`는 crewId·targetProfileId가 필요하다. 소비 컴포넌트(알림 센터, Task 023)마다 `payload.xxx as string` 같은 unsafe cast가 필요해진다.
 - **영향**: 타입이 안전망 역할을 못 해 알림 유형-payload 불일치가 런타임까지 발견되지 않는다. 소비처인 Task 023(알림, 14~16주차)이 시작되기 전까지는 급하지 않다.
 - **후속**: `NotificationType`을 판별자로 쓰는 discriminated union(`NotificationPayloadMap` 형태 — 유형별 payload 인터페이스를 정의하고 `Notification`을 제네릭 또는 유니온으로 재구성)을 제안. Task 023 착수 시 검토.
+- **31일차(BOARD) 재확인 — (B) 근거가 부분적으로만 성립**: 실제 소비 코드(`notification-routing.ts`)는
+  `payload.xxx as string` 같은 unsafe cast가 아니라 `readResourceId`(런타임 `typeof` 좁히기)로
+  안전하게 읽고 있어 "unsafe cast 필요"라는 원 예측은 빗나갔다(그 자체는 다행). 그런데 "실사용
+  결함 보고 없음"이 성립하는 진짜 이유를 코드로 추적하니, **`NotificationType` 13종 중 실제
+  쓰기 경로가 있는 것은 7종뿐**이다(`meetup_cancelled`·`post_commented`·`crew_disbanded`·
+  `member_removed`·`ownership_transferred`·`poll_withdrawn`은 TS Server Action, `poll_closed`는
+  SQL `finalize_closed_poll` — 전수 grep 확인). 나머지 6종(`join_request_received`·
+  `join_request_approved`·`join_request_rejected`·`invitation_received`·`staff_appointed`·
+  `meetup_created`)은 타입·라우팅 매핑만 있고 실제로 생성하는 코드가 아직 없다 — "결함 보고가
+  없다"는 이 6종이 애초에 한 번도 실행되지 않았기 때문이라, discriminated union이 없었을 때의
+  실제 위험은 검증되지 않은 채 남아 있다. **열림 유지** — 6종에 실 쓰기 경로가 생기는 시점에
+  `notification-routing.ts`의 키 기대값과 대조 재확인이 필요하다(이번에 처음 정확히 특정함).
 
 ### I-025 · 인증 필요 화면 전면 게이트 방식이 미정이다
 
@@ -300,7 +342,21 @@
 
 ### I-028 · 다크 토큰 두 블록의 동기화를 자동으로 검증하지 못한다
 
-- **상태**: 열림
+- **상태**: **해결됨(31일차, DESIGN)** — `src/lib/rules/dark-token-parity.test.ts` 신설. `globals.css`를
+  직접 읽어 `.dark` 블록과 `@media (prefers-color-scheme: dark)` 폴백 블록(중괄호 중첩까지
+  추적하는 파서)을 각각 파싱해 ① 두 블록이 같은 커스텀 프로퍼티 집합을 갖는지 ② 값이 전부
+  일치하는지 ③ `--crew-*`가 어느 쪽에도 재정의되지 않는지(D-026) ④ 파싱이 빈 결과로 거짓
+  통과하지 않는지 4가지를 단언한다. 테스트 러너 범위(D-052 → D-072, `src/lib/rules/**`
+  3개 순수 함수 모듈)와 충돌하는지 먼저 확인했다 — `vitest.config.ts` 자신의 docstring이
+  "include 글롭은 `src/lib/rules/**`를 넓게 잡아 뒀고 다른 파일에 테스트가 없다고 결함은
+  아니다"라고 명시해, 새 include 설정 없이 이 디렉터리에 테스트를 추가하는 것이 D-052
+  결정과 충돌하지 않음을 확인 후 진행했다. 파싱 로직은 재사용 대상이 아니라 테스트 파일
+  전용이라 별도 소스 모듈로 승격하지 않았다(React·Next·데이터 레이어 미import, zone 1 제약
+  자체와는 충돌 없음). `npm test`(41/41 통과, 기존 5개 파일 + 신규 1개)·`npx tsc --noEmit`·
+  `npm run lint` 전부 0 errors로 확인. I-020(ThemeProvider)이 해결돼 폴백 블록 자체가
+  없어지면 이 테스트의 미디어쿼리 파싱 부분도 함께 삭제 대상이 된다는 점만 다음 담당자에게
+  남긴다.
+- **(원래 상태)**: 열림
 - **영역**: 빌드 / 접근성
 - **제보**: DESIGN (2026-07-24, 디자인 개편 D-038)
 - **내용**: `src/app/globals.css`는 다크 값을 **두 곳**에 쓴다 — `@media (prefers-color-scheme: dark)` 폴백과 `.dark` 클래스(I-020으로 명시 토글이 없어 폴백이 필요하다). 개편에서 두 블록이 31개 선언 전부 일치함을, `--crew-*`가 폴백에 없음(D-026)을 파싱 스크립트로 확인했지만 **그 스크립트는 저장소에 남지 않았고 CI도 없다**(R-002 — 테스트 러너 미도입). 다음 사람이 한쪽만 고쳐도 아무것도 실패하지 않는다.
@@ -309,7 +365,34 @@
 
 ### I-029 · `--destructive`와 `--crew-12`(red)가 색상이 가깝다
 
-- **상태**: 열림
+- **상태**: **열림 유지(31일차, DESIGN 실측)** — "가까워 보인다"를 수치로 확정했다.
+  `docs/design/calendar-palette.md`와 같은 방법론(sRGB↔OKLCH 변환, CIE Lab, CIEDE2000, Machado
+  et al. 2009 2형 색각 시뮬레이션)을 재사용해 계산한 결과:
+  - **라이트 모드**: `--destructive`(`oklch(0.52 0.21 27)` → `#c50516`) vs `--crew-12`(`#d20000`)
+    — **ΔE2000 = 4.47**(정상 시각), **CVD(2형) ΔE2000 = 3.05**. 팔레트 문서가 "구분이
+    어려워지는 구간"으로 잡은 기준(ΔE<10)에 한참 못 미치고, 팔레트 자체의 **최악 쌍**(`--crew-8`
+    `#009200` ↔ `--crew-12` `#d20000`, CVD ΔE=2.40, `calendar-palette.md` §3)과 거의 같은 수준이다.
+    두 색끼리의 명도 대비는 **1.10:1**로 사실상 밝기가 같다
+    — 라이트 모드에서는 실질적으로 "같은 빨강"이다.
+  - **다크 모드**: `--destructive`(`oklch(0.72 0.18 22)` → `#ff6e70`, 연한 살구빛) vs `--crew-12`
+    — **ΔE2000 = 23.14**(CVD 18.78), 명도 대비 **2.06:1**. 명확히 구분된다 — 다크 모드는 위험이
+    없다.
+  - **결론: 위험은 라이트 모드에 집중돼 있고 실재한다.** 그럼에도 즉시 닫지 않는 이유는
+    완화책이 이미 코드로 존재하기 때문이다 — `CrewLegend.tsx`·`MeetupBar.tsx`·`CrewColorDot.tsx`
+    전부 크루색을 크루명 텍스트 없이 단독으로 쓰지 않는다(NFR-019 요구사항이 이미 강제,
+    `design-language.md`가 말하는 "배치 규칙"이 실제로 지켜지고 있음을 파일 목록으로 확인).
+    즉 사용자가 색만으로 "이건 삭제/오류다"라고 오독할 경로 자체가 현재 화면 구성에는 없다 —
+    **색은 사실상 같지만 라벨이 항상 동반돼 의미 혼동은 막혀 있다.**
+  - **다음에 완전히 닫으려면**: 이슈 원문이 이미 정한 순서대로(㉠ destructive 이동을 먼저 —
+    크루 팔레트를 건드리면 D-026 전체 재검증이 필요하다) `--destructive`의 hue를 crew-12(Lab
+    hue ≈40°)에서 더 멀리(라이트 `oklch(0.52 0.21 27)`의 H=27을 낮추는 방향, 예: 진분홍/마젠타
+    쪽 H≈345 부근)로 옮기고, 이동 후에도 `destructive` 자신의 배경 대비(4.5:1 본문, 3:1
+    비텍스트)가 유지되는지 재측정해야 한다 — 이번 회차에는 실측만 하고 색 자체는 바꾸지
+    않았다(색상 변경은 별도 화면 검증을 요구해 이번 저비용 묶음의 범위를 벗어난다).
+  - 재현 스크립트는 리포지터리에 남기지 않았다(24일차 운영 규칙 — 휘발성 산출물은 scratchpad
+    전용) — 재현이 필요하면 `docs/design/calendar-palette.md` §6 스크립트에 OKLCH→sRGB 변환과
+    이 두 색(destructive light/dark, `#d20000`)을 대입하면 그대로 나온다.
+- **(원래 상태)**: 열림
 - **영역**: UI / 접근성
 - **제보**: DESIGN (2026-07-24, 디자인 개편 D-038)
 - **내용**: `--destructive`(`oklch(0.52 0.21 27)`)와 크루 12번 색(`#d20000`, H0)이 색상환에서 가깝다. 두 색은 성격이 완전히 다르다 — 전자는 "파괴 동작·오류"라는 시맨틱이고 후자는 "12번 크루"라는 식별자다.
@@ -568,6 +651,8 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   이벤트 없음). 29일차 사용자 결정으로 (C) 외부 입력 대기에서 D-083 방식(팀 제안 → 팀장 승인)
   경로로 옮겨져 닫혔다. 아래 "후속"이 제안한 `withdraw_request` 이벤트 안은 **채택되지 않고
   보류**됐다(소비자 0곳이라 죽은 타입이 되기 때문 — 근거는 D-086, 재검토는 **I-143**과 함께).
+  **31일차 갱신**: I-143·I-144(CORE)가 재검토 선행조건 자체의 성립 가망을 최종 판정 —
+  상세는 I-143 "31일차 갱신"·I-144 "31일차 처분" 절, 제안은 `docs/DECISIONS.draft.CORE.md`.
 - **영역**: 데이터 / 요구사항
 - **제보**: CREW (2026-07-24, 7일차 — Task 016B 가입 신청 버튼 상태 기계 구현 중 발견)
 - **내용**: `requirements.md` 2.4절 "Crew 멤버십 상태" 다이어그램은 `requested`에서 나가는
@@ -586,9 +671,14 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   생기면 철회와 반려를 섞어 보여주는 게 맞는지)는 고객 확인이 없었다.
 - **후속**: 2.4절 다이어그램에 `requested --> [*]`(자진 철회) 전이를 공식 추가할지 결정한다.
   추가하면 `crew-membership-transition.ts`의 `CrewMembershipEvent`에 `withdraw_request`를
-  더하고 `withdrawPendingCrewMembership`이 `rejected` 대신 이 새 이벤트를 쓰도록 고친다.
-  Task 017A(멤버 관리, 반려/강퇴 이력 화면)가 착수되기 전에 정리하는 것이 좋다 — 그 화면이
-  "반려됨" 목록을 보여줄 때 자진 철회 건이 섞여 나오면 사용자에게 오해를 줄 수 있다.
+  더하고 ~~`withdrawPendingCrewMembership`이 `rejected` 대신 이 새 이벤트를 쓰도록 고친다~~
+  — **31일차 정정(CORE)**: 그 함수는 애초에 호출부 0건이던 죽은 코드로 확인돼 삭제됐다
+  (I-144). 이 "후속"이 열어 둔 재검토 자체가 D-086 대안 B 폐기 제안(I-143·I-144 "31일차
+  갱신"·"31일차 처분" 절, `docs/DECISIONS.draft.CORE.md`)으로 닫히는 방향이라 이 문장이
+  가리키던 실행 경로는 더 이상 존재하지 않는다. Task 017A(멤버 관리, 반려/강퇴 이력 화면)가
+  착수되기 전에 정리하는 것이 좋다 — 그 화면이 "반려됨" 목록을 보여줄 때 자진 철회 건이
+  섞여 나오면 사용자에게 오해를 줄 수 있다(이 문장 자체는 여전히 유효 — 화면은 실제로
+  9일차에 이미 구분해 만들어졌다, D-086 "병합이 무해하다는 실증" 절 참고).
 - **제안서 제출 — 승인 대기(29일차, BOARD, 팀장 교차검증 반영 2차)**:
   `docs/decisions/join-request-withdrawal-diagram-i040.md`. 요지 — 새 상태·새 이벤트 신설
   없이 2.4절 `requested --> rejected` 엣지 라벨만 "오너/임원 반려 · 본인 자진 철회 (FR-023 ·
@@ -1128,6 +1218,13 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   호출로 교체한다 — 호출부(`report-client-error.ts`, `error.tsx`, `global-error.tsx`)는
   이 함수의 시그니처가 바뀌지 않는 한 손대지 않는다. ④ `npm run build`로 Turbopack 빌드
   통과를 실제로 검증한다(이번 세션엔 못 함).
+- **31일차(BOARD) — 도착 즉시 닫히는 형태로 확정**: `captureError` 단일 호출부(`grep` 전수
+  확인, `report-client-error.ts` 1곳뿐)가 이미 "DSN만 꽂으면 되는" 어댑터 경계임을 코드로
+  확인했다 — 새 어댑터는 만들지 않기로 판단(근거: 범위를 넓히면 이 단일 교체 지점 전제가
+  깨진다). 이 경계 밖에 구조화되지 않은 `console.error`가 정확히 18곳(CORE 교차검증으로
+  `cast-vote.ts`의 poll 자동 종료 실패 로그 1곳 누락을 잡아 확정) 더 있다는 사실도 함께
+  기록해 뒀다(NFR-028 범위 확장 여부는 별도 결정 대상). DSN 값 도착 시 적용할 절차·판정
+  기준은 `docs/decisions/c-half-confirmed-31.md` §1에 이미 완성돼 있다 — 재조사 불필요.
 
 ### I-056 · 탈퇴 계정 파기(`anonymize_expired_deactivated_profiles`)가 `auth.users`를 Admin API가 아니라 직접 SQL로 수정한다
 
@@ -1574,6 +1671,10 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   전체가 이번에 처음 언급됨)에서 트리거를 다시 보거나, 클라이언트가 `type === "post_link"`
   이벤트 수신 시 개별 재조회(resync 패턴 재사용)로 채우는 방식을 추가해야 한다. 상세는
   `docs/decisions/realtime-broadcast-033.md` §4.
+- **31일차(BOARD) 재확인 — (B) 근거 변화 없음**: 유일한 실 쓰기 경로 `sendChatMessageAction`
+  (`src/lib/actions/send-chat-message.ts`)이 지금도 `type: "text"`만 하드코딩한다(코드 확인).
+  `post_link` 타입 메시지를 만드는 실사용 경로는 여전히 0건 — 28~31일차 사이 새로 생긴 기능
+  없음. (B) 그대로 유지.
 
 ### I-064 · `/sample` 알림 시뮬레이터가 Mock 시드 id(`"profile-1"`)를 실 Supabase에 그대로 보내 항상 예외로 실패했다(수정 완료)
 
@@ -2414,6 +2515,22 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   값이 `useActionState`를 거쳐 폼에 표시되는 배선 자체는 `CrewInfoForm.tsx`/
   `CrewVisibilityForm.tsx`(DESIGN/CREW 소유) 몫이라 이 이슈의 닫힘 범위 밖으로 둔다(정적
   타입·기존 배선을 보면 정상 작동할 것으로 예상되나, 브라우저 실측은 하지 않았다).
+- **후속(브라우저 실측 완료, 31일차 CREW)**: 위 "후속(적용, 20일차 CORE)"가 남긴 런타임 미확인
+  잔여를 닫는다. archived 픽스처 크루(`2724533e-…`, 30일차 I-067 검증용)의 오너 계정으로
+  `/settings`에서 실제로 정보 수정·공개 범위 변경을 저장 시도했다 — 데이터는 트리거로 그대로
+  막혔지만(무결성 문제 없음), 화면에는 `formError`가 도메인 오류 문구가 아니라 **범용 실패
+  문구**("저장하지 못했어요"/"변경하지 못했어요. 다시 시도해 주세요")로만 떴다. `formError`
+  배선 자체(`useActionState` → `CrewInfoForm`/`CrewVisibilityForm`)는 정상 작동하지만,
+  `updateCrewInfoAction`/`updateCrewVisibilityAction`이 `result`의 실제 사유(`error.message`)를
+  버리고 고정 문자열만 반환하는 설계라 "정상 작동 = 도메인 오류 노출"은 아니었다. 이 회차는
+  문구를 손보는 대신 **애초에 archived 크루에서 편집 가능한 폼을 열어 주지 않는 쪽**으로
+  최소 수정했다 — `CrewSettingsContainer`에 `crew.status !== "active"` 조건을 추가해
+  `PostWriteContainer`(Task 040)와 같은 패턴으로 `RouteErrorBoundary(kind="forbidden")`를
+  반환한다(새 UI 패턴 없음, 기존 `ArchivedCrewBanner`가 레이아웃에서 실제 사유를 안내).
+  활성 크루 회귀 없음을 별도 크루로 확인. `npx tsc --noEmit`·해당 파일 `eslint` clean.
+  `updateCrewInfoAction`/`updateCrewVisibilityAction`의 범용 실패 문구 자체(archived 이외의
+  다른 실패 사유에도 적용됨)는 이번 범위가 아니라 손대지 않았다. 상세·스크린샷 5장:
+  `docs/design/i070-archived-crew-settings-31/README.md`.
 
 ### I-071 · 투표 판정 공식(D-003·D-032·D-022)이 TS와 SQL 두 곳에 존재한다 — 물리적으로 피할 수 없는 이중화
 
@@ -3019,6 +3136,39 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   파일(`use-notification-feed.ts`·`lib/realtime/broadcast.ts`)을 만지는 사람이 "로그인 직후
   Realtime 구독을 세션 전파 이후로 지연시킬지" 검토할 수 있게 남긴다. 지금 당장 고칠 정도의
   체감 영향은 아니라고 판단해 이번 회차엔 조사만 했다.
+- **31일차(BOARD) — 정적 분석으로 새 원인 후보를 확정, "경미" 재평가가 필요할 수 있다**:
+  이번 회차 다른 조사(I-094 §2.3(b))에서 `NotificationBellContainer`(`use-notification-feed.ts`)와
+  `ToastHostContainer`가 같은 토픽(`user:{profileId}:notifications`)을 **독립적으로 구독**한다는
+  걸 확인했는데, 이게 이 이슈와 관계있는지 확인했다. `(shell)/layout.tsx` 106행에서
+  `ToastHostContainer`가 인증된 모든 요청에 상시 마운트되고, `AppShell`의 헤더도 항상
+  `NotificationBellServerContainer`(→`NotificationBellContainer`)를 렌더한다 — **둘은 매
+  `(shell)` 페이지에서 동시에 마운트된다**(로그인 직후만이 아니다). 설치된
+  `@supabase/realtime-js`(`node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js`
+  320~336행) 소스를 직접 읽어 확인한 결과, **`client.channel(topic)`은 같은 topic의 채널이
+  이미 있으면 새로 만들지 않고 기존 채널 인스턴스를 그대로 반환한다**(주석 원문: "If a channel
+  with the same topic already exists it will be returned instead of creating a duplicate
+  connection"). 그리고 `RealtimeChannel.subscribe()`(같은 패키지 135행)는 **채널이 `closed`
+  상태일 때만 실제로 join을 수행하고 `onError`/`onClose` 콜백을 등록한다** — 이미 join
+  중이거나 join된 채널에 두 번째로 `subscribe(callback)`을 부르면 그 `if` 블록 전체를 건너뛰어
+  **두 번째 호출자의 콜백은 등록조차 되지 않은 채 조용히 무시된다.** 즉 두 컴포넌트 중 먼저
+  마운트한 쪽만 실제로 `subscribe()`가 동작하고 그 콜백만 상태를 받는다 — 이 이슈가 보고한
+  메시지("realtime subscription error")가 정확히 `use-notification-feed.ts`(벨) 쪽 로그
+  문자열과 일치하고 `ToastHostContainer`의 "toast subscription error" 로그는 보고서에 없는
+  것과 정합적이다(둘 다 에러였다면 콘솔에 2줄이 남아야 하는데 1줄만 보고됐다).
+  **추가로 확인한, 이번에 처음 발견한 별개의 구조적 위험**: `removeChannel`
+  (`RealtimeClient.js` 256행)은 `channel.unsubscribe()` + `channel.teardown()`으로 채널을
+  완전히 파괴한다 — 참조 카운트가 없어 **두 소비자 중 하나가 먼저 언마운트해 `unsubscribe()`를
+  부르면 다른 소비자가 여전히 마운트돼 있어도 공유 채널이 통째로 사라진다**(그 소비자는 자기가
+  구독 중이라고 믿지만 조용히 죽는다 — 실제 발생 여부는 이 두 컴포넌트가 항상 함께
+  마운트·언마운트되는 지금 구조에서는 낮지만, 구조 자체는 존재한다). 이 발견은 코드·설치된
+  패키지 소스만으로 확정했다(브라우저 재현 없이 가능) — **다만 "로그인 직후에만 재현되고
+  새로고침 후 안 되는" 시간 축은 여전히 설명하지 못한다**(원 가설 — 세션 쿠키 전파 타이밍 —
+  이 부분에 대해서는 여전히 유효한 후보로 남는다. 채널 충돌은 "왜 1줄만 보이는가"를
+  설명하지, "왜 하필 로그인 직후에만 에러가 나는가"는 별개로 남아 있다). **브라우저 실측은
+  이번 회차 우선권이 CREW에 있어 하지 않았다** — 다음에 브라우저가 열리면 로그인 직후
+  콘솔에 "toast subscription error" 줄이 실제로 안 보이는지 확인하는 것으로 이 가설을
+  검증할 수 있다. 이 구조적 위험(참조 카운트 없는 공유 채널) 자체는 "경미"로 두기 어렵다는
+  것이 이번 회차 판단이다 — 재평가는 팀장 몫으로 남긴다.
 
 ### I-083 · Turbopack dev 서버가 동시 다중 에이전트 파일 쓰기 중 라우트를 일시적으로 404·500으로 오응답한다(재현 조건 특정, 앱 결함 아님)
 
@@ -3639,6 +3789,13 @@ finalize_closed_poll`(AFTER UPDATE)을 통해 **전혀 다른 테이블(`meetups
   > Realtime`, `search_docs`로 확인한 공식 경로)로 재계산한다. 실제 요금제 전환(Free/Pro →
   Pro 지출 상한 해제)은 대시보드 Billing에서 운영자가 수동으로 확인·집행해야 한다(MCP로 할
   수 없는 대시보드 전용 설정 — SMTP 공급자 확정 때의 I-016과 같은 유형의 잔여).
+- **31일차(BOARD) — 도착 즉시 닫히는 형태로 확정**: 메시지 발생 경로(트리거 4종·토픽 3종
+  전수 확인)·클라이언트당 최대 동시 채널 수(3개, 연결당 100 한도에 전혀 근접하지 않음)·
+  현재 DB 실측 규모(크루 14개, 활성 멤버십 평균 3명, `chat_messages` 132·`notifications`
+  47·`poll_votes` 212·`polls` 62행)를 실제로 산출해 **"현재 규모에서는 어느 플랜이든 월간
+  과금 위험이 없다"**는 부분(위 ①)을 이번 회차로 닫았다. 남은 것은 오직 ②(현재 실제 요금제
+  이름 확인)뿐이며, 그 값이 도착했을 때 적용할 판정표는
+  `docs/decisions/c-half-confirmed-31.md` §2.2에 이미 완성돼 있다 — 재조사 불필요.
 
 ### I-095 · `(app)` 인증 가드 미통과 요청이 HTTP 200 + 콘솔 `assertAuthenticatedSession` 예외로 응답한다 — 화면은 정확하지만 상태 코드·로그가 이상하다
 
@@ -6314,6 +6471,8 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   않아 이미 죽은 코드였다 — 삭제 여부는 후속 이슈 후보로 남겼다. D-086 대안 B(`withdraw_request`
   이벤트 신설) 재검토 선행조건은 이번에도 채워지지 않아 보류 유지. 전체 근거:
   `docs/decisions/i143-withdraw-transitions-passthrough.md`.
+  **31일차 갱신(CORE, I-144)**: 삭제 여부가 ①(완전 삭제)로 결정되면서 대안 B는 "보류"에서
+  "폐기"로 최종 판정됐다 — 상세는 I-144 "31일차 처분" 절.
 - **영역**: 규칙 계층 / 데이터 접근 경계 (NFR-036 · R-015)
 - **제보**: BOARD (2026-07-30, 29일차 — I-040 제안서의 "대안 B" 비용 판정 중 발견,
   팀장이 `grep`으로 독립 재현: `transitionCrewMembershipStatus` 호출부는 `mock/crew.ts`
@@ -6385,7 +6544,12 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
 
 ### I-144 · Mock `withdrawPendingCrewMembership`이 Task 032(18일차)부터 데이터 배럴에서 재노출되지 않는 죽은 코드다
 
-- **상태**: 열림 — 삭제 여부 미결정
+- **상태**: **해결됨(2026-07-30, 31일차, CORE)** — 후속 후보 ①(완전 삭제)로 처분. `grep`으로
+  0건을 직접 재현한 뒤 `src/lib/data/mock/crew.ts`에서 함수를 삭제하고, 이 함수를 이름으로
+  가리키던 주석 2곳(`rejectCrewMembership` docstring·`crew-membership-transition.test.ts`
+  모듈 docstring)도 갱신했다. `npx tsc --noEmit`(I-129 우회 — 임시 `tsconfig` 격리, dev 서버
+  경합 없이 0 errors 확인)·`npm run lint`·`npm test`(5 files·37 tests pass) 전부 통과.
+  이 처분이 D-086 대안 B에 미치는 영향 판정은 아래 참고.
 - **영역**: 데이터 접근 레이어 / 정리(cleanup)
 - **제보**: CREW (2026-07-30, 30일차 — I-143 해소 작업 중 발견)
 - **등재 경위**: D-082 절차대로 CREW가 `docs/ISSUES.draft.CREW.md`에 **번호 없이** 작성하고 팀장이
@@ -6413,3 +6577,357 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
 - **후속 후보**: ① 완전히 삭제(가장 단순, CLAUDE.md 원칙과 정합) ② 배럴에 의도적으로
   남겨 Mock 전용 시나리오(예: 향후 vitest 통합 테스트)의 소비자로 승격 — 둘 중 하나를
   다음 회차에 판단.
+- **31일차 처분(CORE)**: **①을 택했다.** ②(Mock 전용 시나리오 소비자로 승격)를 기각한 이유 —
+  CLAUDE.md가 명시한 vitest 범위는 `quorum.ts`·`poll-decision.ts`·`poll-eligibility.ts` 순수
+  함수 3개뿐이고 "컴포넌트·데이터 접근 레이어·Server Action 등 나머지는 여전히 자동 테스트가
+  없다"고 못박혀 있다 — 지금 이 함수 하나를 위해 데이터 접근 레이어 통합 테스트를 새로 여는
+  것은 그 범위 결정을 우회하는 스코프 확장이라 이번 배정 밖으로 판단했다. `/sample` 확장도
+  이 함수가 표현하는 것(멤버십 쓰기)이 쇼케이스 대상(표현 컴포넌트)이 아니라 데이터 레이어
+  자체라 해당하지 않는다. 구체적 소비 계획이 없는 채로 "미래에 쓰일 수도 있다"는 이유만으로
+  죽은 코드를 유지하는 것은 CLAUDE.md 원칙과 정면으로 어긋난다.
+  **D-086 대안 B 판정**: 이 삭제로 D-086이 보류한 대안 B(`withdraw_request` 이벤트 신설)의
+  재검토 선행조건("TRANSITIONS를 경유하는 살아있는 코드가 생기는 것")이 채워질 가망이
+  없다고 최종 판정했다 — Mock 쪽 유일한 후보(이 함수)는 삭제됐고, Supabase
+  `withdraw_join_request` RPC는 PL/pgSQL 함수라 애초에 TS 모듈을 import할 수 없는 구조다
+  (I-141 해소 이후 계속 그렇다). 두 쓰기 경로 중 어느 쪽도 향후 이 조건을 채울 길이 없다고
+  보고 대안 B를 **폐기**(보류 해제, 영구 기각)를 제안한다. **D-086 본문은 확정된 결정이라
+  직접 수정하지 않는다** — 후속 결정 제안은 `docs/DECISIONS.draft.CORE.md`에 번호 없이
+  남겼다(팀장 승인 후 새 D-\* 번호 부여 대기).
+
+### I-145 · 참조 카운트 없는 `removeChannel`이 같은 topic을 공유하는 다른 소비자의 실시간 구독까지 조용히 끊는다
+
+- **상태**: 해결됨(2026-07-30, 31일차, CORE)
+- **영역**: 실시간 구독 인터페이스 (D-030 ②) / `src/lib/realtime/broadcast.ts`
+- **제보**: BOARD (2026-07-30, 31일차 — I-082 조사 중 `@supabase/realtime-js` 소스를 읽다가
+  발견. `client.channel(topic)`이 같은 topic이면 채널을 공유한다는 점, `removeChannel`이
+  참조 카운트 없이 무조건 teardown한다는 점을 코드로 지목했다. 팀장이 `broadcast.ts:144`의
+  무조건 `removeChannel` 호출과 알림 topic의 실제 소비자가 3곳임을 추가로 확인해 CORE(실시간
+  구독 인터페이스 소유자)에게 수정을 배정했다.)
+- **내용**: `subscribeToRoom`(`broadcast.ts`)은 같은 topic(예: `user:{profileId}:notifications`)을
+  구독하는 여러 컨테이너가 벤더 `supabase.channel(topic)` 호출로 **같은 채널 인스턴스를
+  공유**하게 두면서도, `unsubscribe()`가 조건 없이 `supabase.removeChannel(channel)`을 불렀다.
+  벤더 Phoenix `Channel.teardown()`은 `this.bindings = []`로 **그 채널의 모든 이벤트 바인딩을
+  통째로 비운다** — 공유 소비자 중 아무나 한 명이 언마운트해도 나머지가 여전히 마운트돼 있는
+  채로 실시간 수신이 끊긴다. 실사용 트리거: `NotificationBellContainer`·`ToastHostContainer`가
+  `(shell)/layout.tsx`에 상시 마운트되고, `NotificationCenterListContainer`가 `/notifications`
+  페이지에만 추가로 마운트된다 — `/notifications`를 열었다 나가면 그 컨테이너만 언마운트되며
+  공유 채널을 죽여 벨·토스트의 실시간 알림이 전체 새로고침 전까지 조용히 끊긴다.
+- **재현**: 벤더 소스(`node_modules/@supabase/realtime-js`·`@supabase/phoenix`)를 직접 읽어
+  ① topic 재사용, ② `subscribe()` 재호출 시 상태 콜백 미등록(BOARD 주장, 확인함 — 다만 정확히는
+  "이번 호출만 무시"가 아니라 "그 소비자는 채널 생애주기 동안 상태 변화를 영원히 못 받는다"),
+  ③ `broadcast` 타입 `.on()` 바인딩은 정상적으로 누적되고 채널이 살아 있는 한 전원이 수신함
+  (BOARD가 걱정한 반대 시나리오는 불성립), ④ `teardown()`의 `bindings=[]`가 진짜 방아쇠임을
+  전부 코드 인용으로 확인했다. 앱 코드 쪽은 채팅·투표 topic도 같은 구조가 있는지 확인했으나
+  **둘 다 현재 동시 구독 경로가 없어 재현 불가**(단일 마운트 지점만 존재) — 확정된 실사용
+  트리거는 알림 topic뿐이다. 전체 재현 로그·근거:
+  `docs/decisions/realtime-shared-channel-teardown-145.md`.
+- **해소**: `broadcast.ts`의 `subscribeToRoomViaBroadcast`를 topic당 참조 카운트 공유로
+  재작성했다 — topic당 벤더 `.on()`·`.subscribe()`를 정확히 한 번만 부르고 이벤트·오류를 이
+  파일이 직접 리스너 집합에 팬아웃하며, 그 topic의 리스너가 0개가 될 때만 `removeChannel`을
+  부른다. `subscribeToRoom(id, onEvent): Unsubscribe` 계약(D-030 ②)은 바뀌지 않았다 — 소비자
+  (컨테이너) 코드는 한 줄도 안 고쳤다. 부수 효과로 "late subscriber가 상태 변화를 못 받는다"
+  gap도 함께 해소됐다(이제 topic당 한 번뿐인 상태 콜백이 전체 리스너에게 팬아웃된다).
+  `npx tsc --noEmit`(0 errors)·`npm run lint`(0 errors, 무관한 사전 경고 1건)·`npm test`(6
+  files, 41 tests pass) 확인. 브라우저 실측은 이번 회차 dev 서버 정지 운영 규칙상 하지 않았다.
+- **남은 리스크**: "같은 topic의 마지막 구독자가 언마운트 후 즉시 재구독"이 겹치는 좁은 레이스가
+  이론상 남아 있다 — 이번 수정으로 새로 생긴 회귀가 아니라 벤더의 topic 재사용·teardown 타이밍이
+  만드는 별개의 기존 레이스이며, 이번에 확정한 실사용 시나리오(알림 3-소비자 공유)와는 다른
+  조건이라 별도로 남긴다. 상세는 위 결정 문서 §4.
+
+  **번호 병합 경위(팀장, 회차 마감)**: BOARD도 `docs/ISSUES.draft.BOARD.md`에 같은 결함을
+  독립 등재했다(발견자이므로 당연하다). 두 draft를 이 번호 하나로 합쳤고, BOARD 항목이 담고
+  있던 **브라우저 재현 절차(미리 완성, 아직 실행하지 않음)**는 아래 "재현 절차" 절로 옮겼다.
+- **재현 절차(BOARD, 미실행)**: 계정 `chopin0625@gmail.com`으로 로그인 → `/notifications`
+  방문 → 이탈 → `/sample` 알림 시뮬레이터로 `notifications_broadcast_trigger` 발화 →
+  토스트·벨 배지 수신 여부 관찰. 대조군은 `/notifications` 미방문 세션. **"에러 로그 없음"이
+  "정상"을 뜻하지 않는다** — 채널이 죽어 있으면 에러 자체가 안 남는다. 4갈래 판정표는
+  CORE 확정(`.on()` 바인딩 누적 → 대칭적 전멸만 가능)에 맞춰 갱신됐고, "한쪽만 수신"은 이
+  결함으로 설명되지 않는 별개 국소 결함을 가리킨다. **수정 후 회귀 확인에도 같은 절차를
+  그대로 쓴다.**
+
+### I-146 · 강퇴·임원 임명/해임·가입 신청 승인이 archived 크루에서도 SQL 레벨로는 여전히 성공한다
+
+- **상태**: **해결됨(2026-07-30, 31일차, CREW — 팀장 지시로 SQL 레벨까지 같은 회차에 소진)**
+- **영역**: 데이터 / 크루·멤버십
+- **제보**: CREW(2026-07-30, 31일차 — "archived 크루 쓰기 표면 전수 감사" 추가 배정 중 발견,
+  배포된 트리거·RLS 소스를 `pg_proc`/`pg_policies`로 직접 읽어 확인)
+- **내용**: `crew_memberships_guard_self_transition` 트리거의 "남의 행" 분기(오너/임원이 다른
+  멤버의 role·status를 바꾸는 경로 — 강퇴 FR-027, 임원 임명/해임 FR-024)와
+  `join_requests_update_requester_or_staff` RLS(가입 신청 승인/반려 FR-023 경로)는
+  **crew.status를 전혀 검사하지 않았다.** `disband_crew` RPC도 `join_requests`를 정리하지
+  않아, 해산 직전에 들어온 대기 중 가입 신청이 그대로 `pending`으로 남을 수 있었다. 그 결과
+  오너가 **archived 크루에서도 강퇴·임원 임명/해임을 실제로 성공시킬 수 있었고, 남아 있던
+  대기 중 가입 신청을 승인하면 archived 크루에 새 active 멤버가 실제로 생겼다** — 문구
+  문제가 아니라 데이터 정합성 문제였다.
+- **요구사항 근거(팀장 지시로 사후 점검 — 아래 인용은 마이그레이션 적용 뒤에 확인했다는
+  것을 정직하게 남긴다)**: FR-023(가입 승인)·FR-024(임원 임명/해임)·FR-027(강퇴) 어디에도
+  "대상 크루가 active여야 한다"는 사전조건이 원문 그대로 적혀 있지는 않다. 대신 두 원문
+  조각을 근거로 세웠다 — ① FR-022 사전조건 "**크루가 `public`, 신청자가 비멤버**"(571행)
+  + 이미 코드로 확정된 해석(`create_join_request` RPC, 마이그레이션 `20260729093252_
+  major_fix_i102_...` 헤더의 "private/archived 크루 직접 가입 신청이 가능했다")은 가입 승인
+  가드의 근거로 충분하다. ② 강퇴·임원 임명/해임 가드는 FR-013 "설명"란 원문 "크루를
+  **종료**하고 하위 데이터를 처리한다"(518행) + 이미 **해결됨으로 닫힌** I-066의 "영향"
+  절 원문 "FR-013의 '**해산 = 종료**'라는 의도와 어긋난다"(팀이 이미 합의하고 게시글 작성
+  등을 SQL로 막을 때 쓴 근거)를 같은 종류의 잔여에 확장 적용한 것이다 — 명시적 AC 인용보다는
+  **이미 합의된 원칙의 확장 적용**이라는 성격 차이가 있다는 것을 정직하게 남긴다. 상세는
+  `docs/design/archived-crew-write-surface-audit-31/README.md`("요구사항 근거 자체 점검"
+  절)에 원문 인용 전문을 남겼다.
+- **과거 제외 판정 재확인(`grep`, 팀장 지시)**: I-066 원문(`docs/ISSUES.md` 1917행 "내용"
+  절)이 애초에 명시한 증상은 "게시글 작성·채팅 발신·**크루 정보 수정**" 셋뿐이었다 — 강퇴·
+  임원 임명/해임·가입 승인은 **이월된 것이 아니라 I-066의 문제 정의 자체에 없었다**(이전
+  보고에서 "제외 ①이 이월했다"고 뭉뚱그린 것을 정정한다 — 그 제외는 문맥상
+  `crews_update_staff_or_owner`, 즉 크루 정보 수정 하나를 가리켰다). `docs/ISSUES.md`·
+  `docs/prioritization-and-risks.md` 전체에서 이 정확한 조합(강퇴/임원임명 × archived)을
+  이미 다룬 판정은 없었다.
+- **31일차 앱 레이어 조치**: `decide-join-request.ts`·`remove-crew-member.ts`·
+  `set-crew-member-role.ts` Server Action에 `crew.status !== "active"` 조기 판정을 추가하고,
+  `CrewMembersContainer`의 해당 버튼·패널도 함께 숨겼다.
+- **31일차 SQL 레벨 조치(같은 회차, 팀장 지시로 소진)**: **가드 방식을 택했다**(정리 방식은
+  채택하지 않음, 판단 근거는 아래). 마이그레이션 2건:
+  1. `supabase/migrations/20260730071304_crew_memberships_guard_archived_officer_actions_31.sql`
+     — `crew_memberships_guard_self_transition()`의 "남의 행" 분기 진입 직후에
+     `if not private.is_crew_active(old.crew_id) then raise exception ...` 추가(그 외 로직
+     불변, 배포본을 `pg_get_functiondef`로 그대로 복사한 뒤 한 블록만 삽입).
+  2. `supabase/migrations/20260730071317_join_requests_guard_archived_crew_decision_31.sql`
+     — `join_requests_update_requester_or_staff` 정책에 `alter policy`로
+     `private.is_crew_active(crew_id)`를 `using`·`with_check` 양쪽에 추가.
+  둘 다 `posts_insert_members`·`comments_insert_members`·`invitations_insert_staff_or_owner`가
+  이미 쓰는 `private.is_crew_active` 함수를 그대로 재사용했다(새 함수·새 패턴 없음).
+- **가드 vs 정리(disband_crew가 대기 중 신청/초대를 정리) 판단**: **가드만 적용, 정리는
+  하지 않았다.** 가드가 이미 완전한 SQL 강제 경계이고(REST 직접 접근까지 포함해 막는다),
+  정리는 "해산은 동결인가 정리인가"라는 FR-013 해석이 필요한 별도 결정이라 이번 마이그레이션
+  범위를 넘어선다고 판단했다 — 가드가 있으면 정리를 안 해도 위험하지 않다(대기 중 신청이
+  영원히 결정 못 되는 상태로 남을 뿐, 데이터가 조용히 잘못되는 경로는 없다). 정리는 UX
+  향상안으로 남겨 둔다(예: 관리자에게 "이 신청은 크루 해산으로 자동 반려됩니다" 안내).
+- **실측(전부 `begin`…`rollback`, 실 데이터 흔적 없음)**: 스크래치 크루 1개 + 임시 멤버
+  4명 + 가입 신청 2건으로 재현. **회귀(활성 크루) 3건 전부 성공**(가입 승인·강퇴·임원 임명) —
+  트리거·RLS 수정이 정상 크루의 기존 동작을 하나도 바꾸지 않았음을 확인. **위반(archived
+  크루) 3건 전부 차단** — 가입 승인은 RLS로 0행(조용히 막힘), 강퇴·임원 해임은 새 트리거
+  예외(`archived crews cannot have membership role or status changed by officers (FR-013)`)로
+  명시적으로 막혔다. 차단 시도 후에도 대상 행 상태 불변 확인(부분 반영 없음). `get_advisors
+  (security)` 신규 WARN 0건(기존 `auth_leaked_password_protection` 1건만 유지). 로컬
+  마이그레이션 파일도 원격 버전(`20260730071304`·`20260730071317`)에 맞춰 남겼다(I-051 재발
+  방지).
+- **DB 잔존물**: 스크래치 크루·임시 멤버·가입 신청 전부 트랜잭션 `rollback`으로 제거됨 —
+  재확인 결과 `crews=14`(archived 1)·`profiles=21`, 회차 시작 기준과 동일. 두 픽스처 크루
+  (`2724533e-…` archived, `729ced18-…` active)도 이름·상태·공개범위 불변.
+- **여전히 못 막은 것**: 위 "부수 발견" 절의 게시글·댓글 UPDATE(수정/삭제) 축은 BOARD
+  도메인이라 이번 조치 대상이 아니다(아래 두 번째 이슈 참고). `disband_crew`의 정리 미적용은
+  의도적 보류이지 결함이 아니다.
+- **상세**: `docs/design/archived-crew-write-surface-audit-31/README.md`("SQL 레벨 잔여" 절,
+  표 #5·#9·#10)에 진입점별 근거(파일·정책명·트리거 함수 본문 인용)와 이번 실측 전문을
+  남겼다.
+
+  **번호 병합 경위(팀장, 회차 마감)**: CREW가 별도 항목으로 올린 "요구사항 원문 근거 없이
+  논리적 정합성으로 적용한 가드"는 **바로 이 가드에 대한 근거 성격 기록**이라 별도 번호를
+  붙이지 않고 이 항목 안으로 합쳤다(위 "요구사항 근거" 절이 그 내용이다). 팀장이 FR-024
+  원문을 직접 확인했고 **사전조건 "대상이 `active` 크루원"은 대상 멤버 상태이지 크루 상태가
+  아니며**, FR-027에는 사전조건 필드 자체가 없다 — CREW의 자기 판정이 정확했다.
+  **31일차 사용자 결정: 가드 유지, 롤백하지 않음, 근거가 "원문 인용"이 아니라 "이미 합의된
+  원칙(FR-013 해산=종료)의 확장 적용"이라는 성격을 문서에 명시.**
+- **재검토 조건(CREW 판단)**: ① FR-024·FR-027에 크루 상태 사전조건/AC가 명시 추가될 때
+  ② `disband_crew`가 대기 신청/초대 정리까지 확장될 때 ③ **"해산 후에도 오너의 사후 정리
+  작업이 가능해야 한다"는 요구가 명시적으로 나올 때**(반대 방향의 요구가 이 가드를 무효화한다).
+
+### I-147 · archived 크루도 초대 수락(self-service)으로 새 active 멤버십이 생긴다 — 31일차 두 마이그레이션이 막은 것과 같은 결함 클래스, 다른 경로
+
+- **상태**: 열림 — 미수정(검증 배정 범위 밖이라 고치지 않음, DB 변경 금지 제약 준수)
+- **영역**: 스키마 / RLS·트리거 (NFR-011·032, FR-013·021) / `invitations`↔`crew_memberships` 동기화
+- **제보**: CORE (2026-07-30, 31일차 — CREW의 마이그레이션
+  `20260730071304_crew_memberships_guard_archived_officer_actions_31.sql`·
+  `20260730071317_join_requests_guard_archived_crew_decision_31.sql` 스키마 검증 배정 중,
+  감사 범위를 인접 경로로 넓혀 발견)
+- **내용**: 위 두 마이그레이션은 "임원 행위"(crew_memberships 남의 행 UPDATE)와 "join_requests
+  결정"(승인·반려) 두 경로에 `private.is_crew_active` 가드를 추가해 archived 크루에서 새
+  active 멤버십이 생기는 것을 막았다. **그런데 세 번째 경로 — 초대 수락(self-service,
+  FR-021)은 손대지 않았고, 정확히 같은 결함이 그 경로에 그대로 남아 있다:**
+  - `invitations_update_invitee_or_staff` 정책(초대 응답 UPDATE)의 `using`·`with_check`
+    어디에도 `is_crew_active`가 없다.
+  - `invitations_guard_response_transition`(BEFORE UPDATE 트리거)도 pending 상태·만료
+    시각·행위자만 검사하고 crew 상태는 보지 않는다.
+  - `invitations_sync_membership_on_response`(AFTER UPDATE)가 수락 시 `crew_memberships`를
+    직접 UPDATE하는데, 이건 `crew_memberships_guard_self_transition` 입장에서 **중첩 호출**
+    (`pg_trigger_depth() > 1`)이라 이번에 추가된 archived 가드는 물론 자기서비스 검증
+    전체를 통째로 건너뛴다.
+  - `disband_crew`는 해산 시 `invitations`를 정리하지 않는다(polls·meetups·chat_messages만
+    처리) — join_requests와 같은 이유로 pending 초대가 해산 이후에도 그대로 남는다.
+  - ~~**앱 레이어도 막지 않는다**: `src/lib/actions/respond-to-invitation.ts`에 crew 상태
+    확인이 전혀 없다~~ — **정정(CREW 지적, CORE 재확인, 31일차)**: 틀렸다. `grep`으로
+    그 파일 안에서 `crew.status` 문자열만 찾았을 뿐이다 — 실제로는
+    `evaluateInvitationResponseEligibility`(`lib/rules/invitation-response-eligibility.ts:35-37`,
+    `crew.status !== "active"` → `crew_unavailable`)가 판정을 맡고
+    `respondToInvitationAction`(75-79행)이 그 결과로 막는다(NFR-036이 요구하는 정확한
+    구조라 `grep`이 못 걸렀다). **다만 재확인 중 더 정밀한 지점을 하나 찾았다**: 이
+    판정이 실제로 보는 `crew.status` 값은 `getCrewById`가 넘겨주는데, 그 함수의 private+
+    비소속 폴백은 **항상 `status:"active"`를 하드코딩**한다(31일차 I-070 교차검증에서
+    CORE가 이미 불변식 주석을 붙인 그 자리, `src/lib/data/supabase/crew.ts`). 이 회차에
+    라이브로 재현한 archived 픽스처 크루는 우연히 `visibility:"public"`이라 그 폴백을
+    타지 않아(공개 크루는 direct select가 role 무관하게 항상 성공) 앱 레이어 판정이
+    실제 `"archived"` 값을 정확히 받았다 — **그래서 CREW의 정정은 이 픽스처에 한해
+    정확하다.** 그런데 **private + archived** 크루에 아직 활성 멤버가 아닌 초대 대상자가
+    응답하는 조합에서는 `getCrewById`가 그 폴백을 타(원본 select가 0행 — 초대 대상자는
+    `crew_memberships.status='invited'`이지 `'active'`가 아니라 RLS
+    `crews_select_authenticated`를 통과 못 함), `evaluateInvitationResponseEligibility`가
+    가짜 `"active"`를 보고 **앱 레이어 판정이 조용히 무력화될 수 있다** — 이건 TS 실행이
+    필요해 이번 SQL 실측으로는 직접 재현하지 못했지만, RLS 정책·`getCrewById` 소스 양쪽을
+    코드로 대조해 조건이 성립함을 확인했다. **즉 CREW의 새 트리거 가드(SQL, 31일차
+    `20260730074232` 마이그레이션)가 private 크루에서는 유일한 실질 방어선이다** — 이
+    번 재검증(아래)이 그 트리거를 축으로 삼은 것이 결과적으로 정확한 이유이기도 하다.
+- **실측**(`begin`…`rollback`, 픽스처 archived 크루 `2724533e-9e02-4609-8ad3-88becec6fe24`,
+  비소속 프로필 `fc91323c-c1eb-46f2-a488-96fa8ae345a8`): postgres로 그 크루에 만료 전 pending
+  초대를 심고, `set_config('request.jwt.claims', ...)` + `set local role authenticated`로
+  초대 대상자 세션을 재현해 수락 UPDATE를 실행 — **성공**. 결과:
+  `invitation_status="accepted"` · `membership_status="active"` · `crew_status="archived"`가
+  동시에 성립했다. `rollback` 후 픽스처 원복 확인(crews 14·archived 1·profiles 21·해당 크루
+  membership 1행=오너만, invitations 0건).
+- **영향**: FR-013(해산된 크루는 더 이상 활동하지 않는다) 위반 — archived 크루에 유령
+  active 멤버가 계속 생길 수 있다. migration 2(join_requests)가 막은 것과 같은 등급이지만,
+  **SQL 직접 PATCH가 아니라 정상 앱 UI로도 재현된다**는 점에서 더 급하다.
+- **후속 후보**: `private.is_crew_active(crew_id)`를 ① `invitations_update_invitee_or_staff`
+  정책의 `using`·`with_check`(migration 2와 대칭 패턴) ② `invitations_guard_response_transition`
+  트리거(둘 중 하나만으로 충분할 수 있음, 중복 여부 판단 필요) 중 최소 하나에 추가하고,
+  `disband_crew`가 pending invitations를 정리할지(join_requests와 같은 질문)도 함께 판단한다.
+  처분(다음 회차 배정 여부·담당)은 팀장 판단.
+- **해소(31일차, CREW 수정 → CORE 재검증)** — CREW가 후보 ②(트리거, `accepted` 전이에만
+  `private.is_crew_active` 검사 추가·`declined`는 계속 허용)로 고쳤다
+  (`supabase/migrations/20260730074232_invitations_guard_archived_crew_acceptance_31.sql`).
+  CORE가 `pg_get_functiondef` 배포본 대조(추가된 5줄 외 무변경 확인)·`begin`…`rollback`
+  실측 3축으로 재검증: **①활성 크루(`729ced18-...`) 수락 정상 성공**(회귀 없음) —
+  `invitation_status="accepted"`·`membership_status="active"`. **②archived 크루 수락
+  차단**(이 항목이 발견한 중첩 트리거 경로 포함) — 예외로 UPDATE 전체가 무효화돼
+  `invitation_status`는 `"pending"`, `crew_memberships.status`는 `"invited"`로 **부분 반영
+  없이** 그대로 남음(`invitations_sync_membership_on_response` AFTER 트리거가 애초에 실행되지
+  않았다는 뜻). **③archived 크루 거절은 여전히 성공** — `invitation_status="declined"`·
+  `membership_status="declined"`(죽은 초대를 스스로 정리하는 self-service 경로 무해 확인).
+  `rollback` 후 픽스처 전부 원복 확인(crews 14·archived 1·profiles 21, 남은 초대 1건은 내
+  테스트와 무관한 사전 존재 seed 행). `get_advisors(security)` 신규 WARN 0건. 3축 전부 PASS.
+  ~~**다만 위 "더 정밀한 지점"이 지적한 private+archived 조합의 앱 레이어 우회 가능성은 이번
+  트리거 수정으로 구조적으로 무의미해졌다** — SQL 최종 경계(트리거)가 이제 `accepted` 전이
+  자체를 막으므로, 그 앞단 앱 레이어 판정이 폴백 때문에 속더라도 실제 쓰기는 성공하지
+  않는다.~~ — **정정(CREW가 한계로 남김 → 팀장 확인 → CORE 재확인, 31일차)**: 절반만 맞았다.
+  **데이터 안전성**은 정확히 이 말대로다(SQL이 막아 유령 멤버십은 안 생긴다). 하지만
+  "구조적으로 무의미해졌다"는 과했다 — **D-030 ③ UX 문제는 이번 트리거 수정과 무관하게
+  그대로 남는다.** `respond-to-invitation.ts`가 `getCrewById`의 가짜 `"active"`를 그대로
+  믿고 `evaluateInvitationResponseEligibility`에서 `{eligible:true}`를 반환하면, 액션은
+  "정확한 사유(archived)"가 아니라 SQL 트리거 예외를 범용 실패 메시지로 뭉뚱그려 보여준다
+  — 데이터는 안전해도 **사용자는 원인 불명 실패를 본다.** 상세·소비자 전수 확인은
+  `src/lib/data/supabase/crew.ts`의 `getCrewById` 폴백 불변식 주석(31일차 재정정판) 참고.
+  새 항목으로 아래 등재.
+
+  **번호 병합 경위(팀장, 회차 마감)**: CREW도 `docs/ISSUES.draft.CREW.md`에 같은 건을
+  해소자 관점으로 등재했다. 이 번호 하나로 합쳤고 **발견 귀속은 CORE, 해소는 CREW**다.
+  CREW가 남긴 **"왜 1차 감사가 이걸 놓쳤는가"**도 함께 옮긴다 — 감사 표의 DB 열에 "트리거
+  크루 상태 미검사"라고 이미 적어 두고도, `#5·#9·#10`에 일관되게 적용한 **"DB가 안 막으면
+  안 막힘"** 기준을 이 행(#8)에서만 느슨하게 적용했다(앱 레이어가 있다는 데 안심했다).
+  **같은 감사 안에서 같은 기준을 행마다 다르게 적용한 것이 원인이다** — 다음 감사자가
+  가장 참고할 부분이다.
+
+### I-148 · `respond-to-invitation.ts`가 private+archived 크루에서 부정확한 실패 사유를 보여준다 — D-030 ③
+
+- **상태**: 열림 — 미수정(이번 회차 범위 확장 안 함, 팀장 지시)
+- **영역**: UX / 오류 채널 (D-030 ③) / `src/lib/actions/respond-to-invitation.ts`
+- **제보**: CREW(초대 수락 수정 중 한계로 발견·보고) → 팀장(코드 확인) → CORE(31일차,
+  `getCrewById` 불변식 주석 정정 중 소비자 전수 재확인)
+- **내용**: `getCrewById`의 private+비소속 폴백은 `status`를 항상 `"active"`로 반환한다
+  (I-070 인접). `respond-to-invitation.ts`는 초대 대상자(아직 `crew_memberships.
+  status='invited'`, `'active'` 아님)를 행위자로 두므로, **private + archived** 크루의
+  대기 중 초대에 응답할 때 이 폴백을 탄다. `evaluateInvitationResponseEligibility`
+  (`lib/rules/invitation-response-eligibility.ts:35-37`)는 `crew.status !== "active"`
+  검사 외에 archived를 걸러낼 독립 조건이 없어 가짜 `"active"`를 그대로 믿고
+  `{eligible:true}`를 반환한다 — 액션이 실제 UPDATE를 시도하고, 31일차 신설
+  `invitations_guard_response_transition` 트리거(`accepted` 전이 archived 가드,
+  `20260730074232` 마이그레이션)가 SQL 레벨에서 그 UPDATE를 예외로 거부한다.
+- **영향**: **데이터는 안전하다** — 트리거가 archived 크루에 유령 멤버십이 생기는 것을
+  막는다(위 I-145 인접 항목의 후속 수정). 다만 사용자는 "이 크루는 해산되었습니다"라는
+  정확한 사유(`crewArchived`류 문구) 대신, SQL 예외를 뭉뚱그린 범용 실패 메시지를 본다 —
+  D-030 ③가 요구하는 "정확한 사유를 보여준다"는 원칙 위반이다. `request-join-crew.ts`도
+  같은 폴백을 타지만(비멤버가 행위자), `evaluateJoinRequestEligibility`가 `visibility
+  !== "public"`이면 `status`와 무관하게 항상 `private_crew`로 거부해 **참인 다른 이유로
+  결국 막히므로** 실질적 결함이 아니다(private 크루는 애초에 join-request 대상이 아니다) —
+  `respond-to-invitation.ts`만 이 결함의 실제 사례다.
+- **후속 후보**: `respond-to-invitation.ts`(또는 `evaluateInvitationResponseEligibility`가
+  받는 `crew` 인자 자체)가 archived 여부를 `getCrewById`의 폴백에 의존하지 않고 확인할
+  방법이 필요하다 — 예: `getCrewById`의 폴백이 `status`를 아예 채우지 않고(타입을
+  `status: CrewStatus | "unknown"`으로 열거나) 호출자가 명시적으로 처리하게 하거나,
+  이 액션만 별도로 크루 존재·상태를 SECURITY DEFINER RPC로 직접 확인하는 방법. 처분(다음
+  회차 배정 여부·구체적 설계)은 팀장 판단.
+
+### I-149 · archived 크루의 posts·comments UPDATE(수정·소프트삭제)는 여전히 가능하다 — 오류가 아니라 19일차 의도적 범위 판정이며, 31일차에 유지가 재확인됐다
+
+- **상태**: 열림 — **(B) 알고 지내기로 한 것으로 명시 기록.** 고치지 않는다(재확인 완료)
+- **영역**: 데이터 / 게시판
+- **제보**: CREW(2026-07-30, 31일차 — "archived 크루 쓰기 표면 전수 감사" 중 발견,
+  `FR-013 AC2 위반 후보`로 보고) → BOARD가 코드·문서 이력을 대조해 "오류 아님, 이미 닫힌
+  결정"으로 재판정(팀장 배정 지시로 조사, 사용자 결정으로 확정)
+- **실제 정책 비대칭(코드로 확인, `pg_policies` 재조회 결과 그대로)**:
+  - `posts_insert_members`(INSERT) — `private.is_crew_active(b.crew_id)` **있음**
+  - `posts_update_author_or_staff_delete`(UPDATE) — **없음**
+  - `comments_insert_members`(INSERT) — **있음**
+  - `comments_update_author_or_staff_delete`(UPDATE) — **없음**
+  - 즉 archived(해산) 크루에서도 글 작성은 막히지만, 작성자 본인의 기존 글·댓글 수정과
+    임원의 소프트 삭제는 여전히 성공한다.
+- **이것이 오류가 아니라 19일차 의도적 범위 판정이라는 근거**: 이 비대칭을 만든
+  마이그레이션 `supabase/migrations/20260725094141_crews_block_writes_in_archived_crew_i066.sql`
+  (19일차, CORE, I-066 해소)의 헤더 주석이 UPDATE를 **제외 ②로 명시**한다 — "I-066 원문의
+  핵심 증상은 '새로 쓴다'(INSERT)이지 '기존 걸 고친다'가 아니다. 편집·모더레이션 차단까지
+  넣으면 **'과잉'(팀장이 경고한 것)** 위험이 있어 이번엔 INSERT만 좁힌다." `docs/ISSUES.md`
+  I-066은 이 상태로 **"해결됨"**으로 닫혔고(1917행), 20일차 각주(1974~1975행)가 "UPDATE도
+  '과잉' 위험 판단으로 넣지 않았다"고 같은 내용을 재확인한다 — **미결 이월이 아니라 닫힌
+  이슈의 최종 확정 상태로 이미 기록돼 있었다.**
+- **FR-013 AC2 원문 판정 — CREW의 인용은 원문이 아니라 일반화였다**: `docs/requirements/
+  requirements.md` 527행 AC2 원문 그대로 — "Given 해산된 크루, When **크루원이 캘린더 조회**,
+  Then 해당 크루의 **미래 Meetup 바**가 사라지고 과거 항목은 열람 전용으로 남는다." Given/When
+  전체가 **캘린더·Meetup 조회**에 관한 것이고 "게시글"·"post"는 이 AC 어디에도 없다. CREW가
+  인용한 "기존 게시글은 열람 전용으로 남는다"는 원문이 아니라 CREW의 일반화다 — **이 AC는
+  posts·comments의 UPDATE를 규정하지 않는다.** 이 한 줄을 남기는 이유는 다음 사람이 같은
+  일반화를 다시 원문으로 착각하는 것을 막기 위해서다.
+- **실측(31일차, BOARD)**: `execute_sql`로 확인 — 현재 archived 크루는 **1개뿐**이고 그
+  크루의 게시글 수는 **0건**이다. 즉 지금 이 gap으로 실제 데이터가 수정된 사례는 **0건** —
+  노출은 이론적 위험이며 진행 중인 사고가 아니다.
+- **31일차 처리 경위**: 팀장이 CREW의 "FR-013 AC2 위반" 프레이밍을 원문 대조 없이 받아들여
+  BOARD에게 "확정됐다"며 마이그레이션 적용을 배정했다. BOARD가 적용 전 위 두 근거(AC2 원문·
+  19일차 마이그레이션 헤더)를 직접 대조해 **적용을 보류하고 보고**했고, 사용자가 **"19일차
+  결정 유지, 마이그레이션 적용하지 않는다"**로 확정했다(31일차). 팀장 자기 지적: "실물(정책
+  비대칭)만 보고 이력(왜 그런지)은 보지 않았다" — 30일차의 같은 유형 결함(팀장이 원문 확인
+  없이 절차를 확정) 재발.
+- **재검토 조건(BOARD 판단)**: 아래 중 하나라도 실제로 발생하면 이 판정을 다시 봐야 한다 —
+  ① archived 크루에 게시글이 실제로 쌓이는 운영 규모가 되어(현재 0건) 위 "실피해 0" 전제가
+  깨질 때, ② FR-013이 개정되어 AC2 또는 새 AC가 posts·comments를 명시적으로 다룰 때, ③
+  사용자·법무 쪽에서 "과거 기록 무결성"을 명시적 요구사항으로 새로 확정할 때(D-083류 제품
+  값 결정과 같은 경로). 그 전까지는 19일차 판정("과잉 방지")이 유효하다.
+- **관련**: I-066(닫힘, `docs/ISSUES.md` 1917행) · `docs/decisions/rls-policies-029b.md` §18 ·
+  `docs/design/archived-crew-write-surface-audit-31/README.md`(CREW 원 감사 산출물)
+
+  **번호 병합 경위(팀장, 회차 마감)**: CREW도 같은 건을 자기 draft에 등재했다가
+  **스스로 "종결(정정)"으로 바꾸고 "severity가 가장 높다"는 자기 판단까지 명시적으로 철회**했다.
+  이 번호 하나로 합쳤다. **발견(정책 비대칭 실재)은 CREW, 반증(오류가 아니라 19일차 의도적
+  판정)은 BOARD**다.
+- **팀장 결함 기록**: 팀장이 CREW의 "FR-013 AC2 위반" 프레이밍을 **원문 대조 없이 그대로 받아**
+  BOARD에게 "확정했다"고 배정했다. `pg_policies`로 정책 비대칭은 확인했지만 **왜 비대칭인지
+  (이력)는 확인하지 않았다** — 실물만 보고 이력을 안 본 것이다. 30일차에 "팀장이 원문이 요구한
+  절차를 확인하지 않았다"(I-050)는 같은 유형이 이미 한 번 났는데 반복했다. **BOARD가 멈추지
+  않았으면 닫힌 결정이 재조사 없이 뒤집혔다.**
+
+### I-150 · `createPost`도 `createComment`와 같은 패턴의 잠재 결함 — RLS 거부 시 원시 예외를 던진다(수정하지 않음, 범위 밖)
+
+- **상태**: 열림(신규) — 수정하지 않음, 범위 밖으로 명시 이월
+- **영역**: 데이터 / 게시판
+- **제보**: BOARD(2026-07-30, 31일차 — `create-comment.ts` 수정 중 형제 파일 대조하다 발견)
+- **내용**: `src/lib/data/supabase/board.ts`의 `createPost`가 여전히
+  `Promise<Post>`를 반환하며 `if (error) throw error`로 원시 예외를 던진다 — 이번에 고친
+  `createComment`(수정 전)와 정확히 같은 모양이다. `posts_insert_members` RLS가
+  `private.is_crew_active`로 archived 크루의 INSERT를 거부하므로, archived 크루에서
+  `createPostAction`(`src/lib/actions/create-post.ts` 225행, `const post = await
+  createPost({...})`, try/catch 없음)을 직접 호출하면 `DataResult` 계약을 어기고 처리되지
+  않은 예외가 그대로 올라갈 가능성이 있다.
+- **왜 이번에 안 고쳤는가**: 이번 회차 배정은 `create-comment.ts`(댓글) 한정이었다 — 범위를
+  스스로 넓히지 않았다. 같은 파일(`create-post.ts`)이 이미 다른 회차 산출물(I-079·I-130 등)로
+  여러 결정이 얹혀 있어, 손대려면 별도 배정으로 영향 범위를 다시 따져야 한다.
+- **확인 못 한 것**: 브라우저 재현(archived 크루에서 실제로 글쓰기 폼에 도달해 제출까지
+  가는지 — `PostWriteContainer`가 이미 진입 자체를 막는다는 기록이 있어(I-066 19일차 BOARD
+  각주) 정상 UI 경로로는 도달하지 않을 수 있다, 직접 액션 호출 시에만 재현될 가능성). 이번
+  회차는 코드 대조만 했다.
+- **후속(제안)**: `createComment`에 적용한 것과 같은 패턴(`err("forbidden", error.message)`,
+  `Promise<DataResult<Post>>`)으로 `createPost`를 맞추고 `createPostAction`의 해당 지점도
+  `!result.ok` 분기로 바꾼다. `updatePost`·`deletePost`(같은 파일)는 이미 이 패턴이라 참고할
+  수 있다.

@@ -44,6 +44,24 @@ import type { Id } from "@/lib/types";
  * 그 레이아웃과 마찬가지로 이 컨테이너도 "알려라"만 하고, "설정" 버튼 자체는 숨기지 않는다
  * (숨기면 오너가 크루명이라도 다시 확인할 방법이 없어진다 — 배너로 "이 크루는 해산됐다"를
  * 먼저 보여주는 것으로 충분하다는 것이 기존 D-039 판단과 같은 결이다).
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사) — 비소속 방문자 분기에도 같은 배너를 단다.**
+ * 위 30일차 수정은 "활성 멤버십" 분기에만 배너를 달았다 — public archived 크루를 비소속
+ * 방문자(게스트 포함)가 보는 `CrewIntroPreview` 분기는 여전히 아무 안내 없이 일반 크루처럼
+ * 보였고, `resolveJoinRequestButtonState`는 crew.status를 보지 않아 "가입 신청" 버튼도
+ * 그대로 활성으로 떴다(`request-join-crew.ts`가 이번에 실제 사유로 정확히 거부하도록
+ * 고쳐졌으므로 클릭해도 데이터는 안전하지만, 애초에 안내가 없는 것은 정직하지 않다).
+ * 버튼 자체는 숨기지 않는다(위 문단과 같은 이유 — 실패 시 정확한 문구를 보여주는 것으로
+ * 충분하다는 원칙을 여기도 그대로 적용한다) — `ArchivedCrewBanner`만 같은 방식으로 추가한다
+ * (새 컴포넌트 없음, 활성 멤버십 분기와 완전히 같은 패턴).
+ *
+ * **`crew.status`가 여기서 신뢰 가능한 값인지 확인**(`crew.ts`의 `getCrewById` 불변식 참고) —
+ * 이 분기는 `crew.visibility === "private"` 조건을 이미 통과한 뒤라(위에서 그 경우는 먼저
+ * `PrivateCrewNotice`로 갈라진다) 도달 시점의 크루는 항상 `public`이다. `public` 크루는
+ * `crews_select_anon_public`/`crews_select_authenticated` RLS가 멤버십과 무관하게 direct
+ * select를 항상 허용하므로, `getCrewById`가 `status`를 항상 `"active"`로 고정해 반환하는
+ * private 전용 RPC 폴백(0행일 때만 타는 경로)에는 이 분기가 도달하지 않는다 — 여기서 읽는
+ * `crew.status`는 항상 실제 값이다.
  */
 export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
   const crew = await getCrewById(crewId);
@@ -95,14 +113,17 @@ export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
   });
 
   return (
-    <CrewIntroPreview
-      crewId={crew.id}
-      name={crew.name}
-      description={crew.description}
-      category={crew.category}
-      colorIndex={crew.colorKey}
-      memberCount={memberCount}
-      joinState={joinState}
-    />
+    <>
+      {crew.status === "archived" && <ArchivedCrewBanner />}
+      <CrewIntroPreview
+        crewId={crew.id}
+        name={crew.name}
+        description={crew.description}
+        category={crew.category}
+        colorIndex={crew.colorKey}
+        memberCount={memberCount}
+        joinState={joinState}
+      />
+    </>
   );
 }

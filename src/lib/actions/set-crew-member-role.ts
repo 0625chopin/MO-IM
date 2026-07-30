@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { recordAuditLog } from "@/lib/audit/audit-log";
-import { getCrewMembership, setCrewMembershipRole } from "@/lib/data";
+import { getCrewById, getCrewMembership, setCrewMembershipRole } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
@@ -23,6 +23,12 @@ import type { CrewMembershipRole } from "@/lib/types";
  * `checkPermission`의 3.3절 매트릭스 행(`crew:appoint_staff`)은 "오너인가"만 보고 대상의
  * role·상태는 모른다(그 매트릭스 셀 자체가 크루 컨텍스트를 받지 않는 unconditional allow다).
  * 대상 조건은 이 액션이 `getCrewMembership`으로 대상 멤버십을 직접 조회해 확인한다.
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사) — 진짜 결함을 막는다.**
+ * `crew_memberships_guard_self_transition`의 "남의 행" role-change 분기는 crew.status를
+ * 검사하지 않아, archived 크루에서도 임원 임명·해임이 그대로 성공한다(`remove-crew-member.ts`
+ * 와 같은 원인). 이 액션이 최초 진입점이라 여기서 막는다. SQL 쪽 동급 방어는 이번 회차
+ * 범위 밖으로 별도 보고한다.
  */
 export interface SetCrewMemberRoleFormState {
   success?: boolean;
@@ -59,6 +65,11 @@ export async function setCrewMemberRoleAction(
   const permission = checkPermission({ role: viewerRole, action: "crew:appoint_staff" });
   if (!permission.allowed) {
     return { formError: strings.crew.members.appoint.errors.notAllowed };
+  }
+
+  const crew = await getCrewById(crewId);
+  if (!crew || crew.status !== "active") {
+    return { formError: strings.crew.members.appoint.errors.crewArchived };
   }
 
   const targetMembership = await getCrewMembership(crewId, targetProfileId);

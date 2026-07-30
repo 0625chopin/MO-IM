@@ -235,9 +235,11 @@ export async function approveCrewMembership(
 
 /**
  * 가입 신청 반려(FR-023) — 멤버십 쪽 반영. 2.4절 `requested --reject_request--> rejected`.
- * 신청자 본인의 자진 철회(`withdrawPendingCrewMembership`)와 결과 상태(`rejected`)는 같지만
- * 호출 맥락(오너·임원의 결정 vs 본인의 철회)이 달라 함수를 나눴다 — "누가 끝냈는지"는
- * `JoinRequest.decidedBy`(반려는 값 있음, 철회는 `null`)로 구분된다(I-040).
+ * 신청자 본인의 자진 철회도 개념상 같은 종착 상태(`rejected`)로 합류한다(D-086) — 다만
+ * 그 경로를 담당하던 별도 Mock 함수(`withdrawPendingCrewMembership`)는 Task 032(18일차)부터
+ * 실제 호출부가 0건이던 죽은 코드였음이 30일차(I-143·I-144)에 드러나 31일차에 삭제됐다.
+ * "누가 끝냈는지"는 함수 분리가 아니라 `JoinRequest.decidedBy`(반려는 값 있음, 철회는
+ * `null`)로 구분된다(I-040).
  */
 export async function rejectCrewMembership(
   crewId: Id,
@@ -352,32 +354,10 @@ export async function initiateCrewMembership(
   return membership;
 }
 
-/**
- * 가입 신청 철회(FR-022 E4)의 멤버십 쪽 반영. 2.4절 다이어그램에는 신청자 자신의 철회
- * 전이가 없다(오너/임원의 승인·반려만 정의됨) — 재신청 가능 여부(`removed`만 차단)에는
- * 차이가 없으므로 실용적으로 `rejected`(반려)와 같은 종착 상태로 합류시킨다. "누가 왜
- * 끝냈는지"의 실제 기록은 `JoinRequest.status`(`pending`→`withdrawn`, `join-request.ts`)가
- * 이미 구분해 담당한다 — 이 근사가 맞는지는 `docs/ISSUES.md` I-039에 남겼다.
- *
- * **I-143 해소(30일차)** — 이전에는 `membership.status = "rejected"`를 직접 대입하고
- * `if (status !== "requested")` 가드를 손으로 다시 썼다. `rejectCrewMembership`(위)과
- * 대칭을 맞춰 `transitionCrewMembershipStatus(membership.status, "reject_request")`를
- * 거치도록 바꿨다 — 대입값(`"rejected"`)과 가드 조건(`"requested"`에서만 허용)은
- * `TRANSITIONS.requested.reject_request`가 이미 표현하던 것과 동일해 동작은 바뀌지 않는다
- * (근거: `docs/decisions/i143-withdraw-transitions-passthrough.md`).
- */
-export async function withdrawPendingCrewMembership(
-  crewId: Id,
-  profileId: Id,
-): Promise<DataResult<CrewMembership>> {
-  const membership = store.crewMemberships.find(
-    (m) => m.crewId === crewId && m.profileId === profileId,
-  );
-  if (!membership) return err("not_found", `crew ${crewId} 의 멤버십(${profileId})을 찾을 수 없다.`);
-  const next = transitionCrewMembershipStatus(membership.status, "reject_request");
-  if (!next) {
-    return err("conflict", `crew ${crewId} 의 멤버십(${profileId})은 대기 중 신청 상태가 아니다.`);
-  }
-  membership.status = next;
-  return ok(membership);
-}
+// `withdrawPendingCrewMembership`(가입 신청 자진 철회의 멤버십 쪽 반영)은 31일차에 삭제됐다.
+// Task 032(18일차)부터 `src/lib/data/index.ts` 배럴이 `./mock/*`를 재노출하지 않아 실제
+// 호출부가 0건이던 죽은 코드였다(I-144, CLAUDE.md "확실히 unused면 완전히 지운다" 원칙 적용).
+// 실제 자진 철회 쓰기 경로는 Mock `withdrawJoinRequest`(`./join-request.ts`, `join_requests`만
+// 갱신)와 Supabase `withdraw_join_request` RPC(SQL 트랜잭션 안에서 `crew_memberships`까지
+// 원자적으로 갱신)가 각각 담당한다 — 이 함수는 애초에 그 경로들 중 어디에도 연결된 적이
+// 없었다.

@@ -21,6 +21,11 @@ import { strings } from "@/lib/strings";
  * 안내 문구를 더 정확히 보여주기 위한 이중화일 뿐이다. `transferCrewOwnership`(`lib/data`)이
  * 호출하는 `crews_guard_owner_only_fields` 트리거(Task 040 확장)가 실제 경계이며, publishable
  * key로 `/rest/v1/crews`를 직접 PATCH해도 이 트리거가 막는다.
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사)** — 오너 이양은 `crews.owner_id`를 UPDATE하므로
+ * I-070과 같은 `crews_guard_archived_immutable` 트리거를 그대로 탄다(SQL이 이미 막는다,
+ * 데이터 문제 아님). 다만 그 실패가 이 화면까지 오면 위 범용 `errors.failed`로만 보였다
+ * (I-070과 동일한 "(b) 범용 실패 문구" 패턴) — 여기서 먼저 걸러 정확한 문구를 준다.
  */
 export interface TransferCrewOwnershipFormState {
   formError?: string;
@@ -57,6 +62,10 @@ export async function transferCrewOwnershipAction(
 
   if (confirmName !== crew.name) {
     return { formError: strings.crew.settings.transferOwnership.errors.nameMismatch };
+  }
+
+  if (crew.status !== "active") {
+    return { formError: strings.crew.settings.transferOwnership.errors.crewArchived };
   }
 
   const targetMembership = await getCrewMembership(crewId, targetProfileId);

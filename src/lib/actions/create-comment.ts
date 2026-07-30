@@ -73,12 +73,18 @@ export async function createCommentAction(
     }
   }
 
-  const comment = await createComment({
+  const result = await createComment({
     postId: input.postId,
     authorId: session.profileId,
     parentId,
     body: input.body.trim(),
   });
+  // 31일차(CREW 감사 발견) — `comments_insert_members` RLS(archived 크루 등)가 여기서 거부될
+  // 수 있다. `createComment`가 이제 DataResult를 반환하므로(I-070과 같은 패턴) 그대로 전달한다.
+  if (!result.ok) {
+    return result;
+  }
+  const comment = result.data;
 
   if (post.authorId !== session.profileId) {
     await createNotification({

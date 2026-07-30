@@ -114,6 +114,51 @@ export async function getCrewById(id: Id): Promise<Crew | null> {
     visibility: summary.visibility as CrewVisibility,
     colorKey: 0,
     ownerId: "",
+    // **불변식(31일차, I-070 교차검증 중 DESIGN 발견 → CORE 근거 정정 → CREW·팀장이 그 정정의
+    // 소비자 목록 자체가 불완전했음을 재차 지적, 3단계 수정 이력) — 이 폴백이 반환하는
+    // `status`는 항상 "active"로 고정돼 있고 실제 크루 상태를 반영하지 않는다.**
+    // `crew_directory_summary` RPC가 status 컬럼을 주지 않기 때문이다.
+    //
+    // **소비자는 두 부류다 — 컨테이너(안전)와 Server Action(부분적으로 안전하지 않음).**
+    // ① 컨테이너(`CrewSettingsContainer`·`CrewMembersContainer`·`BoardListContainer`·
+    // `PostWriteContainer`·`MessageListContainer`, 레이아웃 자신의 archived 배너)는 전부
+    // `(app)/crews/[crewId]/layout.tsx`의 활성 크루원 게이트(`isActiveMembership`, D-039,
+    // **역할 무관**) 뒤에서만 실행된다 — `crews_select_authenticated` RLS도 role 조건 없이
+    // "활성 멤버십이면" direct select를 허용하므로(`pg_policies` 실측 확인), 그 게이트를
+    // 통과한 시점엔 direct select가 이미 항상 성공해 이 폴백에 도달하지 않는다(84-91행과
+    // 같은 근거).
+    // ② **`src/lib/actions/*.ts` Server Action 10개도 `getCrewById`를 부른다** —
+    // `decide-join-request`·`disband-crew`·`invite-crew-member`·`remove-crew-member`·
+    // `request-join-crew`·`respond-to-invitation`·`set-crew-member-role`·
+    // `transfer-crew-ownership`·`update-crew-info`·`update-crew-visibility`. **Server
+    // Action은 그 레이아웃 게이트 뒤에 있지 않다** — 별도 진입점이다. 이 중 8개
+    // (`request-join-crew`·`respond-to-invitation` 제외 전부)는 행위자가 이미 그 크루의
+    // staff/owner이거나(임원 행위) 이미 처리 대상 크루의 활성 멤버여야만 호출 가능한
+    // 액션이라 실질적으로 안전하다(행위자가 활성 멤버 → direct select 성공, 위 ①과 같은
+    // 이유).
+    //
+    // **안전하지 않은 나머지 2개, 확인한 결과가 서로 다르다**:
+    // - `request-join-crew.ts`: 행위자가 아직 비멤버(가입 신청 자체가 그런 행위)라 private
+    //   크루에서는 이 폴백을 탄다. 하지만 `evaluateJoinRequestEligibility`가 방문 크루의
+    //   `visibility !== "public"`이면 `status`와 무관하게 항상 `private_crew`로 거부한다
+    //   (`join-request-eligibility.ts`) — 폴백이 준 가짜 `"active"`를 그 앞의
+    //   `crew.status !== "active"` 검사가 못 잡아도, 뒤이은 visibility 검사가 **참인 다른
+    //   이유로** 결국 막는다. 사용자는 "archived라서" 대신 "private이라서"를 보게 되지만
+    //   private 크루는 애초에 join-request 대상이 아니므로 **둘 다 참인 설명이라 사실상
+    //   무해**하다.
+    // - `respond-to-invitation.ts`: **여기는 실결함이다.** 초대 대상자는 `crew_memberships.
+    //   status='invited'`(`'active'`가 아님)라 private 크루에서 이 폴백을 탄다.
+    //   `evaluateInvitationResponseEligibility`는 이 경우를 걸러낼 다른 독립 조건이 없다 —
+    //   폴백의 가짜 `"active"`를 그대로 믿고 `{eligible:true}`를 반환해 실제 쓰기 시도로
+    //   넘어간다. 데이터는 안전하다(`invitations_guard_response_transition` 트리거,
+    //   31일차 `20260730074232` 마이그레이션, I-145 인접 항목이 SQL 최종 경계에서 막는다) —
+    //   다만 사용자는 "이 크루는 해산되었습니다"라는 정확한 사유 대신 원인 불명의 범용
+    //   실패 메시지를 본다(D-030 ③ 위반). `docs/ISSUES.draft.CORE.md`에 등재, 수정은
+    //   다음 회차 후보(이번 회차는 범위를 넓히지 않는다).
+    //
+    // **이 함수에 `status`를 새로 소비하는 코드(컨테이너든 Server Action이든)를 추가하기
+    // 전에**, 그 호출자가 이미 활성 멤버임이 보장되는 자리인지 먼저 확인할 것 — 보장되지
+    // 않고 다른 독립된 조건도 없다면 `respond-to-invitation.ts`와 같은 결함이 반복된다.
     status: "active",
   };
 }

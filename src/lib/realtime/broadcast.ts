@@ -8,6 +8,22 @@
  * 모듈 스코프 싱글턴 하나만 만들고, 여러 `subscribeToRoom` 호출은 그 위에 채널만 새로
  * 여는 것으로 이 제약을 지킨다.
  *
+ * **31일차(CORE) — 같은 topic에 대한 채널을 참조 카운트로 공유한다(I-145).** `@supabase/
+ * realtime-js`(`node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js`
+ * `channel()`)는 같은 topic 문자열로 `channel()`을 두 번 부르면 **새로 만들지 않고 기존
+ * 인스턴스를 그대로 반환**한다 — 알림처럼 `NotificationBellContainer`·`ToastHostContainer`·
+ * `NotificationCenterListContainer` 세 컨테이너가 같은 topic(`user:{id}:notifications`)을
+ * 독립적으로 구독하면 셋이 **같은 채널 객체**를 공유하게 된다. 그런데 벤더 `removeChannel`은
+ * 참조 카운트가 없어 `channel.unsubscribe()` → `channel.teardown()`을 그대로 실행하고,
+ * 벤더 Phoenix `Channel.teardown()`(`node_modules/@supabase/phoenix/assets/js/phoenix/
+ * channel.js`)은 `this.bindings = []`로 **그 채널의 모든 이벤트 바인딩을 통째로 비운다** —
+ * 셋 중 하나만 언마운트해도(예: `/notifications`를 열었다 나가면) 나머지 둘이 여전히
+ * 마운트돼 있는데도 공유 채널이 죽어 실시간 알림이 조용히 끊긴다. 아래 `rooms` 맵이 topic당
+ * 리스너 집합과 참조 카운트를 들고 있다가 **마지막 구독자가 나갈 때만** `removeChannel`을
+ * 부르는 것으로 해소한다. `subscribeToRoom(id, onEvent): Unsubscribe` 계약(D-030 ②)은
+ * 바뀌지 않는다 — 다중화는 이 파일 안에서만 일어난다. 조사 경위·벤더 소스 재현 로그는
+ * `docs/decisions/realtime-shared-channel-teardown-145.md` 참고.
+ *
  * **토픽 = roomId다.** 이 파일은 전송 계층이라 "crew:{id}:chat" 같은 토픽 문자열을 만들지
  * 않는다(029B §6.1의 명명 규칙) — 호출자(컨테이너)가 `roomId` 인자에 이미 올바른 토픽
  * 문자열을 넣어서 호출해야 `realtime.messages`의 Authorization 정책(RLS)이 매치된다.
@@ -26,7 +42,7 @@
 import { createSupabaseBrowserClient } from "@/lib/data/supabase/client";
 import { getRealtimeAuthTokenAction } from "@/lib/realtime/get-realtime-auth-token";
 
-import type { SubscribeToRoom, Unsubscribe } from "./types";
+import type { RealtimeErrorHandler, RealtimeEventHandler, SubscribeToRoom, Unsubscribe } from "./types";
 
 type BroadcastClient = ReturnType<typeof createSupabaseBrowserClient>;
 
@@ -104,44 +120,87 @@ function getClient(): BroadcastClient {
  */
 const TERMINAL_STATUSES = new Set(["CHANNEL_ERROR", "TIMED_OUT"]);
 
+interface RoomListener {
+  onEvent: RealtimeEventHandler;
+  onError?: RealtimeErrorHandler;
+}
+
+interface RoomEntry {
+  channel: ReturnType<BroadcastClient["channel"]>;
+  listeners: Set<RoomListener>;
+}
+
+/** topic(roomId) → 공유 채널 항목. 같은 topic을 구독하는 소비자가 여럿이면(예: 알림의
+ *  벨·토스트·목록 3곳) 벤더 `supabase.channel()`이 어차피 같은 채널 인스턴스를 반환하므로
+ *  (I-145 상단 docstring 참고), 여기서도 하나만 만들고 리스너만 늘린다 — `removeChannel`은
+ *  이 맵의 리스너가 0개가 될 때만 부른다(참조 카운트). */
+const rooms = new Map<string, RoomEntry>();
+
 /** `SubscribeToRoom` 계약의 실데이터 구현. `index.ts`가 이 값을 `subscribeToRoom`으로 노출한다.
  *  전송 계층이라 payload 내용을 해석하지 않는다(`types.ts` 참고) — `occurredAt`은 이 클라이언트가
- *  이벤트를 수신한 시각이다(도메인 생성 시각이 필요하면 payload 안의 필드를 소비자가 읽는다). */
+ *  이벤트를 수신한 시각이다(도메인 생성 시각이 필요하면 payload 안의 필드를 소비자가 읽는다).
+ *
+ *  **I-145 해소 — topic당 채널·바인딩을 한 번만 만들고 리스너 집합으로 팬아웃한다.** 벤더
+ *  `RealtimeChannel.subscribe()`는 채널이 이미 열려 있으면(`closed`가 아니면) 본문 전체를
+ *  건너뛴다 — 즉 두 번째 소비자가 `.subscribe(callback)`을 불러도 그 `callback`(상태 콜백,
+ *  여기서는 `onError` 발화용)은 **등록조차 되지 않는다**(재현: `RealtimeChannel.js`의
+ *  `if (this.channelAdapter.isClosed()) { ... }` 가드, 문서 참고). 그래서 벤더의 `.subscribe()`·
+ *  `.on()`은 topic당 **정확히 한 번만** 부르고, 그 안에서 수신한 이벤트·오류를 이 맵의
+ *  `listeners` 전원에게 우리가 직접 팬아웃한다 — 개별 소비자가 각자 `.on()`을 부르지 않으므로
+ *  벤더가 공개하지 않는 `channel.off(event, ref)`(내부 전용, `RealtimeChannel`이 노출하지
+ *  않는다)에 의존할 필요도 없어진다. */
 export const subscribeToRoomViaBroadcast: SubscribeToRoom = (roomId, onEvent, onError) => {
   const supabase = getClient();
   let closed = false;
-  let channel: ReturnType<BroadcastClient["channel"]> | null = null;
+  const listener: RoomListener = { onEvent, onError };
 
   void (async () => {
     if (authReady) await authReady;
     if (closed) return;
 
-    channel = supabase.channel(roomId, { config: { private: true } });
-    channel.on("broadcast", { event: "*" }, (message) => {
-      if (closed) return;
-      onEvent({
-        type: message.event,
-        roomId,
-        payload: message.payload,
-        occurredAt: new Date().toISOString(),
+    let entry = rooms.get(roomId);
+    if (!entry) {
+      const channel = supabase.channel(roomId, { config: { private: true } });
+      entry = { channel, listeners: new Set() };
+      rooms.set(roomId, entry);
+
+      channel.on("broadcast", { event: "*" }, (message) => {
+        const current = rooms.get(roomId);
+        if (!current) return;
+        const event = {
+          type: message.event,
+          roomId,
+          payload: message.payload,
+          occurredAt: new Date().toISOString(),
+        };
+        for (const l of current.listeners) l.onEvent(event);
       });
-    });
-    channel.subscribe((status, err) => {
-      if (closed) return;
-      if (TERMINAL_STATUSES.has(status)) {
-        onError?.({
+      channel.subscribe((status, err) => {
+        if (!TERMINAL_STATUSES.has(status)) return;
+        const current = rooms.get(roomId);
+        if (!current) return;
+        const error = {
           roomId,
           message: `Realtime 구독 실패(${status}) — 인가 거부(RLS)이거나 네트워크 문제일 수 있다.`,
           cause: err,
-        });
-      }
-    });
+        };
+        for (const l of current.listeners) l.onError?.(error);
+      });
+    }
+
+    entry.listeners.add(listener);
   })();
 
   const unsubscribe: Unsubscribe = () => {
     if (closed) return;
     closed = true;
-    if (channel) void supabase.removeChannel(channel);
+    const entry = rooms.get(roomId);
+    if (!entry) return;
+    entry.listeners.delete(listener);
+    if (entry.listeners.size === 0) {
+      rooms.delete(roomId);
+      void supabase.removeChannel(entry.channel);
+    }
   };
   return unsubscribe;
 };

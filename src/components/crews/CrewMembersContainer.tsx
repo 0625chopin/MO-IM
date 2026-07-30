@@ -34,6 +34,19 @@ const ROLE_RANK: Record<CrewMembershipRole, number> = { owner: 0, staff: 1, memb
  * **가입 신청 목록은 승인 권한이 있을 때만 조회한다** — 일반 크루원은 `crew:approve_join_request`가
  * 애초에 거부되므로 `JoinRequestPanel` 자체를 그리지 않는다. 데이터도 그 경우 조회하지 않아
  * 불필요한 프로필 조인을 피한다.
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사) — 쓰기 버튼을 `crew.status === "active"`로도
+ * 가둔다.** 이 컨테이너는 원래 crew.status를 전혀 읽지 않아 archived 크루에서도 초대·가입
+ * 신청 승인/반려·임원 임명·오너 이양·강퇴 버튼이 전부 정상 활성 상태로 열려 있었다 —
+ * `CrewSettingsContainer`가 I-070에서 겪은 것과 같은 구조의 결함이다(같은 레이아웃의
+ * `ArchivedCrewBanner`가 이유는 안내하지만 이 컨테이너의 쓰기 버튼 노출 여부는 그것과
+ * 무관하게 결정됐다). 다만 이 화면은 설정 화면과 달리 **멤버 로스터(읽기)가 archived
+ * 크루에서도 의미가 있어** 컨테이너 전체를 막지 않고 로스터는 그대로 둔 채 초대·승인/반려
+ * (가입 신청 패널 자체 포함, `CrewSettingsContainer`와 같은 이유로 표시/조작을 함께 막는다)·
+ * 임명·이양·강퇴만 `crew.status === "active"`로 추가로 가둔다 — `BoardListContainer`의
+ * `canWrite = permission && crew?.status === "active"` 패턴과 같다(새 패턴 아님). Server
+ * Action 쪽 강제 경계는 각 액션 파일에서 같은 회차에 별도로 추가했다(이 UI 변경은 그 위에
+ * 얹는 방어). 본인 탈퇴(`leavePermission`)는 self-service라 제외한다(아래 참고).
  */
 export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
   const crew = await getCrewById(crewId);
@@ -51,10 +64,17 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
   const viewerMembership = await getCrewMembership(crewId, session.profileId);
   const viewerRole = deriveUserRoleForPermissionCheck(viewerMembership);
 
-  const canInvite = checkPermission({ role: viewerRole, action: "crew:invite_member" }).allowed;
-  const canApprove = checkPermission({ role: viewerRole, action: "crew:approve_join_request" }).allowed;
-  const canAppoint = checkPermission({ role: viewerRole, action: "crew:appoint_staff" }).allowed;
-  const canTransferOwnership = checkPermission({ role: viewerRole, action: "crew:transfer_ownership" }).allowed;
+  // 31일차(CREW, archived 크루 쓰기 표면 감사) — 아래 "쓰기" 판정에만 곱한다. 로스터·처리
+  // 내역 열람과 본인 탈퇴(`leavePermission`)는 archived 크루에서도 여전히 의미가 있어
+  // 제외한다(탈퇴는 자기 자신만 대상인 self-service라 다른 쓰기 버튼과 위험도가 다르다).
+  const isActive = crew.status === "active";
+
+  const canInvite = checkPermission({ role: viewerRole, action: "crew:invite_member" }).allowed && isActive;
+  const canApprove =
+    checkPermission({ role: viewerRole, action: "crew:approve_join_request" }).allowed && isActive;
+  const canAppoint = checkPermission({ role: viewerRole, action: "crew:appoint_staff" }).allowed && isActive;
+  const canTransferOwnership =
+    checkPermission({ role: viewerRole, action: "crew:transfer_ownership" }).allowed && isActive;
   const leavePermission = checkPermission({
     role: viewerRole,
     action: "crew:leave",
@@ -94,7 +114,7 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
             ? strings.crew.members.leave.errors.ownerMustTransferOrDisband
             : null,
         canTransferOwnership: canTransferOwnership && !isSelf && membership.role !== "owner",
-        canRemove: !isSelf && membership.role !== "owner" && removePermission.allowed,
+        canRemove: !isSelf && membership.role !== "owner" && removePermission.allowed && isActive,
         isBlockedByViewer: blockedIds.has(membership.profileId),
         canReportOrBlock: !isSelf,
       };

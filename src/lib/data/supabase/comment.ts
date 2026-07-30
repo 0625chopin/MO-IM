@@ -48,7 +48,15 @@ export interface CreateCommentInput {
   body: string;
 }
 
-export async function createComment(input: CreateCommentInput): Promise<Comment> {
+/**
+ * 댓글 작성(FR-033 AC1). **31일차(CREW, archived 크루 쓰기 표면 감사) 해소** —
+ * `comments_insert_members` RLS(archived 크루 등)가 여기서 거부될 수 있는데, 예전엔
+ * `throw error`가 `createCommentAction`까지 처리되지 않은 예외로 그대로 올라갔다.
+ * `updateCrewInfo`·`updateCrewVisibility`(I-070, 20일차 CORE)가 이미 쓰는 패턴
+ * (`err("forbidden", …)`)으로 맞춘다 — D-030 ③에 따라 예외를 던지지 않고 도메인 오류로
+ * 표현한다.
+ */
+export async function createComment(input: CreateCommentInput): Promise<DataResult<Comment>> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("comments")
@@ -60,8 +68,8 @@ export async function createComment(input: CreateCommentInput): Promise<Comment>
     })
     .select("*")
     .single();
-  if (error) throw error;
-  return toComment(data);
+  if (error) return err("forbidden", error.message);
+  return ok(toComment(data));
 }
 
 export type UpdateCommentInput = Pick<Comment, "body">;
