@@ -180,6 +180,17 @@
 > `invited` 행이 남아 있어도 권한상 무해하다. 알려진 한계(멤버십 집계에 `invited` 유령 인원이
 > 잡힐 가능성)는 `docs/decisions/invitation-expiry-i030.md` 참고.
 
+> **29일차 추가(D-086, I-040)**: `requested --> rejected` 엣지에 **본인 자진 철회(FR-022 E4)**
+> 라벨이 병기된 것은 두 경로가 `crew_memberships` 레벨에서 **같은 상태로 합류**하기 때문이다 —
+> 새 상태(`withdrawn`)도 새 이벤트(`withdraw_request`)도 추가하지 않았다. 이 병합으로 사용자에게
+> 정보가 손실되지 않는다는 것은 **이미 작동하는 화면으로 증명돼 있다**: 철회와 반려의 구분을
+> 담당하는 것은 이 다이어그램이 다루는 `crew_memberships.status`가 아니라 `JoinRequest.status`
+> 이고, `JoinRequestPanel`의 "처리 내역" 탭이 9일차(Task 017A, 커밋 `8c0b3e1`)부터 `withdrawn`을
+> "철회함"으로, `rejected`를 "반려됨"으로 **따로** 렌더해 왔다. 철회 후 재신청은 아래
+> `rejected --> requested` 엣지가 도달 경로와 무관하게 커버하므로 별도 전이가 필요하지 않다
+> (상태 노드는 어느 엣지로 도달했는지 기억하지 않는다). 근거·기각한 대안 2건은
+> `docs/decisions/join-request-withdrawal-diagram-i040.md` 참고.
+
 ```mermaid
 stateDiagram-v2
     [*] --> invited: 오너/임원이 초대 (FR-020)
@@ -187,7 +198,7 @@ stateDiagram-v2
     invited --> active: 사용자 수락 (FR-021)
     invited --> declined: 사용자 거절 (FR-021)
     requested --> active: 오너/임원 승인 (FR-023)
-    requested --> rejected: 오너/임원 반려 (FR-023)
+    requested --> rejected: 오너/임원 반려 · 본인 자진 철회 (FR-023 · FR-022 E4)
     active --> left: 본인 탈퇴 (FR-026)
     active --> removed: 강퇴 (FR-027)
     declined --> requested: 본인 자진 재신청 (FR-022)

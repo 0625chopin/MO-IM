@@ -21,10 +21,22 @@ import { createSupabaseServerClient } from "./server";
  * 두 테이블 모두에 부분 커밋이 남지 않음을 SELECT로 직접 확인) 원시 로그는
  * `docs/decisions/i054-atomic-write-rpcs.md` 참고.
  *
+ * **I-141 해소(29일차, CORE)** — `withdrawJoinRequest`도 같은 클래스 결함이었다: `join_requests`
+ * UPDATE(`status: "withdrawn"`)와 `crew_memberships` UPDATE(`status: "rejected"`)를 별도
+ * PostgREST 호출 두 개로 실행해, 두 번째가 실패하면 `crew_memberships`가 `requested`로 영구
+ * 고아 상태가 됐다(재신청 불가·임원 재처리 불가, `docs/ISSUES.md` I-141). `withdraw_join_request`
+ * RPC(같은 029B 2단 구조)로 단일 트랜잭션에 묶었다. 자기반증(강제 실패 시 두 UPDATE 모두 롤백
+ * 확인 + 정상 회귀 + `crew_memberships_guard_self_transition`의 `requested→rejected` self-service
+ * 분기가 non-nested 트리거 호출 경로에서도 허용됨을 실측)은 `docs/decisions/i141-atomic-
+ * withdraw-join-request.md` 참고. 이 RPC 전환에 맞춰 `join_requests_update_requester_or_staff`
+ * RLS 정책에서 신청자 본인의 직접 UPDATE(`status='withdrawn'`) 분기를 제거했다 — 정당 경로가
+ * RPC 단독으로 바뀌어 그 분기를 남겨 두면 클라이언트가 여전히 비원자적 2단 쓰기를 재현할 수
+ * 있었다(D-064/I-054와 동일 근거). staff/owner의 승인·반려(FR-023) 분기는 무변경이다.
+ *
  * 승인/반려는 `trg_join_requests_sync_membership_on_decision`(AFTER UPDATE)이 자동
  * 동기화하므로 `decideJoinRequest`가 다시 건드리지 않는다. 철회(자진, FR-022 E4)는 그
- * 트리거의 대상이 아니라서 `withdrawJoinRequest`가 직접 되돌린다(여전히 두 개의 UPDATE —
- * I-054 대상은 INSERT 경로뿐이었다).
+ * 트리거의 대상이 아니라서 `withdraw_join_request` RPC가 같은 트랜잭션 안에서 직접
+ * 되돌린다.
  *
  * **FR-023 동시 승인 방지**: `decideJoinRequest`는 `.eq("status","pending")` 조건부 UPDATE를
  * 쓴다 — D-019와 같은 원리(행 락 획득 후 WHERE 재평가)로, 두 임원이 동시에 승인/반려를
@@ -119,32 +131,32 @@ export async function decideJoinRequest(
   return ok(toJoinRequest(data));
 }
 
-/** 가입 신청 철회(FR-022 E4). 요청한 본인만 철회할 수 있다 — 조회 조건 자체가 게이트다. */
+/**
+ * 가입 신청 철회(FR-022 E4). 요청한 본인만 철회할 수 있다 — `withdraw_join_request` RPC가
+ * 내부에서 `auth.uid()`를 쓰므로(`create_join_request`와 같은 이유, RPC가 유일한 정당 경로),
+ * 호출자가 다른 `requesterId`를 넘겨도 결과는 세션 기준으로만 나온다. `join_requests` UPDATE
+ * (`status: "withdrawn"`)와 `crew_memberships` UPDATE(`status: "rejected"`)가 단일 트랜잭션
+ * 안에서 원자적으로 처리된다(I-141 해소, 29일차 — 위 모듈 docstring 참고). `requesterId`는
+ * Mock과의 시그니처 동일성(NFR-034)을 위해 파라미터로 남겨 둔다.
+ */
 export async function withdrawJoinRequest(
   id: Id,
+  // Mock 시그니처 호환용(NFR-034) — withdraw_join_request RPC가 auth.uid()를 쓰므로 실데이터는
+  // 이 값을 쓰지 않는다(위 docstring). 사용하지 않지만 시그니처 자리는 유지한다.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   requesterId: Id,
 ): Promise<DataResult<JoinRequest>> {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("join_requests")
-    .update({ status: "withdrawn" })
-    .eq("id", id)
-    .eq("requester_id", requesterId)
-    .eq("status", "pending")
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("withdraw_join_request", { p_id: id }).single();
   if (error) throw error;
-  if (!data) return err("not_found", `join request ${id} 를 찾을 수 없다.`);
 
-  // join_requests에는 철회 동기화 트리거가 없다 — crew_memberships를 이 레이어가 직접
-  // 되돌린다(I-039 근사와 동일하게 rejected로, 위 모듈 docstring 참고).
-  const { error: membershipError } = await supabase
-    .from("crew_memberships")
-    .update({ status: "rejected" })
-    .eq("crew_id", data.crew_id)
-    .eq("profile_id", requesterId)
-    .eq("status", "requested");
-  if (membershipError) throw membershipError;
-
+  if (!data.ok) {
+    if (data.reason_code === "not_found" || data.reason_code === "forbidden") {
+      return err(data.reason_code, `join request ${id} 철회가 거부됐다(${data.reason_code}).`);
+    }
+    throw new Error(
+      `withdraw_join_request(${id})가 예상 밖의 reason_code를 반환했다: ${data.reason_code}`,
+    );
+  }
   return ok(toJoinRequest(data));
 }

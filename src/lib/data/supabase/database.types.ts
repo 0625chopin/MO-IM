@@ -1337,6 +1337,21 @@ export type Database = {
         Args: { batch_size?: number; max_duration?: string }
         Returns: number
       }
+      withdraw_join_request: {
+        Args: { p_id: string }
+        Returns: {
+          created_at: string
+          crew_id: string
+          decided_at: string
+          decided_by: string
+          id: string
+          message: string
+          ok: boolean
+          reason_code: string
+          requester_id: string
+          status: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
