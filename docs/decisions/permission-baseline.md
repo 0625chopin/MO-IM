@@ -507,3 +507,221 @@ integer, ...)`로 **정확히 달라짐**. 25일차 BOARD가 추가한 이 컬�
 - `docs/decisions/meetup-reschedule-079.md`가 이 세션 시점엔 없어 CORE의 1차 문서와
   대조하지 못했다(대신 실제 적용된 SQL 원문으로 대조) — 문서가 이후 생기면 내용이 이번 절과
   어긋나지 않는지 한 번 더 확인이 필요하다(미확인으로 남김).
+
+## 9. I-134 해소 — BEFORE 가드 트리거 함수 EXECUTE 권한 관례 확정 (27일차)
+
+- **일자**: 2026-07-30(27일차) / **담당**: CREW / **관련**: I-134, D-074 · **결정으로 승격**:
+  `prioritization-and-risks.md` **D-077**
+- **왜 최우선인가**: 이번 회차 CORE·BOARD가 각각 신규 트리거·RPC 함수를 만들 예정이고, 어느
+  관례를 따를지 이 판정을 기다리고 있었다(팀장 지시).
+
+### 9.1 전수 조회 — `pg_trigger` + `pg_proc` 조인
+
+```sql
+select t.tgname as trigger_name, c.relname as table_name,
+       case when (t.tgtype::int & 66) = 66 then 'BEFORE+INSTEAD'
+            when (t.tgtype::int & 2) = 2 then 'BEFORE' else 'AFTER' end as timing,
+       p.proname as function_name, n.nspname as function_schema,
+       p.prosecdef as security_definer, p.proacl::text as proacl
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+join pg_proc p on p.oid = t.tgfoid
+join pg_namespace n on n.oid = p.pronamespace
+where not t.tgisinternal and n.nspname in ('public','private')
+order by table_name, trigger_name;
+```
+
+**결과**: `public`·`private`을 통틀어 사용자 트리거 정의 **30개**(§4 쿼리 7의 26일차 기준선과
+일치, 이번 회차 아직 신규 마이그레이션 미적용 시점). 트리거에 연결된 함수는 전부 `public`
+스키마에 있다(`private` 스키마 함수는 트리거로 직접 연결된 것이 0건 — 전부 RPC로만 호출됨,
+쿼리 4/6과 일관).
+
+**타이밍·SECURITY 속성별 분류**:
+
+| 그룹 | 개수 | 관례 |
+| --- | --- | --- |
+| BEFORE, `security_definer=true`(DEFINER) | 7 | 전부 `postgres,service_role`만(REVOKE) — `crew_memberships_guard_self_insert_request`·`invitations_guard_response_transition`·`poll_eligible_voters_guard_insert_scope`·`poll_votes_guard_immutability`·`polls_guard_decision_integrity`·`comments_guard_reply_depth`·`reports_guard_self_update_reason_only`. **I-134의 대상이 아니다** — DEFINER는 호출자 권한이 아니라 함수 소유자 권한으로 실행되므로 D-074가 이미 무조건 REVOKE를 요구하는 그룹이고, 실제로도 예외 0건으로 지켜지고 있다. |
+| BEFORE, `security_definer=false`(INVOKER, "가드" 계열) | **12** | **여기가 I-134의 실제 분류 대상.** 아래 9.2 |
+| AFTER (전부 DEFINER, 브로드캐스트·프로비저닝) | 11 | 범위 밖(BEFORE 가드가 아님), 전부 REVOKE 상태로 일관 |
+
+### 9.2 BEFORE + INVOKER 가드 함수 12개 — 관례 A vs B 개수
+
+- **관례 A(`PUBLIC`/`anon`/`authenticated` EXECUTE 유지)**: **11개** —
+  `chat_messages_guard_delete_only`·`comments_guard_non_author_delete_only`·
+  `crew_memberships_guard_self_transition`·`crews_guard_archived_immutable`·
+  `crews_guard_owner_only_fields`·`join_requests_stamp_decided_at`·
+  `meetups_guard_attendee_scope`·`notification_preferences_guard_mandatory_types`·
+  `notifications_guard_read_only_self_update`·`posts_guard_non_author_delete_only`·
+  `profiles_guard_self_status_transition`(25일차 §6 관찰과 정확히 같은 11개, 27일차에도
+  불변 확인).
+- **관례 B(생성 즉시 명시적 REVOKE)**: **1개** — `posts_guard_reschedule_target_scope`
+  (26일차 CORE, `meetup_reschedule_pipeline_079`).
+
+### 9.3 실측 — 트리거 함수가 EXECUTE 권한을 직접 필요로 하는가
+
+가설: 트리거 함수는 Postgres가 트리거 컨텍스트(소유자 권한)로만 호출하고, 반환 타입이
+의사 타입 `trigger`인 함수는 일반 SQL로 직접 호출하는 것 자체가 원천 차단된다 — 그렇다면
+EXECUTE 그랜트의 유무가 실제 방어에 아무 영향을 못 준다. `execute_sql`로 `authenticated`
+롤 컨텍스트(`set local role authenticated`)에서 두 그룹 각각 하나씩 직접 호출을 시도했다:
+
+1. **관례 B(REVOKE 상태) — `posts_guard_reschedule_target_scope()`**:
+   ```
+   ERROR: 42501: permission denied for function posts_guard_reschedule_target_scope
+   ```
+   → ACL 검사(`pg_proc_aclcheck`)에서 즉시 거부됨. 함수 본문에 도달하지 못한다.
+2. **관례 A(EXECUTE 유지 상태) — `chat_messages_guard_delete_only()`**:
+   ```
+   ERROR: 0A000: trigger functions can only be called as triggers
+   CONTEXT: compilation of PL/pgSQL function "chat_messages_guard_delete_only" near line 1
+   ```
+   → ACL 검사는 **통과**했지만(EXECUTE가 있으므로), Postgres 자체가 "트리거 함수는 트리거로만
+   호출 가능하다"는 **타입 레벨 규칙으로 두 번째 방어선**을 건다. 두 시도 모두 최종적으로
+   함수 본문이 실행되지 않는다는 결과는 같지만, **막히는 지점(에러 코드)이 다르다** —
+   `42501`(권한)이 아니라 `0A000`(기능 자체가 이 컨텍스트에서 무의미함).
+
+**결론**: 반환 타입이 `trigger`인 BEFORE 가드 함수는 **EXECUTE 그랜트와 무관하게** 일반
+세션(anon/authenticated는 물론 `postgres`로 직접 SQL을 실행해도 동일)에서 호출할 방법이
+없다 — 트리거 매니저만 이 함수를 부를 수 있고, 트리거를 이 함수에 연결하는 `CREATE TRIGGER`는
+테이블 소유자·상위 권한만 실행할 수 있는 DDL이라 `anon`/`authenticated`가 임의로 새 트리거를
+붙여 우회하는 것도 불가능하다. 즉 **관례 A(EXECUTE 유지)도 이미 안전하다** — I-134가 "결함
+아님"으로 판정한 것과 일치한다.
+
+### 9.4 그런데도 관례 B를 채택하는 이유 — 결정
+
+**신규 BEFORE 가드 트리거 함수부터 관례 B(생성 마이그레이션 안에서 명시적
+`revoke execute on function ... from public, anon, authenticated`)를 표준으로 채택한다.**
+보안상 필수는 아님을 9.3에서 실측으로 확인했지만, 그럼에도 B를 고르는 이유:
+
+1. **규칙이 하나면 판단이 필요 없다.** "이 함수가 진짜 트리거 전용 반환 타입인지, 나중에
+   다른 용도로 재사용될 여지는 없는지"를 매번 판별해서 관례 A/B를 나누는 것보다, **모든 새
+   함수는 REVOKE**라는 D-074의 기존 규칙을 트리거 함수까지 예외 없이 확장하는 편이 다음
+   작성자(CORE·BOARD 포함)가 실수할 여지를 없앤다.
+2. **비용이 0에 가깝다.** REVOKE 한 줄 추가로 끝나고, 26일차 CORE의 선례(`meetup_reschedule
+   _pipeline_079`)가 이미 부작용 없이 증명했다 — 앱 레이어 호출 경로(트리거는 트리거로만
+   실행됨)에 영향이 없다.
+3. **9.3의 방어선은 "함수가 실제로 반환 타입 `trigger`를 유지하는 동안만" 유효하다.** 만약
+   누군가 이 가드 로직을 재사용하려고 함수를 일반 반환 타입으로 리팩터링하면, 그 순간 두
+   번째 방어선(`0A000`)이 조용히 사라지고 **EXECUTE 그랜트만 남는다.** 그때 EXECUTE가 이미
+   열려 있으면 그 즉시 구멍이 된다. REVOKE를 처음부터 걸어 두면 이런 리팩터링 실수가 나도
+   `42501`로 시끄럽게 드러난다(D-074가 §7-③에서 이미 이 실패 방향을 선호한 것과 동일한 논리).
+4. **D-074와 완전히 일관된 단일 문장으로 문서화할 수 있다.** "이 프로젝트의 모든 신규
+   `public`/`private` 함수는 생성 마이그레이션 안에서 명시적으로 EXECUTE를 회수한다 — 예외
+   없음(SECURITY DEFINER든 INVOKER든, RPC든 트리거든)."
+
+### 9.5 기존 11개 함수 소급 여부 — 소급하지 않는다(이번 회차)
+
+**기본은 신규부터 적용**이다. 기존 11개(관례 A)를 지금 REVOKE로 바꾸는 것은 실제 앱 동작에
+영향이 없을 것으로 9.3이 시사하지만, **회귀 위험 대비 이득이 낮다** — 이미 안전하다고
+실측으로 확인된 것을 지금 굳이 건드릴 필요가 없고, 트리거 함수 11개를 한 번에 고치는
+마이그레이션은 리뷰 부담 대비 보안 이득이 없다(9.3 결론). **소급이 필요하다는 판단이 서면**
+(예: 이 중 하나가 트리거 전용 반환 타입에서 벗어나는 리팩터링이 생기는 시점) 그 함수 1개만
+개별적으로 REVOKE 마이그레이션을 붙인다 — 이번 회차에는 실행하지 않는다.
+
+### 9.6 검증 대상 목록 — 이번 회차 CORE·BOARD 신규 함수 대조용
+
+배정 3(정기 대조)에서 이번 회차 신규 트리거·RPC가 위 관례(트리거는 REVOKE, 그 중에서도
+DEFINER는 무조건·INVOKER 가드도 이제부터 REVOKE)를 따랐는지 확인한다 — 9.4 결정 이후에
+만들어지는 모든 신규 함수가 대상이다.
+
+## 10. 27일차 정기 대조 — CORE·BOARD 마이그레이션 3(+1)건 적용 후
+
+- **일자**: 2026-07-30(27일차) / **담당**: CREW · **전제**: 팀장이 `list_migrations`로
+  CORE·BOARD의 적용 완료를 확인한 뒤 신호를 보냄.
+- **적용된 마이그레이션 — 팀장 통지 3건 + 대조 중 추가 발견 1건(총 4건)**:
+
+| version | 이름 | 담당 | 내용 요약 |
+| --- | --- | --- | --- |
+| `20260730011532` | `admin_grant_revoke_system_admin_rpcs_075` | CORE | I-075 해소. `private.admin_grant_system_admin`·`admin_revoke_system_admin`·`admin_list_system_admins` 신규(029B 2단 구조: private DEFINER + public INVOKER 래퍼) |
+| `20260730012226` | `i130_posts_guard_reschedule_open_proposal_exclusion` | BOARD | I-130 해소. 기존 `posts_guard_reschedule_target_scope` 함수 본문을 `CREATE OR REPLACE`해 같은 `target_meetup_id`를 겨냥한 `open` 상태 일정 변경 제안 중복을 거부하는 EXISTS 서브쿼리 추가. 새 트리거는 만들지 않음 |
+| `20260730012337` | `admin_grant_revoke_rpcs_075_fix_decision_number_refs` | CORE | 결정 번호 정정(1차) — `comment on function`(pg_description)만 D-077→D-078로 수정 |
+| `20260730012724` | `admin_grant_revoke_rpcs_075_fix_inline_comment_decision_ref` | CORE | 결정 번호 정정(2차, **팀장 통지 목록에 없던 4번째 마이그레이션 — 이번 대조로 발견**) — `private.admin_revoke_system_admin` 함수 본문 내부 SQL 주석(`prosrc`)까지 D-077→D-078로 수정 + REVOKE/GRANT 재명시 |
+
+  **4번째 마이그레이션 자체는 회귀가 아니다** — 로직 변경 없이 주석 문구 정정과 권한 재확인
+  뿐이고, `body_hash` 델타(아래 표)로 설명 가능하다. 다만 팀장 통지 목록에 없었으므로 이번
+  대조로 처음 확인했다는 점은 기록해 둔다.
+
+### 10.1 8개 쿼리 독립 재실행 — 원시 출력에서 직접 센 값(팀장 사전 측정과 대조)
+
+| # | 25/26일차 기준선 | 27일차(CREW 독립 측정) | 델타 | 팀장 사전 측정과 일치? |
+| --- | --- | --- | --- | --- |
+| 1 (RLS 활성화) | 27개 테이블 | **27개**(원시 배열 직접 카운트, 전부 `rls_enabled=true`) | 0 | 일치(27→27) |
+| 2 (RLS 정책) | 61개 | **61개**(테이블별로 다시 세어 합산: audit_logs1·auth_attempts1·blocks3·boards1·chat_messages3·chat_room_reads3·chat_rooms1·comments3·crew_memberships3·crews4·email_resend_attempts1·handle_availability_check_attempts1·handle_search_attempts1·invitations3·join_requests3·meetup_attendances1·meetup_schedule_changes1·meetups2·notification_preferences4·notifications2·poll_eligible_voters3·poll_votes3·polls3·posts3·product_events1·profiles3·reports3 = 61) | 0 | 일치(61→61) |
+| 3 (테이블 권한) | TRUNCATE 0건 | **TRUNCATE 여전히 0건**(26개 테이블×anon/authenticated 전수 확인) | 0 | 일치 |
+| 4 (함수 EXECUTE 그랜티) | private 20 / public 50 | **private 23**(+3) **/ public 53**(+3) | **+3/+3(합 +6)** | **부분 불일치 — 팀장은 "public +3"만 보고, private도 +3 증가했다는 언급이 없었다.** 실제로는 CORE의 admin 함수 3종이 029B 2단 구조라 private·public 양쪽에 하나씩 생겨 **총 6개 함수가 늘었다**(사람 눈에 보이는 "새 RPC 3개"가 실제 오브젝트 6개를 만든다는 것은 이 프로젝트 전례와 일관된다 — 착시 방지 차 명시) |
+| 5 (default privileges) | `public` `S`/`f`/`r` 3행 | **바이트 단위 완전 일치** | 0 | 일치 |
+| 6 (함수 인벤토리) | private 20 / public 50, search_path 예외 2건(`chat_messages_broadcast`·`join_requests_stamp_decided_at`) | private **23**(+3) / public **53**(+3), **search_path 예외 여전히 2건**(신규 함수 6개 전부 `search_path=""` 정상) | +3/+3 | 쿼리 4와 동일 |
+| 7 (트리거) | 정의 30 / 행(`information_schema.triggers`) 34 | **정의 30(불변) / 행 34(불변)** | **0** | **일치, 그러나 팀장 수치의 산출 방식이 다르다 — 아래 10.2** |
+| 8 (Realtime publication) | 0행 | **0행** | 0 | 일치 |
+
+### 10.2 트리거 카운팅 기준 차이 해소 — 팀장이 요청한 확인
+
+팀장의 `pg_trigger`(`not tgisinternal`) 기준 측정은 "30 → 30"이라는 **한 숫자**만 보고했는데,
+이 문서(25일차부터)는 `information_schema.triggers` 기준으로 "정의 30 / 행 34" **두 숫자**를
+쓴다. **원인을 확인했다**: `pg_trigger`는 트리거 오브젝트 하나당 한 행이다(다중 이벤트는
+`tgtype` 비트마스크 하나에 인코딩) — 그래서 트리거 "정의" 개수와 정확히 같다(30). 반면
+`information_schema.triggers`는 SQL 표준을 따르느라 **다중 이벤트 트리거를 이벤트별로
+펼쳐서** 여러 행으로 보여준다 — 이 프로젝트엔 INSERT+UPDATE 양쪽에 걸린 트리거가 4개
+(`chat_messages_broadcast_trigger`·`poll_votes_broadcast_trigger`·
+`notification_preferences_guard_mandatory_types`·`trg_posts_guard_reschedule_target_scope`)
+있어 30 + 4 = 34행이 된다. **두 쿼리 다 맞고, 세는 대상이 다를 뿐이다** — `pg_trigger`는
+"트리거 오브젝트 수", `information_schema.triggers`는 "트리거×이벤트 조합 수"를 센다. **이번
+회차 결론**: 27일차에도 다중 이벤트 트리거는 그대로 4개(신규 0, 소멸 0)라 두 기준 모두
+"델타 0"으로 일치한다 — 혼선은 **숫자가 다른 것**이 아니라 **"트리거 정의"라는 말이 두
+쿼리에서 다른 것을 가리킨다는 점**이었다. **다음 회차부터**: 이 문서 §4 쿼리 7의 판정 기준은
+계속 `information_schema.triggers`(정의/행 분리)를 표준으로 쓴다 — `pg_trigger` 기준으로
+대조하는 사람은 이 10.2절을 참고해 "정의 수"만 이 문서의 "정의" 행과 비교한다.
+
+### 10.3 함수 그랜티 유실(D-074 우려) 확인 — `CREATE OR REPLACE` 3회 재정의된 함수
+
+`private.admin_revoke_system_admin`은 이번 회차에 **3번**(`011532` 생성 →`012337` 코멘트만
+→`012724` 전체 재정의+명시적 재부여) `CREATE OR REPLACE`됐다 — D-074가 우려한 "교체 시
+그랜트 유실"을 검증하기 가장 좋은 사례였다. 최종 상태: `private.admin_revoke_system_admin` →
+`authenticated,postgres`(마지막 마이그레이션이 `revoke all ... grant execute ... to
+authenticated`로 명시 재부여), `public.admin_revoke_system_admin` → `authenticated,postgres,
+service_role`(`postgres`/`service_role`은 최초 생성 마이그레이션의 기본 부여가 유지, 마지막
+마이그레이션은 `public`/`anon`만 명시적으로 다뤘다) — **의도한 최종 권한과 일치, 유실 없음.**
+`posts_guard_reschedule_target_scope`(BOARD, `CREATE OR REPLACE` 1회)도 `proacl`이
+`{postgres=X/postgres,service_role=X/postgres}`로 26일차 이후 불변 — **REVOKE 상태 유지
+확인**(BOARD의 마이그레이션 주석도 "D-074와 같은 이유로 명시적 재확인"이라고 스스로 밝혀 둠).
+
+### 10.4 D-077 관례 준수 확인 — 신규/수정 트리거·RPC 함수
+
+- **BOARD, `posts_guard_reschedule_target_scope`**: `security_definer=false`(INVOKER, BEFORE
+  트리거)인데도 `revoke execute on function ... from public, anon, authenticated;`를
+  명시적으로 재확인했다. 마이그레이션 주석이 **D-077을 직접 인용**하며 "이 함수는 관례 A로도
+  안전하지만 예외 없는 명시적 REVOKE가 확정 관례라 따른다"고 밝혔다 — **D-077이 등재된 지
+  몇 시간 만에 실제로 참조·적용된 사례.**
+- **CORE, `admin_grant_system_admin`·`admin_revoke_system_admin`·`admin_list_system_admins`**:
+  RPC(반환 타입이 `trigger`가 아님)라 I-134/D-077의 직접 대상은 아니지만, 같은 정신(D-074
+  "신규 함수는 예외 없이 REVOKE")을 따라 `public`/`anon`에 노출하지 않고 `authenticated`만
+  부여했다 — 일관성 확인.
+- **결론**: 이번 회차 신규·수정 함수 4개(BOARD 1 + CORE 3) 전부 확정 관례를 따랐다. 위반 0건.
+
+### 10.5 발견한 이슈 — D-078/D-079 번호가 DB 안에도 실제로 갈려 있다
+
+마이그레이션 원문(§ 위 표)을 직접 읽다가 발견했다: **CORE의 `admin_grant_revoke_system_admin
+_rpcs_075`(011532)는 처음에 "관리자 최소 1명 보장" 결정을 D-077로 적었다가, CREW(나)가
+같은 시각 I-134 판정을 D-077로 먼저 등재한 것을 알고 `012337`·`012724` 두 마이그레이션으로
+DB 안의 코멘트·주석을 D-077 → D-078로 스스로 고쳤다.** 그런데 **BOARD의 `i130_posts_guard_
+reschedule_open_proposal_exclusion`(012226) 마이그레이션 주석도 "사용자 결정(27일차, D-078
+예정 등재)"라고 적어, BOARD 역시 자신의 I-130 트리거 차단 결정을 D-078로 예상하고 있다.**
+즉 **CORE와 BOARD가 지금 이 순간 DB 마이그레이션 주석 안에서 서로 D-078을 자기 것이라고
+동시에 주장하는 상태**다. 팀장이 나에게 통지한 최종 배치(D-078=BOARD, D-079=CORE)를 따르면
+BOARD는 이미 맞고, **CORE는 `admin_revoke_system_admin`의 코멘트·주석을 D-078 → D-079로
+한 번 더 고치는 후속 마이그레이션이 필요하다** — 이번 대조 시점(4번째 마이그레이션
+`012724`까지 적용된 상태) 기준으로 아직 그 수정은 반영되지 않았다. **스키마·권한 자체는
+델타 없이 정상**이라 이건 회귀가 아니라 **문서/주석 내용의 번호 드리프트**이지만, CORE가
+이미 두 번 자체 수정한 이력(011532→012337→012724)이 있었던 자리라 세 번째 수정이 또
+필요하다는 것을 놓치면 DB 주석과 `prioritization-and-risks.md`가 서로 다른 번호를 말하게
+된다 — 팀장에게 즉시 보고한다(아래 최종 보고 참고).
+
+### 10.6 27일차 종합 판정
+
+- **설명되지 않는 변경**: **0건.** 함수 +6(private+3/public+3)·트리거 정의/행 불변(0/0)·
+  나머지 전 쿼리 불변이 마이그레이션 4건(팀장 통지 3건 + 대조로 발견한 4번째 1건) 원문으로
+  전부 설명된다.
+- **그랜트 유실(D-074)**: **0건.** 3회 재정의된 `admin_revoke_system_admin`도 최종 상태가
+  의도와 일치.
+- **D-077 관례 위반**: **0건.**
+- **회귀는 아니지만 즉시 보고할 것**: **10.5의 D-078/D-079 DB 주석 드리프트** — CORE의
+  후속 정정 마이그레이션 1건이 더 필요하다.

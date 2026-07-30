@@ -10,6 +10,7 @@ import { MeetupAttendanceActions } from "@/components/meetup/MeetupAttendanceAct
 import { MeetupDetail } from "@/components/meetup/MeetupDetail";
 import { MeetupDetailSkeleton } from "@/components/meetup/MeetupDetailSkeleton";
 import { MeetupLifecycleActions } from "@/components/meetup/MeetupLifecycleActions";
+import { MeetupRescheduleConflict } from "@/components/meetup/MeetupRescheduleConflict";
 import { MeetupRescheduleForm } from "@/components/meetup/MeetupRescheduleForm";
 import { MeetupRescheduleSkeleton } from "@/components/meetup/MeetupRescheduleSkeleton";
 import { MeetupScheduleHistory } from "@/components/meetup/MeetupScheduleHistory";
@@ -38,6 +39,11 @@ import type { ReactNode } from "react";
  * 무효화 안내를 이 섹션에 더했다. 21일차(Task 041)의 임시 경로("일정 변경" 클릭 →
  * `cancelMeetupAction` → 새 제안글 작성 안내)는 완전히 대체됐다 — `MeetupLifecycleActions`의
  * "일정 변경" 확인 Dialog·전용 문구는 더 이상 없다(그 항목 note 참고).
+ *
+ * **I-130(27일차, BOARD) 추가** — 같은 Meetup을 겨냥한 open 일정 변경 제안 상호 배제
+ * (사용자 결정, D-079: "트리거로 DB에서 차단하고, UI는 도달 전에 사전 안내한다"). 전용
+ * 도메인 오류 컴포넌트 `MeetupRescheduleConflict`(기존 제안글로 가는 링크 포함)를 라우트
+ * 진입 시점(전체 화면)·폼 제출 시점(인라인, TOCTOU) 두 자리에 등록했다.
  */
 
 function participant(id: string, displayName: string): MeetupParticipantView {
@@ -346,8 +352,19 @@ export const meetupSection = defineSection({
       },
     },
     {
+      name: "MeetupRescheduleConflict — 이미 진행 중인 제안 (I-130)",
+      note: "같은 Meetup을 겨냥한 open 일정 변경 제안이 이미 있을 때 MeetupRescheduleContainer가 폼 대신 반환하는 전체 화면 도메인 오류입니다(직접 URL 접근 방어, D-079). RouteErrorBoundary의 고정 카탈로그를 쓰지 않고 전용 컴포넌트를 새로 둔 이유는 이 상태가 '기존 제안글로 가는 링크'를 반드시 함께 보여줘야 하기 때문입니다(팀장 지시 — 막다른 길로 느끼지 않게). conflictingPostId가 실재하지 않는 값이라 링크를 눌러도 '게시글을 찾을 수 없어요'로 안전하게 끝납니다.",
+      panels: {
+        error: (
+          <PreviewFrame height={360}>
+            <MeetupRescheduleConflict crewId="sample-crew" conflictingPostId="sample-post-reschedule-conflict" />
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
       name: "MeetupRescheduleForm — 제출 시점 도메인 오류",
-      note: "createPostAction(kind:'denied')이 대상 Meetup 사전 검증에서 반환하는 나머지 두 코드입니다. '다른 크루 Meetup 대상'은 targetMeetupId가 가리키는 Meetup이 요청의 crewId와 다른 크루 소속일 때(not_found로 합쳐 반환 — cancelMeetupAction과 같은 관례, 크루 경계 정보를 굳이 노출하지 않는다) — 이 페이지는 crewId를 대상 Meetup에서 그대로 유도하므로 정상 UI로는 거의 도달하지 않는 방어적 코드입니다(PostWriteContainer의 도달성 낮은 throw와 같은 사정). '이미 처리됨'은 이 폼을 연 뒤 대상 Meetup이 취소되거나 예정일이 지나는 등 상태가 바뀐 채로 제출했을 때(TOCTOU) — 위 라우트 레벨 'conflict'(페이지를 여는 시점)와 코드는 같지만 등장 시점이 다릅니다.",
+      note: "createPostAction(kind:'denied')이 대상 Meetup 사전 검증에서 반환하는 나머지 코드들입니다. '다른 크루 Meetup 대상'은 targetMeetupId가 가리키는 Meetup이 요청의 crewId와 다른 크루 소속일 때(not_found로 합쳐 반환 — cancelMeetupAction과 같은 관례, 크루 경계 정보를 굳이 노출하지 않는다) — 이 페이지는 crewId를 대상 Meetup에서 그대로 유도하므로 정상 UI로는 거의 도달하지 않는 방어적 코드입니다(PostWriteContainer의 도달성 낮은 throw와 같은 사정). '이미 처리됨'은 이 폼을 연 뒤 대상 Meetup이 취소되거나 예정일이 지나는 등 상태가 바뀐 채로 제출했을 때(TOCTOU) — 위 라우트 레벨 'conflict'(페이지를 여는 시점)와 코드는 같지만 등장 시점이 다릅니다. **I-130(27일차) 추가** — 맨 아래는 폼을 연 뒤 다른 사람이 먼저 같은 Meetup에 제안을 등록했을 때(code: 'duplicate_proposal') 실제 MeetupRescheduleForm이 보여주는 것과 같은 컴포넌트(MeetupRescheduleConflict, className으로 폼 인라인 카드로 좁힘)입니다 — ErrorState 두 개와 다르게 고정 문구가 아니라 기존 제안글 링크를 함께 보여줍니다.",
       panels: {
         error: (
           <div className="flex flex-col gap-3">
@@ -358,6 +375,11 @@ export const meetupSection = defineSection({
             <ErrorState
               title={strings.meetup.reschedule.errors.submitFailed}
               description={strings.meetup.reschedule.errors.conflict}
+            />
+            <MeetupRescheduleConflict
+              crewId="sample-crew"
+              conflictingPostId="sample-post-reschedule-conflict"
+              className="min-h-0 items-start gap-3 rounded-lg border border-solid border-destructive/40 bg-destructive/5 p-4 text-left"
             />
           </div>
         ),

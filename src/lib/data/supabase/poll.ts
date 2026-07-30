@@ -237,25 +237,35 @@ export interface CreatePollInput {
 }
 
 /**
- * 찬반 투표 생성(FR-040). `polls_insert_proposal_author` RLS가 제안 글 작성자만 허용한다.
- * D-025 — 스냅샷을 `poll_eligible_voters` 조인 테이블에 함께 만든다(생성 후 불변, §7.6).
+ * 찬반 투표 생성(FR-040) + D-025 대상자 스냅샷(`poll_eligible_voters`)을 단일 트랜잭션으로.
+ *
+ * **I-054 해소(28일차, CORE)** — 예전에는 `polls` INSERT와 `poll_eligible_voters` bulk INSERT가
+ * 별도 PostgREST 호출(=별도 트랜잭션)이라 두 번째가 실패하면 `polls` 행만 커밋된 채 남을 수
+ * 있었다. `create_poll` RPC(029B 2단 구조)가 둘을 한 트랜잭션으로 묶는다 — 대상자 중 하나라도
+ * `poll_eligible_voters_guard_insert_scope` 트리거(활성 멤버·open 상태 검사)에 걸리면 poll
+ * 생성 자체가 롤백된다. 이 RPC가 이제 유일한 정당 생성 경로라 `polls`·`poll_eligible_voters`의
+ * client INSERT GRANT는 회수됐다(D-065 전제 변경, 마이그레이션
+ * `i054_atomic_join_request_and_poll_creation_rpcs`). 자기반증 원시 로그는
+ * `docs/decisions/i054-atomic-write-rpcs.md` 참고.
+ *
+ * 이 함수는 `DataResult`를 쓰지 않는다(원래도 안 썼다) — 호출자(`create-post.ts`)가 이미
+ * `post.author_id`로 검증된 본인 글에 대해서만 호출하므로 `ok:false`는 진짜 프로그래밍 오류에
+ * 가깝다. 실패하면 예외를 던진다.
  */
 export async function createPoll(input: CreatePollInput): Promise<Poll> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
-    .from("polls")
-    .insert({ post_id: input.postId, opens_at: input.opensAt, closes_at: input.closesAt })
-    .select("*")
+    .rpc("create_poll", {
+      p_post_id: input.postId,
+      p_opens_at: input.opensAt,
+      p_closes_at: input.closesAt,
+      p_eligible_voter_ids: input.eligibleVoterIds,
+    })
     .single();
   if (error) throw error;
-
-  if (input.eligibleVoterIds.length > 0) {
-    const { error: votersError } = await supabase.from("poll_eligible_voters").insert(
-      input.eligibleVoterIds.map((profileId) => ({ poll_id: data.id, profile_id: profileId })),
-    );
-    if (votersError) throw votersError;
+  if (!data.ok) {
+    throw new Error(`create_poll(${input.postId})가 실패했다: ${data.reason_code}`);
   }
-
   return toPoll(data);
 }
 

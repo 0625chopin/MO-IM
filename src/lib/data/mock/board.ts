@@ -44,6 +44,20 @@ export async function getPostById(id: Id): Promise<Post | null> {
   return post && !post.deletedAt ? post : null;
 }
 
+/** I-130(27일차, BOARD) — `supabase/board.ts`와 동일 계약(NFR-035). Mock은 DB 트리거를
+ *  흉내내지 않지만(이 파일 상단 `CreatePostInput.targetMeetupId` 참고와 같은 사정), 이 조회
+ *  함수 자체는 Server Action의 사전 검증이 호출하므로 양쪽 다 구현해 둔다. */
+export async function findOpenRescheduleProposal(targetMeetupId: Id): Promise<Post | null> {
+  const candidates = store.posts.filter(
+    (p) => p.targetMeetupId === targetMeetupId && p.type === "meetup_reschedule_proposal" && !p.deletedAt,
+  );
+  for (const post of candidates) {
+    const poll = store.polls.find((pl) => pl.postId === post.id);
+    if (poll?.status === "open") return post;
+  }
+  return null;
+}
+
 export interface ListPostsPageQuery {
   type?: PostType;
   /** 1부터 시작. */

@@ -50,6 +50,11 @@ import type { AuthSession } from "./auth-session";
  * - iOS 홈 인디케이터 영역을 피하도록 `env(safe-area-inset-bottom)`만큼 아래 여백을 준다.
  *   이게 없으면 실제 아이폰에서 마지막 탭의 라벨이 제스처 바에 가린다. `AppShell`의 콘텐츠
  *   하단 여백도 같은 값을 더해 맞춰 놨다.
+ *
+ * **로딩 스켈레톤 높이(I-136, 27일차)**: `globals.css`의 `--tab-bar-height`(3.5rem)를 쓴다 —
+ * `AppShell`의 하단 스페이서가 참조하는 것과 같은 토큰이다. 실측 결과 실제(콘텐츠 채워진) 탭바
+ * 높이는 53.6875px로 이 토큰(56px)보다 약간 작다 — 로딩 스켈레톤이 실제보다 살짝 더 큰 것은
+ * 안전한 방향(예약 공간이 남으면 남았지 모자라지 않는다)이라 그대로 둔다.
  */
 export function MobileTabBar({ session }: { session: AuthSession }) {
   const pathname = usePathname();
@@ -58,7 +63,7 @@ export function MobileTabBar({ session }: { session: AuthSession }) {
     return (
       <nav
         aria-hidden="true"
-        className="fixed bottom-0 left-1/2 z-40 flex h-14 w-full max-w-app -translate-x-1/2 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed bottom-0 left-1/2 z-40 flex h-[var(--tab-bar-height)] w-full max-w-app -translate-x-1/2 border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="flex flex-1 items-center justify-center">

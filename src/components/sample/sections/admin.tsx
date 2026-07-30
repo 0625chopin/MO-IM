@@ -1,6 +1,9 @@
 import { AdminReportQueue } from "@/components/admin/AdminReportQueue";
 import { AdminReportQueueSkeleton } from "@/components/admin/AdminReportQueueSkeleton";
 import { AdminReportStatusTabs } from "@/components/admin/AdminReportStatusTabs";
+import type { SystemAdminRowViewModel } from "@/components/admin/system-admin-view-models";
+import { SystemAdminList } from "@/components/admin/SystemAdminList";
+import { SystemAdminListSkeleton } from "@/components/admin/SystemAdminListSkeleton";
 import { PreviewFrame } from "@/components/sample/PreviewFrame";
 import { defineSection } from "@/components/sample/showcase-types";
 import { ErrorState } from "@/components/ui/error-state";
@@ -128,6 +131,55 @@ const SAMPLE_REPORT_HISTORY: AdminReportQueueItem[] = [
 /** "전체" 탭 데모용 — 대기·처리됨·기각됨이 섞인 목록. */
 const SAMPLE_REPORTS_ALL: AdminReportQueueItem[] = [...SAMPLE_REPORTS, ...SAMPLE_REPORT_HISTORY];
 
+/** 관리자 3명 — 본인(가운데)과 회수 가능한 다른 관리자 2명(I-075, 27일차). */
+const SAMPLE_SYSTEM_ADMINS: SystemAdminRowViewModel[] = [
+  {
+    profileId: "sample-admin-1",
+    handle: "chopin_0625",
+    displayName: "쇼팽",
+    avatarUrl: null,
+    status: "active",
+    isSelf: false,
+    canRevoke: true,
+    revokeBlockedReason: null,
+  },
+  {
+    profileId: "sample-admin-2",
+    handle: "0625chopin",
+    displayName: "쇼팽(부계정)",
+    avatarUrl: null,
+    status: "active",
+    isSelf: true,
+    canRevoke: false,
+    revokeBlockedReason: strings.admin.systemAdmins.revokeBlockedReason.self,
+  },
+  {
+    profileId: "sample-admin-3",
+    handle: "yuna_book",
+    displayName: "김유나",
+    avatarUrl: null,
+    status: "active",
+    isSelf: false,
+    canRevoke: true,
+    revokeBlockedReason: null,
+  },
+];
+
+/** 관리자 1명뿐 — D-078 "최소 1명 보장"이 회수 버튼 자체를 막는 모습(자기 자신 여부와
+ *  무관하게 마지막 관리자 문구가 우선한다, `SystemAdminsContainer` docstring 참고). */
+const SAMPLE_SYSTEM_ADMINS_SOLE: SystemAdminRowViewModel[] = [
+  {
+    profileId: "sample-admin-1",
+    handle: "chopin_0625",
+    displayName: "쇼팽",
+    avatarUrl: null,
+    status: "active",
+    isSelf: true,
+    canRevoke: false,
+    revokeBlockedReason: strings.admin.systemAdmins.revokeBlockedReason.lastAdmin,
+  },
+];
+
 /**
  * FR-082 관리자 콘솔(Task 042B, D-008·D-014, NFR-015). 실제 사용처는 `/admin`
  * (`AdminReportsContainer`) — 관리자(`profiles.is_system_admin`)만 접근할 수 있다(AC2, 일반
@@ -154,7 +206,7 @@ export const adminSection = defineSection({
   label: "관리자 콘솔",
   title: "관리자 콘솔",
   description:
-    "FR-082(D-008·D-014, NFR-015). 신고 대기열·처리 이력을 상태 탭(전체·대기 중·처리됨·기각됨)으로 확인하고, 대기 중인 신고는 기각·콘텐츠 삭제·계정 제재 중 하나로 처리합니다(admin_resolve_report RPC, D-050). /admin은 system_admin만 접근할 수 있고 일반 회원은 404를 봅니다(AC2, D-049).",
+    "FR-082(D-008·D-014, NFR-015). 신고 대기열·처리 이력을 상태 탭(전체·대기 중·처리됨·기각됨)으로 확인하고, 대기 중인 신고는 기각·콘텐츠 삭제·계정 제재 중 하나로 처리합니다(admin_resolve_report RPC, D-050). /admin은 system_admin만 접근할 수 있고 일반 회원은 404를 봅니다(AC2, D-049). 27일차(I-075)부터 같은 페이지 아래에 시스템 관리자 지정·회수 섹션이 추가됐다(D-076·D-078).",
   items: [
     {
       name: "AdminReportQueue",
@@ -218,6 +270,50 @@ export const adminSection = defineSection({
               <AdminReportStatusTabs status="all">
                 <AdminReportQueue reports={SAMPLE_REPORTS_ALL} statusFilter="all" />
               </AdminReportStatusTabs>
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "SystemAdminList",
+      note: "실제 컴포넌트입니다(I-075, 27일차, D-076·D-078). '관리자 지정' 버튼은 실제 UserSearchField(InviteMemberDialog와 공유)를 열고, 지정·회수 둘 다 실제 Server Action에 연결돼 있습니다 — 게스트/비관리자 세션에서 제출하면 실제 forbidden 오류가 표시됩니다. 회수 버튼은 canRevoke===false일 때 아예 비활성 + 이유 문구로 바뀝니다(RPC reason_code를 파싱해 분기하지 않는다는 admin-grant-revoke-rpcs-075.md §4 원칙 — 버튼이 막히는 것 자체가 1차 UX입니다).",
+      panels: {
+        default: (
+          <PreviewFrame height={420}>
+            <div className="p-4">
+              <SystemAdminList admins={SAMPLE_SYSTEM_ADMINS} />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={200}>
+            <div className="p-4">
+              <SystemAdminListSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={280}>
+            <div className="flex flex-col gap-3 p-4">
+              <LabeledDemo label="관리자 0명 — 이론상 도달하지 않아야 하는 방어적 빈 상태(D-078이 DB에서 막는다)">
+                <SystemAdminList admins={[]} />
+              </LabeledDemo>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={420}>
+            <div className="flex flex-col gap-3 p-4">
+              <LabeledDemo label="관리자가 1명뿐 — 그 유일한 행의 회수 버튼이 사전에 막힌다(D-078, '자기 자신' 문구보다 우선)">
+                <SystemAdminList admins={SAMPLE_SYSTEM_ADMINS_SOLE} />
+              </LabeledDemo>
+              <LabeledDemo label="지정 실패 — 핸들을 찾을 수 없음(handle_not_found)">
+                <ErrorState title={strings.admin.systemAdmins.grant.errors.handle_not_found} />
+              </LabeledDemo>
+              <LabeledDemo label="회수 실패 방어선 — cannot_target_self(사전 검증이 새는 경우)">
+                <ErrorState title={strings.admin.systemAdmins.revoke.errors.cannot_target_self} />
+              </LabeledDemo>
             </div>
           </PreviewFrame>
         ),

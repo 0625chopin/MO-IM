@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 
 import { formatDayLabelKo, formatStartTimeKo, todayIsoUtc } from "@/components/calendar/date-grid";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
+import { MeetupRescheduleConflict } from "@/components/meetup/MeetupRescheduleConflict";
 import { MeetupRescheduleForm } from "@/components/meetup/MeetupRescheduleForm";
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { getCrewById, getCrewMembership, getMeetupById } from "@/lib/data";
+import { findOpenRescheduleProposal, getCrewById, getCrewMembership, getMeetupById } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { isMeetupAttendanceOpen } from "@/lib/rules/meetup-attendance-eligibility";
 import { checkPermission } from "@/lib/rules/permission";
@@ -32,6 +33,13 @@ export interface MeetupRescheduleContainerProps {
  * 액션 레벨 재검증과는 별개 — 이 페이지를 연 시점의 방어다). 제출 시점에 대상이 그 사이
  * 바뀌면(TOCTOU) `createPostAction`이 같은 `conflict` 코드를 반환하고 `MeetupRescheduleForm`이
  * 폼 인라인 오류로 보여준다 — "이미 처리됨" 시나리오가 그 지점이다.
+ *
+ * **I-130(27일차) — 같은 Meetup을 겨냥한 open 제안이 이미 있으면 여기서도 걸러진다.**
+ * `findOpenRescheduleProposal`이 걸리면 폼을 아예 렌더하지 않고 `MeetupRescheduleConflict`
+ * (기존 제안글로 가는 링크 포함, D-079)를 값으로 반환한다 — 버튼(`MeetupLifecycleActions`의
+ * "일정 변경 제안")을 거치지 않은 직접 URL 접근도 같은 안내를 받는다. 제출 시점에 다른
+ * 사람이 먼저 등록하면(TOCTOU) `createPostAction`이 같은 사실을 `code: "duplicate_proposal"`
+ * 로 반환하고 `MeetupRescheduleForm`이 같은 컴포넌트를 폼 인라인으로 보여준다.
  */
 export async function MeetupRescheduleContainer({ meetupId }: MeetupRescheduleContainerProps) {
   const session = await getAuthSession();
@@ -68,6 +76,14 @@ export async function MeetupRescheduleContainer({ meetupId }: MeetupRescheduleCo
   const todayIso = todayIsoUtc(new Date());
   if (!isMeetupAttendanceOpen(meetup, todayIso)) {
     return <RouteErrorBoundary kind="conflict" />;
+  }
+
+  // I-130 — 이 Meetup을 겨냥한 open 일정 변경 제안이 이미 있으면 폼을 열지 않는다(사용자
+  // 결정, D-079). DB 트리거가 최종 방어선이지만 raise exception이라 여기서 먼저 걸러 사용자를
+  // 막다른 길이 아니라 기존 제안글로 안내한다.
+  const conflictingProposal = await findOpenRescheduleProposal(meetup.id);
+  if (conflictingProposal) {
+    return <MeetupRescheduleConflict crewId={meetup.crewId} conflictingPostId={conflictingProposal.id} />;
   }
 
   return (

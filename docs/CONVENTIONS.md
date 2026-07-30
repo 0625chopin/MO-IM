@@ -247,6 +247,10 @@ ESLint 규칙만으로 아키텍처를 완전히 강제할 수는 없다(파일�
 
 ## 남은 리스크·다음 회차로 넘길 사항
 
+- **회차 운영 중 `docs/ISSUES.md`·`docs/prioritization-and-risks.md` 동시편집·번호(`I-*`/`D-*`)
+  부여 규칙은 이 파일의 범위 밖이다.** 코드 디렉터리·명명 규약이 아니라 회차 운영 절차이므로
+  `.claude/skills/team-day-runner/SKILL.md` **§0-1**이 단일 소스다(28일차, I-138·I-140). 여기에
+  중복 등재하지 않는다.
 - **파일명 케이스(kebab-case/PascalCase) 자동 검사는 아직 없다.** `eslint-plugin-unicorn`의 `filename-case`나 유사 플러그인이 필요한데 `package.json` 변경은 CREW 담당이라 이 Task에서는 추가하지 않았다. 명명 규약은 현재 **문서 + 코드 리뷰**로만 지켜진다. 새 devDependency가 필요하면 CREW와 조율해 별도 Task로 추가할 것을 제안한다.
 - **`lib/realtime`의 구현체 파일명(`mock.ts`/`broadcast.ts`)은 이 Task에서 확정한 제안이다.** `src/lib/realtime/`(README.md만)까지는 이번 Task에서 스캐폴드했지만 실제 `index.ts`·`mock.ts`·`broadcast.ts`는 CORE의 Task 020A~020C(채팅, 9~13주차)에서 채운다. 이름이 달라지면 이 문서와 `eslint.config.mjs`의 딥 임포트 차단 패턴(`@/lib/realtime/mock`, `@/lib/realtime/broadcast`)을 함께 갱신해야 한다.
 - **`lib/data`의 20개 엔티티를 `mock/`·`supabase/` 아래 파일 단위로 어떻게 나눌지(엔티티별 1파일 vs 도메인 묶음)는 Task 007이 정한다.** 이 문서는 두 최상위 디렉터리의 존재와 상호 비참조 규칙까지만 확정했다.

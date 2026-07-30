@@ -1112,6 +1112,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_grant_system_admin: {
+        Args: { p_profile_id: string }
+        Returns: {
+          ok: boolean
+          reason_code: string
+        }[]
+      }
+      admin_grant_system_admin_by_handle: {
+        Args: { p_handle: string }
+        Returns: {
+          ok: boolean
+          profile_id: string
+          reason_code: string
+        }[]
+      }
       admin_list_reports: {
         Args: { p_status?: string }
         Returns: {
@@ -1131,12 +1146,29 @@ export type Database = {
           target_type: string
         }[]
       }
+      admin_list_system_admins: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          display_name: string
+          handle: string
+          profile_id: string
+          status: string
+        }[]
+      }
       admin_resolve_report: {
         Args: { p_action: string; p_report_id: string }
         Returns: {
           ok: boolean
           reason_code: string
           status: string
+        }[]
+      }
+      admin_revoke_system_admin: {
+        Args: { p_profile_id: string }
+        Returns: {
+          ok: boolean
+          reason_code: string
         }[]
       }
       anonymize_expired_deactivated_profiles: {
@@ -1149,6 +1181,41 @@ export type Database = {
           already_blocked: boolean
           ok: boolean
           reason_code: string
+        }[]
+      }
+      create_join_request: {
+        Args: { p_crew_id: string; p_message?: string }
+        Returns: {
+          created_at: string
+          crew_id: string
+          decided_at: string
+          decided_by: string
+          id: string
+          message: string
+          ok: boolean
+          reason_code: string
+          requester_id: string
+          status: string
+        }[]
+      }
+      create_poll: {
+        Args: {
+          p_closes_at: string
+          p_eligible_voter_ids?: Json
+          p_opens_at: string
+          p_post_id: string
+        }
+        Returns: {
+          closed_by: string
+          closes_at: string
+          decided_at: string
+          id: string
+          ok: boolean
+          opens_at: string
+          post_id: string
+          reason_code: string
+          result: string
+          status: string
         }[]
       }
       create_report: {

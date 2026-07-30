@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { AdminReportQueueSkeleton } from "@/components/admin/AdminReportQueueSkeleton";
 import { AdminReportsContainer } from "@/components/admin/AdminReportsContainer";
 import { AdminReportStatusTabs } from "@/components/admin/AdminReportStatusTabs";
+import { SystemAdminListSkeleton } from "@/components/admin/SystemAdminListSkeleton";
+import { SystemAdminsContainer } from "@/components/admin/SystemAdminsContainer";
 import { parseReportStatusFilter } from "@/lib/rules/report-resolution";
 import { strings } from "@/lib/strings";
 
@@ -23,6 +25,13 @@ import { strings } from "@/lib/strings";
  * `parseReportStatusFilter`(순수 함수, `lib/rules/report-resolution.ts`)가 잘못된/누락된
  * `?status=` 값을 조용히 `"pending"`으로 되돌린다 — 오타·구버전 링크로 404·크래시를 내지
  * 않는다.
+ *
+ * **27일차(I-075) — "시스템 관리자" 섹션 추가.** 신고 처리와 완전히 독립된 관심사(둘 다
+ * `is_system_admin` 게이트 뒤에 있다는 것만 같다)라 `?status=` 필터·`Suspense key`와
+ * 무관한 별도 `Suspense`로 감싼다 — 신고 상태 탭을 바꿔도 이 섹션은 다시 로딩하지 않고,
+ * 그 반대도 마찬가지다. 페이지 제목을 "신고 관리"(섹션 h2로 남김) 위에 "관리자 콘솔"
+ * 상위 h1으로 한 단 올렸다 — 이제 이 페이지가 담는 관심사가 둘이라 페이지 전체를
+ * 아우르는 제목이 필요하다.
  */
 export default async function AdminReportsPage({
   searchParams,
@@ -33,18 +42,39 @@ export default async function AdminReportsPage({
   const status = parseReportStatusFilter(rawStatus);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 p-4">
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-4">
       <div className="flex flex-col gap-1">
         <h1 className="font-heading text-xl font-semibold text-foreground">
-          {strings.admin.reports.title}
+          {strings.admin.console.title}
         </h1>
-        <p className="text-sm text-muted-foreground">{strings.admin.reports.description}</p>
+        <p className="text-sm text-muted-foreground">{strings.admin.console.description}</p>
       </div>
-      <AdminReportStatusTabs status={status}>
-        <Suspense key={status} fallback={<AdminReportQueueSkeleton />}>
-          <AdminReportsContainer status={status} />
+
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-heading text-lg font-semibold text-foreground">
+            {strings.admin.reports.title}
+          </h2>
+          <p className="text-sm text-muted-foreground">{strings.admin.reports.description}</p>
+        </div>
+        <AdminReportStatusTabs status={status}>
+          <Suspense key={status} fallback={<AdminReportQueueSkeleton />}>
+            <AdminReportsContainer status={status} />
+          </Suspense>
+        </AdminReportStatusTabs>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-heading text-lg font-semibold text-foreground">
+            {strings.admin.systemAdmins.title}
+          </h2>
+          <p className="text-sm text-muted-foreground">{strings.admin.systemAdmins.description}</p>
+        </div>
+        <Suspense fallback={<SystemAdminListSkeleton />}>
+          <SystemAdminsContainer />
         </Suspense>
-      </AdminReportStatusTabs>
+      </section>
     </main>
   );
 }

@@ -97,6 +97,43 @@ export async function getPostById(id: Id): Promise<Post | null> {
   return data ? toPost(data) : null;
 }
 
+/**
+ * I-130(27일차, BOARD) — 이 Meetup을 `target_meetup_id`로 겨냥한, 아직 종료되지 않은
+ * (`polls.status='open'`) 일정 변경 제안 post가 있으면 그 post를 반환한다. DB 트리거
+ * (`posts_guard_reschedule_target_scope`, I-130 확장)가 두 번째 open 제안의 INSERT/UPDATE
+ * 자체를 막지만 `raise exception`이라 사전에 걸러야 한다(`create-post.ts` 상단 docstring과
+ * 같은 근거 — `MeetupRescheduleContainer`(라우트 진입 시점)·`createPostAction`(제출 시점)
+ * 양쪽이 이 함수를 쓴다). **종료된(closed/withdrawn) 제안은 대상이 아니다** — 한 번 부결된
+ * 뒤 재제안은 정상 경로다(트리거가 `pl.status='open'`만 본다).
+ *
+ * `posts`→`polls` 순차 조회다(embedded select 대신) — `listEligibleVotersWithCurrentStatus`와
+ * 같은 이유로 단순한 형태를 택했다. 트리거가 이미 "같은 대상 + open은 최대 1건"을 강제하므로
+ * 후보가 여럿이어도 실제로 open인 것은 많아야 1건이다.
+ */
+export async function findOpenRescheduleProposal(targetMeetupId: Id): Promise<Post | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data: candidates, error } = await supabase
+    .from("posts")
+    .select("*")
+    .eq("target_meetup_id", targetMeetupId)
+    .eq("type", "meetup_reschedule_proposal")
+    .is("deleted_at", null);
+  if (error) throw error;
+  if (!candidates || candidates.length === 0) return null;
+
+  for (const row of candidates) {
+    const post = toPost(row);
+    const { data: poll, error: pollError } = await supabase
+      .from("polls")
+      .select("status")
+      .eq("post_id", post.id)
+      .maybeSingle();
+    if (pollError) throw pollError;
+    if (poll?.status === "open") return post;
+  }
+  return null;
+}
+
 export interface ListPostsPageQuery {
   type?: PostType;
   /** 1부터 시작. */
