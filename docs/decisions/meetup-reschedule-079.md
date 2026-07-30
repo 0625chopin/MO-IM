@@ -306,7 +306,7 @@ interface MeetupScheduleChange {
    `0 errors`를 받았지만, **이 문제가 이 세션에 국한된 것인지, tsconfig의 `include`가
    `.next/dev/types/**/*.ts`를 명시하는 것 자체가 구조적 위험(다른 팀원이 dev 서버를 돌리는
    동안 누구든 `tsc --noEmit`을 돌리면 같은 함정에 빠진다)인지는 이번 회차에서 결론 내지
-   않는다** — 팀장 판단이 필요한 별개 사안으로 `docs/ISSUES.draft.CORE.md`에 남긴다.
+   않는다** — 팀장 판단이 필요한 별개 사안으로 남겼고, 27일차에 `docs/ISSUES.md` **I-138**로 등재됐다.
 5. **`npm run build`(프로덕션 빌드)는 이번 회차에 돌리지 않았다** — 다른 팀원의 `npm run dev`가
    `.next/`를 계속 쓰고 있어 빌드 충돌을 피하려고 생략했다(운영 규칙 "flock 안에서 장기 실행
    서버를 백그라운드로 띄우지 마라"의 취지를 넓게 해석 — 빌드도 같은 디렉터리를 다툰다).
@@ -324,4 +324,4 @@ interface MeetupScheduleChange {
 - `src/lib/data/mock/{board,meetup,fixtures}.ts`·`mock/seed/{generate-board,generate-
   meetups}.ts`(NFR-035 타입 동일성 유지 + `applyMeetupReschedule`/`listMeetupScheduleChanges`
   Mock 구현).
-- 본 문서, `docs/ISSUES.draft.CORE.md`(번호 없는 신규 이슈 초안).
+- 본 문서, `docs/ISSUES.md`(27일차 병합 완료 — I-137·I-138).

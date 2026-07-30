@@ -98,3 +98,57 @@ export interface AuditLog {
   targetId: Id;
   createdAt: ISODateTimeString;
 }
+
+/**
+ * 관리자 지정(`admin_grant_system_admin`)이 반환하는 실패 사유(I-075, D-076). 호출자가
+ * 관리자가 아니거나(forbidden), 대상이 자기 자신이거나(cannot_target_self, D-076), 대상이
+ * 없거나(target_not_found)/비활성이거나(target_not_active)/이미 관리자면(already_admin)
+ * 거부한다. UI는 이 코드를 파싱해 분기하지 않는다 — 자기 자신 대상 여부·마지막 관리자
+ * 여부는 `listSystemAdmins()`로 사전에 알 수 있으므로, 정상 흐름에서는 already_admin·
+ * cannot_target_self에 도달하지 않도록 화면이 먼저 막아야 한다(방어선일 뿐).
+ *
+ * `handle_not_found`는 **`admin_grant_system_admin_by_handle` 경로에서만** 나온다(27일차
+ * 후속). 이 코드는 호출자가 이미 관리자 인가를 통과한 뒤에만 반환된다 — 비관리자는 실존
+ * 여부와 무관하게 항상 `forbidden`만 받는다(R-012, I-074와 같은 실패 모드를 SQL 실행
+ * 순서로 차단, `admin-grant-revoke-rpcs-075.md` 참고). 그래서 이 코드가 "열거 오라클"이
+ * 되지 않는다 — 이미 인가된 관리자에게만 의미 있는 구분이다.
+ */
+export type SystemAdminGrantReasonCode =
+  | "forbidden"
+  | "cannot_target_self"
+  | "target_not_found"
+  | "target_not_active"
+  | "already_admin"
+  | "handle_not_found";
+
+/**
+ * 관리자 회수(`admin_revoke_system_admin`)가 반환하는 실패 사유(I-075, D-076·D-078).
+ * **가드 순서가 의도적이다** — SQL이 `last_admin_forbidden`을 `cannot_target_self`보다
+ * 먼저 검사한다(`admin-grant-revoke-rpcs-075.md` 참고). 관리자가 1명뿐일 때 그 1명을
+ * 대상으로 삼으면(자기 자신이 호출하든 아니든) `last_admin_forbidden`이 먼저 나온다 —
+ * `cannot_target_self`는 관리자가 2명 이상이라 인원 수 가드를 통과했는데도 자기 자신을
+ * 대상으로 삼은 경우에만 나온다. UI가 이 순서를 몰라도 되도록, "마지막 관리자인지"·
+ * "자기 자신인지"는 둘 다 `listSystemAdmins()` 결과(전체 관리자 수 + 각 행이 세션
+ * 프로필과 같은 id인지)로 호출 전에 판정할 수 있다.
+ */
+export type SystemAdminRevokeReasonCode =
+  | "forbidden"
+  | "target_not_found"
+  | "target_not_active"
+  | "not_admin"
+  | "last_admin_forbidden"
+  | "cannot_target_self";
+
+/**
+ * 관리자 목록(`admin_list_system_admins`) 한 행 — 관리자만 열람 가능(비관리자는 빈
+ * 배열, `admin_list_reports`와 같은 R-012식 "존재 비노출" 원칙). UI는 이 목록의 길이로
+ * "마지막 관리자"를, 각 행의 `profileId`를 세션 프로필과 비교해 "자기 자신"을 회수/지정
+ * 버튼 노출 이전에 사전 판정해야 한다(트리거·RPC 예외 메시지 파싱 금지).
+ */
+export interface SystemAdminSummary {
+  profileId: Id;
+  handle: string;
+  displayName: string;
+  avatarUrl: string | null;
+  status: string;
+}

@@ -1112,6 +1112,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_grant_system_admin: {
+        Args: { p_profile_id: string }
+        Returns: {
+          ok: boolean
+          reason_code: string
+        }[]
+      }
+      admin_grant_system_admin_by_handle: {
+        Args: { p_handle: string }
+        Returns: {
+          ok: boolean
+          profile_id: string
+          reason_code: string
+        }[]
+      }
       admin_list_reports: {
         Args: { p_status?: string }
         Returns: {
@@ -1131,12 +1146,29 @@ export type Database = {
           target_type: string
         }[]
       }
+      admin_list_system_admins: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          display_name: string
+          handle: string
+          profile_id: string
+          status: string
+        }[]
+      }
       admin_resolve_report: {
         Args: { p_action: string; p_report_id: string }
         Returns: {
           ok: boolean
           reason_code: string
           status: string
+        }[]
+      }
+      admin_revoke_system_admin: {
+        Args: { p_profile_id: string }
+        Returns: {
+          ok: boolean
+          reason_code: string
         }[]
       }
       anonymize_expired_deactivated_profiles: {

@@ -1128,14 +1128,31 @@ export const ko = {
       submit: "제안 등록",
       submitPending: "등록하는 중…",
       errors: {
-        /** `CreatePostActionResult`의 `kind:"denied"` 세 코드에 대응한다(`create-post.ts`
-         *  참고, BOARD가 새 `kind`를 만들지 않고 기존 코드 유니온에 `conflict`만 얹기로 판단한
-         *  근거는 그 파일 docstring에 있다). */
+        /** `CreatePostActionResult`의 `kind:"denied"` 네 코드에 대응한다(`create-post.ts`
+         *  참고, BOARD가 새 `kind`를 만들지 않고 기존 코드 유니온에 `conflict`·
+         *  `duplicate_proposal`을 얹기로 판단한 근거는 그 파일 docstring에 있다). */
         forbidden: "일정 변경 제안 권한이 없어요",
         notFound: "대상 모임을 찾을 수 없어요",
         conflict: "취소됐거나 예정일이 지난 모임이라 일정 변경을 제안할 수 없어요",
+        /** I-130(27일차) — `duplicateProposal.title`과 같은 사실을 가리키지만, 이쪽은 폼
+         *  안쪽 인라인 오류 문구다(전체 화면 `MeetupRescheduleConflict`와 다른 자리에 쓰인다).
+         *  링크 라벨은 `duplicateProposalLinkLabel`을 함께 쓴다. */
+        duplicateProposal: "이 모임은 이미 다른 일정 변경 제안이 진행 중이에요",
+        duplicateProposalLinkLabel: "진행 중인 제안으로 이동",
         submitFailed: "제안을 등록하지 못했어요. 다시 시도해 주세요",
       },
+    },
+    /**
+     * I-130(27일차, BOARD) — 같은 Meetup을 겨냥한 open 일정 변경 제안이 이미 있을 때의 전체
+     * 화면 도메인 오류(`MeetupRescheduleConflict`, D-030③). 사용자 결정(27일차, D-079):
+     * "트리거로 DB에서 차단하고, UI는 도달 전에 사전 안내한다." `errors.duplicateProposal`
+     * (폼 인라인)과 같은 사실을 가리키지만 이쪽은 라우트 진입 시점 전체 화면 문구다.
+     */
+    duplicateProposal: {
+      title: "이미 진행 중인 일정 변경 제안이 있어요",
+      description:
+        "이 모임은 이미 다른 일정 변경 제안이 투표 중이에요. 새 제안을 만드는 대신 진행 중인 제안에 참여해 주세요.",
+      linkLabel: "진행 중인 제안 보기",
     },
   },
 
@@ -1596,6 +1613,12 @@ export const ko = {
 
   /** FR-082 관리자 콘솔(Task 042B, `/admin`). SC-21. */
   admin: {
+    /** 페이지 전체 제목(27일차, I-075) — 아래 `reports`·`systemAdmins` 두 섹션을 묶는 h1.
+     *  섹션별 제목(`reports.title`·`systemAdmins.title`)은 각자의 h2로 그대로 둔다. */
+    console: {
+      title: "관리자 콘솔",
+      description: "신고를 처리하고 시스템 관리자를 지정·회수해요.",
+    },
     reports: {
       title: "신고 관리",
       description:
@@ -1688,6 +1711,69 @@ export const ko = {
         target_already_removed: "이미 삭제된 콘텐츠예요.",
         account_not_suspendable: "이미 제재됐거나 활성 상태가 아닌 계정이에요.",
         unhandled_action: "처리하지 못했어요. 다시 시도해 주세요.",
+      },
+    },
+    /**
+     * 관리자 지정/회수(I-075, 27일차, D-076·D-078) — `admin-grant-revoke-rpcs-075.md` §4가
+     * 요구하는 대로 "자기 자신 대상"·"마지막 관리자"는 버튼을 숨기거나 비활성화하는 1차 UX로
+     * 막고, 아래 `revoke.errors`·`grant.errors`의 `cannot_target_self`·`last_admin_forbidden`은
+     * 그 사전 검증이 새는 경우의 방어선 문구로만 쓴다(정상 흐름에서는 도달하지 않는다).
+     */
+    systemAdmins: {
+      title: "시스템 관리자",
+      description: "다른 사용자를 관리자로 지정하거나 회수해요. 자기 자신은 대상이 될 수 없고, 관리자는 최소 1명이 있어야 해요.",
+      selfBadge: "나",
+      list: {
+        empty: {
+          title: "관리자가 없어요",
+          description: "표시할 관리자가 없어요",
+        },
+      },
+      /** 회수 버튼을 사전에 막을 때(§4) 행에 보여주는 이유 문구 — reason_code가 아니라
+       *  `listSystemAdmins()` 결과만으로 판정한 값이다. */
+      revokeBlockedReason: {
+        self: "자기 자신은 회수할 수 없어요",
+        lastAdmin: "관리자는 최소 1명이 필요해요",
+      },
+      grant: {
+        trigger: "관리자 지정",
+        dialogTitle: "관리자 지정",
+        dialogDescription: "핸들로 검색해 관리자로 지정해요. 대상은 활성 계정이어야 해요.",
+        grantButton: "관리자로 지정",
+        submitPending: "지정하는 중…",
+        grantedNotice: "관리자로 지정했어요",
+        errors: {
+          notAllowed: "관리자 권한이 없어요",
+          forbidden: "관리자 권한이 없어요",
+          cannot_target_self: "자기 자신은 지정할 수 없어요",
+          target_not_found: "사용자를 찾을 수 없어요",
+          target_not_active: "활성 상태가 아닌 계정이에요",
+          already_admin: "이미 관리자예요",
+          /** 27일차 후속 — handle 해석이 `admin_grant_system_admin_by_handle` RPC 내부로
+           *  옮겨가면서 이 사유도 RPC의 reason_code(snake_case)로 그대로 온다. 비관리자는
+           *  이 코드에 도달하지 않는다(forbidden이 handle 조회보다 먼저 걸린다, R-012) —
+           *  이 문구는 이미 인가된 관리자에게만 보인다. */
+          handle_not_found: "그 핸들의 사용자를 찾을 수 없어요",
+          failed: "지정하지 못했어요. 다시 시도해 주세요.",
+        },
+      },
+      revoke: {
+        button: "회수",
+        dialogTitle: "관리자 권한을 회수할까요?",
+        dialogDescription: "회수하면 이 사용자는 더 이상 관리자 콘솔에 접근할 수 없어요. 되돌리려면 다시 지정해야 해요.",
+        submit: "회수",
+        cancel: "취소",
+        submitPending: "회수하는 중…",
+        revokedNotice: "관리자 권한을 회수했어요",
+        errors: {
+          forbidden: "관리자 권한이 없어요",
+          target_not_found: "사용자를 찾을 수 없어요",
+          target_not_active: "활성 상태가 아닌 계정이에요",
+          not_admin: "이미 관리자가 아니에요",
+          last_admin_forbidden: "관리자는 최소 1명이 필요해요",
+          cannot_target_self: "자기 자신은 회수할 수 없어요",
+          failed: "회수하지 못했어요. 다시 시도해 주세요.",
+        },
       },
     },
   },

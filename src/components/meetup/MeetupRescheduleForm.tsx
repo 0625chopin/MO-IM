@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { getPostDetailHref } from "@/components/board/board-links";
+import { MeetupRescheduleConflict } from "@/components/meetup/MeetupRescheduleConflict";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,15 @@ const DENIED_MESSAGE: Record<"forbidden" | "not_found" | "conflict", string> = {
 };
 
 /**
+ * I-130(27일차) — `duplicate_proposal`은 고정 문구가 아니라 기존 제안글로 가는 링크를 함께
+ * 실어야 해서(`conflictingPostId`) `DENIED_MESSAGE`(문자열 하나) 자리에 넣을 수 없다. 폼
+ * 인라인 오류를 "고정 문구" | "기존 제안 링크 안내" 둘로 구분해 표현한다.
+ */
+type RescheduleFormError =
+  | { kind: "message"; text: string }
+  | { kind: "duplicate_proposal"; conflictingPostId: Id };
+
+/**
  * "일정 변경 제안" 전용 글쓰기 폼(I-079/FR-065 AC2, 26일차 BOARD) — `PostWriteForm`의 모임
  * 제안 필드 세트와 같은 모양이지만 유형 토글이 없다(`meetup_reschedule_proposal` 고정) +
  * `targetMeetupId`를 항상 함께 보낸다. 표현/컨테이너 구분이 없는 클라이언트 경계인 이유도
@@ -71,7 +81,7 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
   const [capacity, setCapacity] = useState("");
 
   const [fieldErrors, setFieldErrors] = useState<CreatePostFieldErrors>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<RescheduleFormError | null>(null);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,8 +107,10 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
       if (!result.ok) {
         if (result.kind === "fields") {
           setFieldErrors(result.fieldErrors);
+        } else if (result.code === "duplicate_proposal") {
+          setFormError({ kind: "duplicate_proposal", conflictingPostId: result.conflictingPostId });
         } else {
-          setFormError(DENIED_MESSAGE[result.code]);
+          setFormError({ kind: "message", text: DENIED_MESSAGE[result.code] });
         }
         return;
       }
@@ -230,10 +242,19 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
           </Field>
         </FieldGroup>
 
-        {formError && (
+        {formError?.kind === "message" && (
           <p role="alert" className="text-sm text-destructive">
-            {formError}
+            {formError.text}
           </p>
+        )}
+        {formError?.kind === "duplicate_proposal" && (
+          <div role="alert">
+            <MeetupRescheduleConflict
+              crewId={crewId}
+              conflictingPostId={formError.conflictingPostId}
+              className="min-h-0 items-start gap-3 rounded-lg border border-solid border-destructive/40 bg-destructive/5 p-4 text-left"
+            />
+          </div>
         )}
 
         <Button type="submit" disabled={pending} className="w-full">

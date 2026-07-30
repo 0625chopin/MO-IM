@@ -110,14 +110,37 @@ export function AppShell({
           정적 배지 링크로 폴백한다. */}
       <HeaderNav session={session} notificationBell={<NotificationBellServerContainer />} />
 
-      {/* 모바일 하단 여백은 탭바 높이(3.5rem)와 iOS 홈 인디케이터 영역을 함께 비운다 —
-          `MobileTabBar`가 같은 `env(safe-area-inset-bottom)`을 쓰므로 두 값은 함께 움직인다.
-          개편 전 고정 `pb-16`은 safe-area가 있는 기기에서 마지막 콘텐츠가 탭바에 가렸다. */}
-      <div
-        id={showSkipLink ? "main-content" : undefined}
-        className="flex min-h-0 flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0"
-      >
+      {/* **I-136(27일차) 재작성 — padding-bottom에서 스페이서 형제 요소로.** 이 `div`는
+          `min-h-0 flex-1`이라 조상 높이 체인(I-118·I-122)을 따라 **확정 높이**를 받고
+          늘어나지 않는다. 옛 구현은 이 확정 높이 박스 자체에 `pb-[calc(3.5rem+…)]`을 줬는데,
+          `min-h-0`가 이 박스의 자동 최소 높이를 0으로 지워 버려 **자식(`{children}`, 즉 각
+          페이지의 `<main>`)이 padding까지 포함한 이 박스 전체보다 커지는 순간(콘텐츠가
+          뷰포트보다 길어 스크롤이 필요해지는 순간) padding이 실제로 그려지는 자리를 자식의
+          넘친 콘텐츠가 뒤덮어 버렸다** — `padding`은 부모 자신의 박스 안에서만 의미가
+          있고, 부모 박스가 늘어나지 않으면 자식이 그 padding "구간"을 그대로 밟고 지나간다.
+          실측(격리 Chromium, `/meetups/[id]/reschedule` 스크롤 최하단): 예약값 56px >
+          탭바 실제 높이 53.6875px — 예약값 자체는 부족하지 않았는데도, `elementFromPoint`가
+          제출 버튼 좌표에서 탭바 아이콘 `<path>`를 반환했고 CDP 실좌표 클릭·터치 탭 둘 다
+          `/calendar`로 오내비게이트됐다(탭바가 실제로 그 좌표를 차지하고 있었다는 뜻).
+          같은 패턴(`<main flex-1 flex-col p-4>`, 다른 17개 라우트 대부분과 동일 골격)을 쓰는
+          `/crews/[id]/settings`("크루 해산" 버튼)·`/notifications`(마지막 알림 링크)·
+          `/meetups/[id]`("모임 취소" 버튼)에서도 콘텐츠가 뷰포트보다 길어지는 순간 같은
+          겹침이 재현됐다 — 페이지 개별 결함이 아니라 이 셸의 여백 예약 전략 자체의 결함이었다.
+
+          고침: padding 대신 **`{children}`의 형제로 실제 높이를 가진 스페이서 `div`**를 둔다.
+          flex-column 레이아웃은 한 아이템이 자기 몫보다 커져도(overflow) 다음 형제를 그
+          아이템의 "이상적인" 자리가 아니라 **실제로 그려진 자리 바로 다음**에 이어 그린다 —
+          이게 flex의 기본 스택 순서 보장이다(padding은 이 보장을 받지 못하는 부모 자신의
+          속성일 뿐이다). 그래서 콘텐츠가 넘치든 안 넘치든 탭바 높이만큼의 빈 공간이 항상
+          실제로 확보된다. 값은 `globals.css`의 `--tab-bar-height`(`MobileTabBar`의 로딩
+          스켈레톤과 공유)로 뒀다 — 임의 px가 아니라 토큰 하나를 두 곳이 함께 참조한다.
+          `MobileTabBar`가 같은 `env(safe-area-inset-bottom)`을 쓰므로 두 값은 함께 움직인다. */}
+      <div id={showSkipLink ? "main-content" : undefined} className="flex min-h-0 flex-1 flex-col">
         {children}
+        <div
+          aria-hidden="true"
+          className="h-[calc(var(--tab-bar-height)+env(safe-area-inset-bottom))] w-full shrink-0 md:hidden"
+        />
       </div>
 
       <MobileTabBar session={session} />

@@ -306,12 +306,19 @@ const eslintConfig = defineConfig([
       "src/lib/auth/**",
       "src/lib/audit/**",
       "src/components/**/*.tsx",
-      // I-074 — zone 6b(아래)가 이 두 파일을 대신 맡는다. flat config는 같은 파일에 매치되는
+      // I-074 — zone 6b(아래)가 이 파일들을 대신 맡는다. flat config는 같은 파일에 매치되는
       // 여러 config의 같은 rule을 병합하지 않고 나중 객체가 통째로 덮어쓰므로(파일 상단
       // 공통 주의사항), 이 zone과 6b의 `files`/`ignores`가 겹치면 안 된다 — 여기서 빼고
       // 6b에서만 매칭시킨다.
       "src/lib/actions/check-handle-availability.ts",
       "src/lib/actions/invite-crew-member.ts",
+      // I-075(27일차) — `grant-system-admin.ts`는 여기 없다. DESIGN이 처음에 이 파일을
+      // 3번째 예외로 등록했으나(`getProfileByHandle`로 handle→id를 앱 레이어에서 먼저
+      // 해석), 팀장이 "인가 검사보다 존재 확인이 먼저 실행돼 R-012를 위반한다"고 판단해
+      // handle 해석 자체를 `admin_grant_system_admin_by_handle` RPC 내부로 옮겼다
+      // (`admin-grant-revoke-rpcs-075.md` 참고) — 이 파일은 이제 `getProfileByHandle`을
+      // 전혀 호출하지 않으므로 예외 목록에 다시 넣지 않는다(허용 목록을 넓히면 규칙의
+      // 억지력이 약해진다는 것이 정확히 이 사례의 교훈이었다).
     ],
     rules: {
       "no-restricted-imports": [
@@ -324,10 +331,11 @@ const eslintConfig = defineConfig([
     },
   },
 
-  // zone 6b: I-074 허용 목록 — `getProfileByHandle`을 익명 컨텍스트에서 호출해도 되는 두 실
-  // 소비자(모듈 docstring, `src/lib/data/supabase/profile.ts` 참고)만 zone 6의 새 제한에서
-  // 뺀다. zone 6과 나머지 규칙(Supabase 클라이언트 직접 import·mock/realtime 딥 임포트 차단)은
-  // 동일하게 유지한다 — `getProfileByHandle` 제한 한 줄만 뺐다.
+  // zone 6b: I-074 허용 목록 — `getProfileByHandle`을 호출해도 되는 실 소비자(모듈 docstring,
+  // `src/lib/data/supabase/profile.ts` 참고) 2곳만 zone 6의 새 제한에서 뺀다. zone 6과 나머지
+  // 규칙(Supabase 클라이언트 직접 import·mock/realtime 딥 임포트 차단)은 동일하게 유지한다 —
+  // `getProfileByHandle` 제한 한 줄만 뺐다. `grant-system-admin.ts`는 여기 없다(27일차, 위 zone
+  // 6 주석 참고 — 처음 등록됐다가 handle 해석을 RPC 내부로 옮기면서 다시 빠졌다).
   {
     files: ["src/lib/actions/check-handle-availability.ts", "src/lib/actions/invite-crew-member.ts"],
     rules: {

@@ -7,6 +7,7 @@ import { getAuthSession } from "@/components/shell/get-auth-session";
 import {
   createPoll,
   createPost,
+  findOpenRescheduleProposal,
   getBoardByCrewId,
   getCrewMembership,
   getMeetupById,
@@ -52,6 +53,14 @@ import type { Id, PostType } from "@/lib/types";
  * 크루·`isMeetupAttendanceOpen`)을 그대로 가져와 트리거에 도달하기 전에 깔끔한 도메인
  * 오류로 바꾼다(아래 `code: "conflict"` 분기). 트리거의 원문 예외 메시지는 파싱해 분기하지
  * 않는다 — 애초에 도달하지 않게 만드는 쪽이 맞다.
+ *
+ * **I-130(27일차, BOARD) — 같은 Meetup을 겨냥한 open 제안 상호 배제.** 사용자 결정: "트리거로
+ * DB에서 차단하고, UI는 도달 전에 사전 안내한다"(D-079). `posts_guard_reschedule_target_scope`
+ * 트리거가 최종 방어선(상관 서브쿼리로 두 번째 open 제안 INSERT/UPDATE를 거부)이지만, 이
+ * 트리거도 `raise exception`으로 막으므로 위와 같은 이유로 사전 검증이 필요하다 —
+ * `findOpenRescheduleProposal`을 먼저 호출해 걸리면 `code: "duplicate_proposal"`로 깔끔하게
+ * 돌려주고, 그 안내에 **기존 제안글로 가는 링크**(`conflictingPostId`)를 함께 담는다(팀장 지시
+ * — "막다른 길로 느끼지 않게"). 트리거 예외 메시지는 여기서도 파싱하지 않는다.
  */
 export interface CreatePostActionInput {
   crewId: Id;
@@ -91,11 +100,17 @@ export interface CreatePostFieldErrors {
  * 3. `kind: "fields"`는 "사용자가 고친 입력값 자체의 문제"(제목·날짜 형식 등)에 쓰고,
  *    `kind: "denied"`는 "이 요청 자체를 이 사용자·이 대상으로는 수행할 수 없다"에 쓴다 —
  *    "취소된 Meetup 대상"은 후자(입력값이 아니라 대상의 상태 문제)라 `denied`가 맞는 자리다.
+ *
+ * **I-130(27일차) — `code: "duplicate_proposal"` 추가.** "conflict"(대상 Meetup 자체의 상태
+ * 문제)와 성격이 달라 같은 코드로 합치지 않았다 — 이쪽은 대상 Meetup은 멀쩡하고 "이미 같은
+ * 대상을 겨냥한 다른 제안이 진행 중"이라는 별개 사실이라, 안내에 그 제안글 id
+ * (`conflictingPostId`)를 함께 실어야 해서 `code`만으로는 UI가 필요한 정보를 못 만든다.
  */
 export type CreatePostActionResult =
   | { ok: true; postId: Id }
   | { ok: false; kind: "fields"; fieldErrors: CreatePostFieldErrors }
-  | { ok: false; kind: "denied"; code: "forbidden" | "not_found" | "conflict" };
+  | { ok: false; kind: "denied"; code: "forbidden" | "not_found" | "conflict" }
+  | { ok: false; kind: "denied"; code: "duplicate_proposal"; conflictingPostId: Id };
 
 const VOTE_DEADLINE_MESSAGES: Record<
   "in_past" | "after_schedule_date" | "too_short" | "too_long",
@@ -156,6 +171,21 @@ export async function createPostAction(
     }
     if (!isMeetupAttendanceOpen(targetMeetup, todayIsoUtc(new Date()))) {
       return { ok: false, kind: "denied", code: "conflict" };
+    }
+
+    // I-130 — 같은 Meetup을 겨냥한, 아직 종료되지 않은(open) 일정 변경 제안이 이미 있으면
+    // 여기서 막는다. DB 트리거(posts_guard_reschedule_target_scope)가 최종 방어선이지만
+    // raise exception이라 사전에 걸러야 처리되지 않은 500을 피한다(위 두 검증과 같은 이유).
+    // 종료된(closed/withdrawn) 제안은 findOpenRescheduleProposal이 애초에 보지 않는다 — 재제안은
+    // 막지 않는다.
+    const conflictingProposal = await findOpenRescheduleProposal(input.targetMeetupId);
+    if (conflictingProposal) {
+      return {
+        ok: false,
+        kind: "denied",
+        code: "duplicate_proposal",
+        conflictingPostId: conflictingProposal.id,
+      };
     }
   }
 
