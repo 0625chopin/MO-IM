@@ -75,6 +75,10 @@ broadcast_changes(topic_name text, event_name text, operation text, table_name t
 
 §2.1에서 남긴 대로 `chat_messages_broadcast` 트리거는 `postLinkCard`를 항상 `null`로 보낸다. **실제 영향은 현재 0이다** — `sendChatMessageAction`(FR-051 쓰기 경로)은 `type: "text"`만 만든다(코드 확인, `type: "post_link"`를 만드는 실사용 경로가 없다 — mock 시드(`fixtures.ts`)에만 존재). `type: "post_link"` 메시지를 실제로 보낼 수 있는 기능(게시글을 채팅에 공유, FR-052 쓰기 쪽)이 나중에 생기면, 그 메시지가 실시간으로 도착한 다른 크루원 화면에는 카드 없이(본문도 `null`이라 사실상 빈 말풍선) 나타난다 — 그 시점에 반드시 다시 봐야 한다. `docs/ISSUES.md` I-063으로 등재했다.
 
+**36일차(BOARD) 정정** — 위 "카드 없이(사실상 빈 말풍선)" 서술은 실제 렌더 경로와 다르다. `MessageBubble.tsx`가 `message.postLinkCard ?? { kind: "deleted" }`로 방어적 기본값을 씌우기 때문에, 실제로는 `PostLinkCard`가 "삭제된 게시글입니다" 카드를 그린다 — 빈 영역이 아니라 사실과 다른("그 게시글은 삭제되지 않았다") 상태를 확정적으로 보여주는 카드다. "현재 영향 0" 전제 자체는 이번 회차에도(코드 grep 전수 재확인 + `pg_get_functiondef`로 트리거 정의 직접 조회) 그대로 유지된다. 세 처분안 비교와 권고는 `docs/design/post-link-card-disposition-36/README.md` 참고.
+
+**36일차(BOARD, 팀장 실측 반영) 추가 정정** — 위 두 정정 모두 "실제 영향 0"을 **앱 코드 기준**으로만 확인했다. 같은 날 팀장 실측으로 그 전제가 DB 레벨에서는 성립하지 않음이 드러났다 — `chat_messages_insert_members`(INSERT RLS)의 `WITH CHECK`가 `type` 컬럼을 전혀 제한하지 않아, 활성 크루원이 raw REST로 `type: "post_link"` 메시지를 오늘 만들 수 있다(BOARD가 다른 room/post id로 독립 재현, `begin...rollback`으로 흔적 없이 확인). §2.1·§4 원 서술의 "나중에 생기면"은 "이미 열려 있다"로 정정한다. 상세·재처분(좁은 `WITH CHECK` 이중화 제안)은 `docs/design/post-link-card-disposition-36/README.md` §7.
+
 ## 5. E2E 실측 — Node 스크립트로 실제 소켓·DB 트래픽 재현
 
 029B §6.3이 "완전한 end-to-end는 Task 033이 트리거를 붙이고 첫 실제 트래픽이 흐를 때 반드시 재검증해야 한다"고 남긴 것을 이번에 실행했다. `@supabase/supabase-js`(이미 의존성)로 두 실 계정(`chopin0625@gmail.com`·`0625chopin@gmail.com`, CLAUDE.md 테스트계정)에 직접 로그인해 실제 소켓을 열고 실제 DB에 INSERT했다 — Mock이나 트랜잭션 롤백이 아니라 실 트래픽이다. 스크립트는 검증 후 삭제했다(`.tmp-e2e/`, 저장소에 남기지 않음). 테스트 데이터(채팅 메시지 2건·알림 2건)는 확인 직후 전부 DELETE로 정리했고, 정리 후 잔여 0건을 재확인했다.
