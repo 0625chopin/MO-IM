@@ -9,6 +9,7 @@ import { createCrew } from "@/lib/data";
 import { isValidCrewCategory } from "@/lib/rules/crew-category";
 import { validateCrewDescription } from "@/lib/rules/crew-description-validation";
 import { validateCrewName } from "@/lib/rules/crew-name-validation";
+import { DEFAULT_CREW_VISIBILITY, isValidCrewVisibility } from "@/lib/rules/crew-visibility";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
 import type { CrewVisibility } from "@/lib/types";
@@ -49,12 +50,6 @@ export interface CreateCrewFormState {
 // 초기 상태 상수는 여기 두지 않는다 — `'use server'` 파일은 async 함수만 export할 수 있다
 // (signup.ts 모듈 docstring 참고). 호출부(`CrewCreateForm`)가 타입만 가져다 직접 만든다.
 
-const VISIBILITY_VALUES: readonly CrewVisibility[] = ["public", "private"];
-
-function isCrewVisibility(value: string): value is CrewVisibility {
-  return (VISIBILITY_VALUES as readonly string[]).includes(value);
-}
-
 export async function createCrewAction(
   _prevState: CreateCrewFormState,
   formData: FormData,
@@ -71,7 +66,9 @@ export async function createCrewAction(
   const description = String(formData.get("description") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
   const visibilityRaw = String(formData.get("visibility") ?? "");
-  const visibility: CrewVisibility = isCrewVisibility(visibilityRaw) ? visibilityRaw : "public";
+  const visibility: CrewVisibility = isValidCrewVisibility(visibilityRaw)
+    ? visibilityRaw
+    : DEFAULT_CREW_VISIBILITY;
 
   const fieldErrors: CreateCrewFieldErrors = {};
 

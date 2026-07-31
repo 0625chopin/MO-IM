@@ -23,6 +23,7 @@ import { createCrewAction } from "@/lib/actions/create-crew";
 import { CREW_CATEGORIES } from "@/lib/rules/crew-category";
 import { CREW_DESCRIPTION_MAX_LENGTH } from "@/lib/rules/crew-description-validation";
 import { CREW_NAME_MAX_LENGTH } from "@/lib/rules/crew-name-validation";
+import { CREW_VISIBILITIES, DEFAULT_CREW_VISIBILITY } from "@/lib/rules/crew-visibility";
 import { strings } from "@/lib/strings";
 
 /** `'use server'` 파일은 async 함수만 export할 수 있다(`signup.ts` docstring 참고) —
@@ -36,6 +37,11 @@ const INITIAL_CREATE_CREW_STATE: CreateCrewFormState = { fieldErrors: {} };
  * `CREW_CATEGORIES`(`lib/rules/crew-category.ts`)가 카테고리 select의 유일한 소스다 —
  * Task 016A(크루 탐색, 같은 담당자 후속 회차)의 카테고리 필터도 같은 목록을 재사용해야
  * 개설 폼에서 고른 카테고리가 탐색 필터에서도 그대로 잡힌다.
+ *
+ * 공개 범위 라디오도 같은 방식이다 — `CREW_VISIBILITIES`(`lib/rules/crew-visibility.ts`)를
+ * 순회해 만들고, 라벨·설명은 코드값을 키로 `strings.crew.create.visibilityOptions`에서
+ * 꺼낸다. `createCrewAction`이 제출값을 판정할 때 쓰는 목록과 같은 배열이라 "폼에만 있고
+ * 액션은 모르는 선택지"가 생길 수 없다.
  */
 export function CrewCreateForm() {
   const [state, formAction, isPending] = useActionState(createCrewAction, INITIAL_CREATE_CREW_STATE);
@@ -67,6 +73,9 @@ export function CrewCreateForm() {
             name="description"
             required
             maxLength={CREW_DESCRIPTION_MAX_LENGTH}
+            // 소개 입력란은 높이를 고정한다 — ui/textarea 기본값인 `field-sizing-content`(내용에
+            // 따라 자동 확장)와 브라우저 기본 리사이즈 핸들을 함께 끄고, 넘치면 내부 스크롤.
+            className="h-32 min-h-32 resize-none field-sizing-fixed"
             aria-invalid={Boolean(state.fieldErrors.description)}
             aria-describedby={state.fieldErrors.description ? "crew-create-description-error" : undefined}
           />
@@ -101,29 +110,20 @@ export function CrewCreateForm() {
 
         <FieldSet>
           <FieldLegend variant="label">{strings.crew.create.fields.visibility}</FieldLegend>
-          <RadioGroup name="visibility" defaultValue="public">
-            <Field orientation="horizontal">
-              <RadioGroupItem id="crew-create-visibility-public" value="public" />
-              <FieldContent>
-                <FieldLabel htmlFor="crew-create-visibility-public">
-                  {strings.crew.create.visibilityOptions.public.label}
-                </FieldLabel>
-                <FieldDescription>
-                  {strings.crew.create.visibilityOptions.public.description}
-                </FieldDescription>
-              </FieldContent>
-            </Field>
-            <Field orientation="horizontal">
-              <RadioGroupItem id="crew-create-visibility-private" value="private" />
-              <FieldContent>
-                <FieldLabel htmlFor="crew-create-visibility-private">
-                  {strings.crew.create.visibilityOptions.private.label}
-                </FieldLabel>
-                <FieldDescription>
-                  {strings.crew.create.visibilityOptions.private.description}
-                </FieldDescription>
-              </FieldContent>
-            </Field>
+          <RadioGroup name="visibility" defaultValue={DEFAULT_CREW_VISIBILITY}>
+            {CREW_VISIBILITIES.map((visibility) => (
+              <Field key={visibility} orientation="horizontal">
+                <RadioGroupItem id={`crew-create-visibility-${visibility}`} value={visibility} />
+                <FieldContent>
+                  <FieldLabel htmlFor={`crew-create-visibility-${visibility}`}>
+                    {strings.crew.create.visibilityOptions[visibility].label}
+                  </FieldLabel>
+                  <FieldDescription>
+                    {strings.crew.create.visibilityOptions[visibility].description}
+                  </FieldDescription>
+                </FieldContent>
+              </Field>
+            ))}
           </RadioGroup>
         </FieldSet>
       </FieldGroup>

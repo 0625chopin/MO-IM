@@ -5,9 +5,9 @@ import { refresh } from "next/cache";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewById, getCrewMembership, updateCrewVisibility } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
+import { isValidCrewVisibility } from "@/lib/rules/crew-visibility";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
-import type { CrewVisibility } from "@/lib/types";
 
 /**
  * FR-012 크루 공개 범위 변경 Server Action(SC-15, D-007, Task 017B). `CrewVisibilityForm`이
@@ -22,12 +22,6 @@ export interface UpdateCrewVisibilityFormState {
 
 // 초기 상태 상수는 여기 두지 않는다 — `'use server'` 파일은 async 함수만 export할 수 있다
 // (signup.ts 모듈 docstring 참고). 호출부(`CrewVisibilityForm`)가 타입만 가져다 직접 만든다.
-
-const VISIBILITY_VALUES: readonly CrewVisibility[] = ["public", "private"];
-
-function isCrewVisibility(value: string): value is CrewVisibility {
-  return (VISIBILITY_VALUES as readonly string[]).includes(value);
-}
 
 export async function updateCrewVisibilityAction(
   _prevState: UpdateCrewVisibilityFormState,
@@ -53,7 +47,7 @@ export async function updateCrewVisibilityAction(
     return { formError: strings.crew.settings.visibility.errors.notAllowed };
   }
 
-  if (!isCrewVisibility(visibilityRaw)) {
+  if (!isValidCrewVisibility(visibilityRaw)) {
     return { formError: strings.crew.settings.visibility.errors.failed };
   }
 

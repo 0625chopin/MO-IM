@@ -6,7 +6,7 @@ import { CrewColorDot } from "@/components/crews/CrewColorDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { strings, t } from "@/lib/strings";
-import type { Id } from "@/lib/types";
+import type { CrewVisibility, Id } from "@/lib/types";
 
 export interface CrewHomeProps {
   crewId: Id;
@@ -14,7 +14,7 @@ export interface CrewHomeProps {
   description: string;
   category: string;
   colorIndex: number;
-  visibility: "public" | "private";
+  visibility: CrewVisibility;
   memberCount: number;
   /** 임원 이상만 크루 설정 탭이 보인다(3.3절 `crew:update_info` — 일반 크루원은 불가). */
   canManageSettings: boolean;
@@ -43,11 +43,10 @@ export function CrewHome({
           <CrewColorDot colorIndex={colorIndex} />
           <h1 className="font-heading text-lg font-medium text-foreground">{name}</h1>
           <Badge variant="outline">{category}</Badge>
-          <Badge variant="secondary">
-            {visibility === "public"
-              ? strings.crew.create.visibilityOptions.public.label
-              : strings.crew.create.visibilityOptions.private.label}
-          </Badge>
+          {/* 공개 범위 배지 — 코드값을 키로 라벨을 꺼낸다(`CrewCreateForm`의 라디오와 같은
+              소스). 삼항으로 두 갈래를 적어 두면 공개 범위가 늘 때 이 자리가 조용히
+              틀린 라벨을 보여준다. */}
+          <Badge variant="secondary">{strings.crew.create.visibilityOptions[visibility].label}</Badge>
         </div>
         <p className="text-sm text-muted-foreground">{description}</p>
         <p className="text-xs text-muted-foreground">{t((s) => s.crew.home.memberCount, { count: memberCount })}</p>

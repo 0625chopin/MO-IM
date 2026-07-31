@@ -10,6 +10,7 @@ import {
   updateCrewVisibilityAction,
   type UpdateCrewVisibilityFormState,
 } from "@/lib/actions/update-crew-visibility";
+import { CREW_VISIBILITIES } from "@/lib/rules/crew-visibility";
 import { strings } from "@/lib/strings";
 import type { CrewVisibility, Id } from "@/lib/types";
 
@@ -25,6 +26,10 @@ export interface CrewVisibilityFormProps {
  * `CrewSettingsContainer`가 `crew:update_visibility`(오너만 allow)로 이미 걸러야만 이 폼이
  * 렌더된다(R-015, 이 컴포넌트는 판정을 다시 하지 않는다). `CrewInfoForm`과 별도 폼·별도
  * 액션으로 분리한 이유는 `update-crew-visibility.ts` 모듈 docstring 참고(권한 등급이 다르다).
+ *
+ * 선택지는 `CREW_VISIBILITIES`(`lib/rules/crew-visibility.ts`)를 순회해 만든다 — 개설 폼
+ * (`CrewCreateForm`)과 같은 목록·같은 라벨 소스를 쓰므로 "개설 때 고를 수 있던 공개 범위가
+ * 설정에서는 안 보이는" 어긋남이 생기지 않는다.
  */
 export function CrewVisibilityForm({ crewId, initialVisibility }: CrewVisibilityFormProps) {
   const [state, formAction, isPending] = useActionState(
@@ -39,24 +44,19 @@ export function CrewVisibilityForm({ crewId, initialVisibility }: CrewVisibility
         <FieldLegend variant="label">{strings.crew.settings.visibility.heading}</FieldLegend>
         <FieldDescription>{strings.crew.settings.visibility.description}</FieldDescription>
         <RadioGroup name="visibility" defaultValue={initialVisibility}>
-          <Field orientation="horizontal">
-            <RadioGroupItem id="crew-settings-visibility-public" value="public" />
-            <FieldContent>
-              <FieldLabel htmlFor="crew-settings-visibility-public">
-                {strings.crew.create.visibilityOptions.public.label}
-              </FieldLabel>
-              <FieldDescription>{strings.crew.create.visibilityOptions.public.description}</FieldDescription>
-            </FieldContent>
-          </Field>
-          <Field orientation="horizontal">
-            <RadioGroupItem id="crew-settings-visibility-private" value="private" />
-            <FieldContent>
-              <FieldLabel htmlFor="crew-settings-visibility-private">
-                {strings.crew.create.visibilityOptions.private.label}
-              </FieldLabel>
-              <FieldDescription>{strings.crew.create.visibilityOptions.private.description}</FieldDescription>
-            </FieldContent>
-          </Field>
+          {CREW_VISIBILITIES.map((visibility) => (
+            <Field key={visibility} orientation="horizontal">
+              <RadioGroupItem id={`crew-settings-visibility-${visibility}`} value={visibility} />
+              <FieldContent>
+                <FieldLabel htmlFor={`crew-settings-visibility-${visibility}`}>
+                  {strings.crew.create.visibilityOptions[visibility].label}
+                </FieldLabel>
+                <FieldDescription>
+                  {strings.crew.create.visibilityOptions[visibility].description}
+                </FieldDescription>
+              </FieldContent>
+            </Field>
+          ))}
         </RadioGroup>
       </FieldSet>
 
