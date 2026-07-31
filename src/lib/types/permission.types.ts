@@ -52,10 +52,19 @@ export type PermissionAction =
   // Task 041(FR-033, 21일차 BOARD) 추가 — "댓글 작성"(comment:create) 1행만 있고 수정·삭제는
   // 매트릭스에 없었다(원 33행 자체가 회원가입·로그인 제외 후 33행이라 댓글 CRUD 세부는 처음부터
   // 빠져 있었다 — `post:update_own`·`post:delete_own`·`post:delete_any`와 대칭이 되도록 같은
-  // 3분할로 추가한다). 이 세 값을 더해 실제 액션 수는 34개에서 37개가 된다.
+  // 3분할로 추가한다). 이 세 값을 더해 실제 액션 수는 34개에서 37개가 된다(이후 D-111의
+  // 사진 3행이 더해져 40개다 — 아래 `photo:*` 주석 참고).
   | "comment:update_own"
   | "comment:delete_own"
   | "comment:delete_any"
+  // 크루 활동 사진(팀장 요청 신설) — 3.3절 매트릭스에 대응 행이 없다. 요구사항 문서에 없는
+  // 기능이라 새 행을 여는 셈인데, 그렇다고 `post:create`/`post:delete_*`를 재사용하면 "사진
+  // 업로드를 막고 싶다"와 "글쓰기를 막고 싶다"를 영영 구분할 수 없게 된다. 판정 값 자체는
+  // 게시글 3분할(`post:create`·`post:delete_own`·`post:delete_any`)과 똑같이 뒀다 — 같은
+  // "크루원이 크루 안에 콘텐츠를 남긴다"는 성격이기 때문이다.
+  | "photo:create"
+  | "photo:delete_own"
+  | "photo:delete_any"
   | "poll:create_proposal"
   | "poll:vote"
   | "poll:close_early"

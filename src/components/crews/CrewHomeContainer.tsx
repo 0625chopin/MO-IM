@@ -1,8 +1,19 @@
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
+import { BoardListContainer } from "@/components/board/BoardListContainer";
+import { BoardListSkeleton } from "@/components/board/BoardListSkeleton";
+import { MessageListContainer } from "@/components/chat/MessageListContainer";
+import { MessageListSkeleton } from "@/components/chat/MessageListSkeleton";
 import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
+import type { CrewHomeTab } from "@/components/crews/crew-home-tabs";
+import { getCrewHomeTabHref } from "@/components/crews/crew-links";
+import { CrewActivityContainer } from "@/components/crews/CrewActivityContainer";
 import { CrewHome } from "@/components/crews/CrewHome";
 import { CrewIntroPreview } from "@/components/crews/CrewIntroPreview";
+import { CrewMembersContainer } from "@/components/crews/CrewMembersContainer";
+import { CrewMembersSkeleton } from "@/components/crews/CrewMembersSkeleton";
+import { CrewPhotoGalleryContainer } from "@/components/crews/CrewPhotoGalleryContainer";
 import { PrivateCrewNotice } from "@/components/crews/PrivateCrewNotice";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { getCrewById, getCrewMembership, getPublicCrewMemberCount, listCrewMembers } from "@/lib/data";
@@ -10,6 +21,8 @@ import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rule
 import { resolveJoinRequestButtonState } from "@/lib/rules/join-request-button-state";
 import { checkPermission } from "@/lib/rules/permission";
 import type { Id } from "@/lib/types";
+
+import type { ReactNode } from "react";
 
 /**
  * 크루 홈 컨테이너(SC-09, FR-011·FR-022, D-007, Task 016B, D-030 ①) — "크루 홈 4분기 화면
@@ -63,7 +76,17 @@ import type { Id } from "@/lib/types";
  * private 전용 RPC 폴백(0행일 때만 타는 경로)에는 이 분기가 도달하지 않는다 — 여기서 읽는
  * `crew.status`는 항상 실제 값이다.
  */
-export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
+export async function CrewHomeContainer({
+  crewId,
+  tab,
+  page,
+}: {
+  crewId: Id;
+  /** 선택된 탭(팀장 요청). 비소속 방문자 분기에서는 무시된다 — 그들에게는 탭이 없다. */
+  tab: CrewHomeTab;
+  /** 모임투표·게시판 탭의 페이지 번호. 다른 탭에서는 쓰이지 않는다. */
+  page: number;
+}) {
   const crew = await getCrewById(crewId);
   if (!crew) {
     notFound();
@@ -91,7 +114,10 @@ export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
           visibility={crew.visibility}
           memberCount={memberCount}
           canManageSettings={canManageSettings}
-        />
+          activeTab={tab}
+        >
+          {renderTabContent({ crewId, tab, page, colorIndex: crew.colorKey })}
+        </CrewHome>
       </>
     );
   }
@@ -126,4 +152,85 @@ export async function CrewHomeContainer({ crewId }: { crewId: Id }) {
       />
     </>
   );
+}
+
+/**
+ * 탭별 내용 조립(팀장 요청). **이 함수는 활성 멤버십 분기에서만 호출된다** — 비소속 방문자는
+ * `CrewIntroPreview`로 먼저 갈라져 여기 도달하지 않는다. 그래서 각 컨테이너가 자기 권한을 다시
+ * 판정하더라도(`BoardListContainer`의 `board:read`, `MessageListContainer`의 `chat:send_message`)
+ * 정상 경로에서는 항상 통과한다 — 그 판정들은 이 화면 밖의 다른 진입점(직접 라우트)을 위한
+ * 방어이며, 여기서 제거하지 않는다(D-039가 `resolveBoardViewer`를 남겨 둔 것과 같은 이유).
+ *
+ * 탭마다 `Suspense`를 따로 두는 것은 각 탭의 조회 시간이 크게 다르기 때문이다 — 채팅 한 방과
+ * 사진 60장 + 서명 발급은 같은 폴백을 공유할 만큼 비슷하지 않다.
+ */
+function renderTabContent({
+  crewId,
+  tab,
+  page,
+  colorIndex,
+}: {
+  crewId: Id;
+  tab: CrewHomeTab;
+  page: number;
+  colorIndex: number;
+}): ReactNode {
+  switch (tab) {
+    case "votes":
+      return (
+        <Suspense fallback={<BoardListSkeleton />}>
+          <BoardListContainer
+            crewId={crewId}
+            page={page}
+            variant="votes"
+            paginationBaseHref={getCrewHomeTabHref(crewId, "votes")}
+          />
+        </Suspense>
+      );
+
+    case "posts":
+      return (
+        <Suspense fallback={<BoardListSkeleton />}>
+          <BoardListContainer
+            crewId={crewId}
+            page={page}
+            variant="posts"
+            paginationBaseHref={getCrewHomeTabHref(crewId, "posts")}
+          />
+        </Suspense>
+      );
+
+    case "photos":
+      return (
+        <Suspense fallback={<BoardListSkeleton />}>
+          <CrewPhotoGalleryContainer crewId={crewId} />
+        </Suspense>
+      );
+
+    case "members":
+      return (
+        <Suspense fallback={<CrewMembersSkeleton />}>
+          <CrewMembersContainer crewId={crewId} embedded />
+        </Suspense>
+      );
+
+    case "chat":
+      // 채팅만 남은 높이를 다 쓰는 스크롤 영역이다 — 다른 탭은 문서처럼 아래로 흐르지만
+      // 대화는 아래가 최신이라 "바닥에 붙는" 배치가 아니면 매번 스크롤을 내려야 한다.
+      return (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <Suspense fallback={<MessageListSkeleton />}>
+            <MessageListContainer crewId={crewId} />
+          </Suspense>
+        </div>
+      );
+
+    case "activity":
+    default:
+      return (
+        <Suspense fallback={<BoardListSkeleton />}>
+          <CrewActivityContainer crewId={crewId} colorIndex={colorIndex} />
+        </Suspense>
+      );
+  }
 }

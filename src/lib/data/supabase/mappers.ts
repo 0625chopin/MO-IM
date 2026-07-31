@@ -8,6 +8,7 @@ import type {
   CrewMembership,
   CrewMembershipRole,
   CrewMembershipStatus,
+  CrewPhoto,
   CrewVisibility,
   HotMeetup,
   Invitation,
@@ -145,6 +146,19 @@ export function toCrewMembership(row: Tables<"crew_memberships">): CrewMembershi
     status: row.status as CrewMembershipStatus,
     joinedAt: row.joined_at,
     removedReason: row.removed_reason,
+  };
+}
+
+export function toCrewPhoto(row: Tables<"crew_photos">): CrewPhoto {
+  return {
+    id: row.id,
+    crewId: row.crew_id,
+    meetupId: row.meetup_id,
+    uploaderId: row.uploader_id,
+    storagePath: row.storage_path,
+    caption: row.caption,
+    createdAt: row.created_at,
+    deletedAt: row.deleted_at,
   };
 }
 

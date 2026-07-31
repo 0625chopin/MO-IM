@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getBoardListHref } from "@/components/board/board-links";
 import type { BoardPostSummary } from "@/components/board/board-view-models";
-import { BoardList } from "@/components/board/BoardList";
+import { BoardList, type BoardListLabels } from "@/components/board/BoardList";
 import { resolveBoardViewer } from "@/components/board/resolve-board-viewer";
 import {
   getBoardByCrewId,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/data";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
-import type { Id } from "@/lib/types";
+import type { Id, PostType } from "@/lib/types";
 
 /**
  * 게시판 목록 컨테이너(D-030 ①) — Mock 조회를 소유한다. `BoardList`(표현)는 이 컴포넌트가
@@ -33,7 +33,39 @@ import type { Id } from "@/lib/types";
  * 를 한 번만 조회해 이 페이지의 모든 글 작성자와 대조한다 — 글마다 다시 조회하지 않는다
  * (N+1 방지, `getProfileById`를 글마다 부르는 것과 같은 이유로 이미 있던 패턴을 그대로 따름).
  */
-export async function BoardListContainer({ crewId, page }: { crewId: Id; page: number }) {
+/**
+ * 어느 갈래의 목록인가(팀장 요청). `posts` 한 테이블이 두 화면으로 갈리면서 생긴 구분이다 —
+ * 자세한 배경은 `strings.board` docstring 참고.
+ *
+ * - `votes`: 투표가 달린 제안글 2종("모임투표")
+ * - `posts`: 자유글 1종("게시판")
+ * - `all`: 두 갈래가 섞인 원래 목록(`/crews/{id}/board` 라우트가 그대로 쓴다)
+ */
+export type BoardListVariant = "votes" | "posts" | "all";
+
+const VARIANT_TYPES: Record<BoardListVariant, readonly PostType[] | undefined> = {
+  votes: ["meetup_proposal", "meetup_reschedule_proposal"],
+  posts: ["general"],
+  all: undefined,
+};
+
+const VARIANT_LABELS: Record<BoardListVariant, BoardListLabels> = {
+  votes: { empty: strings.board.votes.empty, writeButton: strings.board.votes.writeButton },
+  posts: { empty: strings.board.free.empty, writeButton: strings.board.free.writeButton },
+  all: { empty: strings.board.list.empty, writeButton: strings.board.list.writeButton },
+};
+
+export async function BoardListContainer({
+  crewId,
+  page,
+  variant = "all",
+  paginationBaseHref,
+}: {
+  crewId: Id;
+  page: number;
+  variant?: BoardListVariant;
+  paginationBaseHref?: string;
+}) {
   const board = await getBoardByCrewId(crewId);
   if (!board) {
     notFound();
@@ -52,7 +84,7 @@ export async function BoardListContainer({ crewId, page }: { crewId: Id; page: n
 
   const blockedProfileIds = new Set(await listMyBlockedProfileIds());
 
-  const postsPage = await listPostsByPage(board.id, { page });
+  const postsPage = await listPostsByPage(board.id, { page, types: VARIANT_TYPES[variant] });
   const posts: BoardPostSummary[] = await Promise.all(
     postsPage.items.map(async (post) => {
       // I-079/FR-065 AC2 — 일정 변경 제안도 poll을 갖는 제안글 갈래다. 넓히지 않으면 목록의
@@ -84,6 +116,8 @@ export async function BoardListContainer({ crewId, page }: { crewId: Id; page: n
       totalPages={postsPage.totalPages}
       canWrite={canWrite}
       writeHref={`${getBoardListHref(crewId)}/new`}
+      labels={VARIANT_LABELS[variant]}
+      paginationBaseHref={paginationBaseHref}
     />
   );
 }

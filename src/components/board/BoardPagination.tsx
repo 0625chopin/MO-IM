@@ -16,12 +16,20 @@ export function BoardPagination({
   crewId,
   page,
   totalPages,
+  baseHref,
 }: {
   crewId: Id;
   page: number;
   totalPages: number;
+  /**
+   * 기준 경로. 크루 홈 탭(`/crews/{id}?tab=posts`)처럼 이미 검색 파라미터를 가진 경로가
+   * 들어올 수 있어 `?`/`&`를 값에 따라 골라 붙인다 — 문자열을 그냥 이어 붙이면 탭 정보가
+   * 담긴 링크가 `...?tab=posts?page=2`가 되어 두 파라미터 다 깨진다.
+   */
+  baseHref?: string;
 }) {
-  const base = getBoardListHref(crewId);
+  const base = baseHref ?? getBoardListHref(crewId);
+  const separator = base.includes("?") ? "&" : "?";
   const prevDisabled = page <= 1;
   const nextDisabled = page >= totalPages;
 
@@ -32,7 +40,7 @@ export function BoardPagination({
           {strings.board.list.pagination.prev}
         </span>
       ) : (
-        <Link href={`${base}?page=${page - 1}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+        <Link href={`${base}${separator}page=${page - 1}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
           {strings.board.list.pagination.prev}
         </Link>
       )}
@@ -46,7 +54,7 @@ export function BoardPagination({
           {strings.board.list.pagination.next}
         </span>
       ) : (
-        <Link href={`${base}?page=${page + 1}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+        <Link href={`${base}${separator}page=${page + 1}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
           {strings.board.list.pagination.next}
         </Link>
       )}

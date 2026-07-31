@@ -45,6 +45,9 @@ export * from "./supabase/chat";
 // Task 006·028에서 선반영됐을 뿐 읽기·쓰기 둘 다 이번 회차가 처음이라 다른 도메인처럼
 // "Task 031 읽기 / Task 032 쓰기"로 나뉘지 않고 한 파일이 전부 담당한다.
 export * from "./supabase/comment";
+// 크루 활동 사진(팀장 요청 신설) — 다른 도메인 모듈과 달리 Storage 버킷도 함께 다룬다.
+// 이유는 `./supabase/crew-photo.ts` docstring 참고.
+export * from "./supabase/crew-photo";
 export * from "./supabase/crew";
 export * from "./supabase/handle-availability-rate-limit";
 export * from "./supabase/invitation";

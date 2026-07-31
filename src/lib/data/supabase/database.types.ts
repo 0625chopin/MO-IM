@@ -344,6 +344,61 @@ export type Database = {
           },
         ]
       }
+      crew_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          crew_id: string
+          deleted_at: string | null
+          id: string
+          meetup_id: string | null
+          storage_path: string
+          uploader_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          crew_id: string
+          deleted_at?: string | null
+          id?: string
+          meetup_id?: string | null
+          storage_path: string
+          uploader_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          crew_id?: string
+          deleted_at?: string | null
+          id?: string
+          meetup_id?: string | null
+          storage_path?: string
+          uploader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_photos_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "crews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_photos_meetup_id_fkey"
+            columns: ["meetup_id"]
+            isOneToOne: false
+            referencedRelation: "meetups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_photos_uploader_id_fkey"
+            columns: ["uploader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crews: {
         Row: {
           category: string

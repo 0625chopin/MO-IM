@@ -64,7 +64,20 @@ const ROLE_RANK: Record<CrewMembershipRole, number> = { owner: 0, staff: 1, memb
  * disband가 `crew_memberships`를 건드리지 않기 때문이다(`docs/decisions/crew-lifecycle-040.md`).
  * 상세 판정 근거는 `docs/DECISIONS.draft.CREW.md`.
  */
-export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
+export async function CrewMembersContainer({
+  crewId,
+  embedded = false,
+}: {
+  crewId: Id;
+  /**
+   * 크루 홈 탭 안에 들어간 경우(팀장 요청). 크루 홈이 이미 `<h1>`(크루 이름)과 가로 여백을
+   * 소유하므로 이 컨테이너는 제목 단계를 `<h2>`로 낮추고 자기 패딩을 내려놓는다 — 문서에
+   * `<h1>`이 둘이면 스크린 리더 사용자가 "이 페이지가 무엇에 관한 문서인가"를 두 번 듣는다.
+   * 라우트(`/crews/{id}/members`)로 직접 열렸을 때는 그 페이지의 유일한 제목이라 `<h1>`이
+   * 맞다 — 그래서 숨기지 않고 단계만 바꾼다.
+   */
+  embedded?: boolean;
+}) {
   const crew = await getCrewById(crewId);
   if (!crew) {
     notFound();
@@ -166,11 +179,19 @@ export async function CrewMembersContainer({ crewId }: { crewId: Id }) {
     ]);
   }
 
+  const Heading = embedded ? "h2" : "h1";
+
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 p-4">
+    <div
+      className={
+        embedded ? "flex w-full flex-col gap-6" : "mx-auto flex w-full max-w-2xl flex-col gap-6 p-4"
+      }
+    >
       <header className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="font-heading text-lg font-medium text-foreground">{strings.crew.members.title}</h1>
+          <Heading className={embedded ? "font-heading text-base font-medium text-foreground" : "font-heading text-lg font-medium text-foreground"}>
+            {strings.crew.members.title}
+          </Heading>
           <p className="text-sm text-muted-foreground">
             {t((s) => s.crew.members.memberCountLabel, { count: members.length })}
           </p>

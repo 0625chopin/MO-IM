@@ -1,19 +1,24 @@
 import { Loader2Icon } from "lucide-react";
 
 import { ArchivedCrewBanner } from "@/components/crews/ArchivedCrewBanner";
+import type { CrewActivityEntry } from "@/components/crews/crew-activity-view-models";
 import type { CrewCardViewModel } from "@/components/crews/crew-explore-view-models";
 import type {
   JoinRequestRowViewModel,
   MemberRowViewModel,
 } from "@/components/crews/crew-member-view-models";
+import type { CrewPhotoView } from "@/components/crews/crew-photo-view-models";
+import { CrewActivityTimeline } from "@/components/crews/CrewActivityTimeline";
 import { CrewCreateForm } from "@/components/crews/CrewCreateForm";
 import { CrewGrid } from "@/components/crews/CrewGrid";
 import { CrewGridSkeleton } from "@/components/crews/CrewGridSkeleton";
 import { CrewHome } from "@/components/crews/CrewHome";
 import { CrewHomeSkeleton } from "@/components/crews/CrewHomeSkeleton";
+import { CrewHomeTabs } from "@/components/crews/CrewHomeTabs";
 import { CrewInfoForm } from "@/components/crews/CrewInfoForm";
 import { CrewIntroPreview } from "@/components/crews/CrewIntroPreview";
 import { CrewMembersSkeleton } from "@/components/crews/CrewMembersSkeleton";
+import { CrewPhotoGallery } from "@/components/crews/CrewPhotoGallery";
 import { CrewSearchBar } from "@/components/crews/CrewSearchBar";
 import { CrewSettingsSkeleton } from "@/components/crews/CrewSettingsSkeleton";
 import { CrewVisibilityForm } from "@/components/crews/CrewVisibilityForm";
@@ -31,6 +36,7 @@ import { CrewExploreErrorStatePreview } from "@/components/sample/sections/CrewE
 import { defineSection } from "@/components/sample/showcase-types";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/error-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import { strings } from "@/lib/strings";
 
 /** `CrewGrid`·`CrewCard` 데모용 고정 데이터 — 실제 `CrewExploreContainer`가 `fetchCrewCardsPage`로
@@ -74,6 +80,84 @@ const SAMPLE_CREW_CARDS: CrewCardViewModel[] = [
 const SAMPLE_MY_CREW_CARDS: CrewCardViewModel[] = [
   SAMPLE_CREW_CARDS[0],
   { ...SAMPLE_CREW_CARDS[2], isMember: true, unreadMessageCount: 0 },
+];
+
+/**
+ * `CrewActivityTimeline` 데모용(팀장 요청) — 지난 모임 타임라인. 실제 컨테이너는
+ * `listPastMeetupsForCrew` 결과에 사진을 조인해 이 모양을 만든다. **썸네일은 비워 둔다**:
+ * 실제 값은 만료가 있는 서명 URL이라 `/sample`이 미리 채워 둘 수 있는 값이 아니다
+ * (`CrewPhotoGallery` 데모의 `url: null` 칸이 같은 이유로 있는 자리다).
+ */
+const SAMPLE_ACTIVITY_ENTRIES: CrewActivityEntry[] = [
+  {
+    meetupId: "meetup-1",
+    title: "한강 야간 러닝 10km",
+    dateLabel: "7월 19일 (토)",
+    dateIso: "2026-07-19",
+    place: "여의도 한강공원",
+    attendingCount: 9,
+    isCancelled: false,
+    photoThumbnails: [],
+    photoCount: 0,
+  },
+  {
+    meetupId: "meetup-2",
+    title: "장마 대비 실내 트레드밀",
+    dateLabel: "7월 5일 (일)",
+    dateIso: "2026-07-05",
+    place: null,
+    attendingCount: 0,
+    isCancelled: true,
+    photoThumbnails: [],
+    photoCount: 0,
+  },
+  {
+    meetupId: "meetup-3",
+    title: "북한산 둘레길 걷기",
+    dateLabel: "6월 27일 (토) ~ 6월 28일 (일)",
+    dateIso: "2026-06-27",
+    place: "북한산 우이역 집결",
+    attendingCount: 12,
+    isCancelled: false,
+    photoThumbnails: [],
+    photoCount: 0,
+  },
+];
+
+/**
+ * `CrewPhotoGallery` 데모용(팀장 요청). **`url`이 전부 null이다** — 실제 값은 private 버킷의
+ * 서명 URL이라 `/sample`에서 발급할 수 없다. 덕분에 이 데모가 그리는 것은 "서명에 실패한
+ * 사진" 상태이며, 그건 실제로 화면에 나올 수 있는 상태다(오브젝트가 사라졌을 때) — 빈
+ * 자리를 남기지 않고 안내를 띄운다는 규칙을 여기서 확인할 수 있다.
+ */
+const SAMPLE_PHOTOS: CrewPhotoView[] = [
+  {
+    photoId: "photo-1",
+    url: null,
+    caption: "결승선 통과 직후",
+    uploaderName: "김러너",
+    uploadedAtLabel: "2026년 7월 19일",
+    canDelete: true,
+    meetupTitle: "한강 야간 러닝 10km",
+  },
+  {
+    photoId: "photo-2",
+    url: null,
+    caption: null,
+    uploaderName: "이페이스",
+    uploadedAtLabel: "2026년 6월 28일",
+    canDelete: false,
+    meetupTitle: "북한산 둘레길 걷기",
+  },
+  {
+    photoId: "photo-3",
+    url: null,
+    caption: "다음엔 더 일찍 출발하기로",
+    uploaderName: "박기록",
+    uploadedAtLabel: "2026년 6월 27일",
+    canDelete: false,
+    meetupTitle: null,
+  },
 ];
 
 /** `MemberList` 데모용 고정 데이터(Task 017A) — 오너가 보는 기본 목록. 오너(본인, 탈퇴 불가
@@ -282,10 +366,10 @@ export const crewsSection = defineSection({
     },
     {
       name: "CrewHome (크루원 화면)",
-      note: "public/private 4분기 중 '소속' 두 칸은 공개 범위와 무관하게 이 화면 하나로 합쳐집니다(D-007). default는 오너(설정 탭 노출), empty는 일반 크루원(설정 탭 없음, 크루원 1명)입니다.",
+      note: "public/private 4분기 중 '소속' 두 칸은 공개 범위와 무관하게 이 화면 하나로 합쳐집니다(D-007). 팀장 요청으로 링크 모음이 아니라 탭 셸이 됐습니다 — 탭 내용은 컨테이너가 조립해 children으로 넣습니다. default는 오너(설정 버튼 노출), empty는 일반 크루원(설정 버튼 없음, 크루원 1명)입니다.",
       panels: {
         default: (
-          <PreviewFrame height={260}>
+          <PreviewFrame height={420}>
             <CrewHome
               crewId="crew-1"
               name="주말 러닝 크루"
@@ -295,7 +379,15 @@ export const crewsSection = defineSection({
               visibility="public"
               memberCount={12}
               canManageSettings
-            />
+              activeTab="activity"
+            >
+              <CrewActivityTimeline
+                entries={SAMPLE_ACTIVITY_ENTRIES}
+                stats={{ meetupCount: 8, attendanceCount: 63, photoCount: 24 }}
+                colorIndex={0}
+                upcomingCount={2}
+              />
+            </CrewHome>
           </PreviewFrame>
         ),
         loading: (
@@ -304,7 +396,7 @@ export const crewsSection = defineSection({
           </PreviewFrame>
         ),
         empty: (
-          <PreviewFrame height={220}>
+          <PreviewFrame height={360}>
             <CrewHome
               crewId="crew-1"
               name="갓 만든 크루"
@@ -314,12 +406,138 @@ export const crewsSection = defineSection({
               visibility="private"
               memberCount={1}
               canManageSettings={false}
-            />
+              activeTab="activity"
+            >
+              <CrewActivityTimeline
+                entries={[]}
+                stats={{ meetupCount: 0, attendanceCount: 0, photoCount: 0 }}
+                colorIndex={3}
+                upcomingCount={0}
+              />
+            </CrewHome>
           </PreviewFrame>
         ),
         error: (
           <PreviewFrame height={280}>
             <RouteErrorBoundary kind="not_found" />
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "CrewHomeTabs (크루 홈 탭 내비)",
+      note: "팀장 요청. `role=\"tablist\"`가 아니라 링크 목록입니다 — 탭마다 서버에서 다른 데이터를 조회하므로 링크 이동이 맞고, 화살표 키 이동을 알리고 구현하지 않는 위젯을 만들지 않기 위해서이기도 합니다. 활성 표시는 하단 잉크 바(크루색을 쓰지 않습니다 — 디자인 언어 규칙 ①). 좁은 폭에서는 가로 스크롤됩니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={80}>
+            <div className="px-4 pt-3">
+              <CrewHomeTabs crewId="crew-1" activeTab="activity" />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={80}>
+            <div className="px-4 pt-3">
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={80}>
+            {/* 탭 내비는 "0건" 상태가 없다 — 탭 목록은 데이터가 아니라 화면 구조다.
+                대신 다른 탭이 선택된 모습을 둔다(채팅 탭). */}
+            <div className="px-4 pt-3">
+              <CrewHomeTabs crewId="crew-1" activeTab="chat" />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={110}>
+            <div className="p-4">
+              <ErrorState title={strings.crew.home.tabForbidden} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "CrewActivityTimeline (활동내역)",
+      note: "팀장 요청. 지난 모임을 세로 잉크 선 위에 찍습니다 — 번호(01/02/03) 대신 선을 쓴 이유는 이 목록에서 정보인 것이 순번이 아니라 시간의 연속성이기 때문입니다. 점은 확정성 스케일을 그대로 씁니다(열린 모임=크루색 채움, 취소=빈 원) — 색만으로 상태를 전달하지 않습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={420}>
+            <div className="p-4">
+              <CrewActivityTimeline
+                entries={SAMPLE_ACTIVITY_ENTRIES}
+                stats={{ meetupCount: 8, attendanceCount: 63, photoCount: 24 }}
+                colorIndex={0}
+                upcomingCount={2}
+              />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={280}>
+            <div className="flex flex-col gap-4 p-4">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={320}>
+            <div className="p-4">
+              <CrewActivityTimeline
+                entries={[]}
+                stats={{ meetupCount: 0, attendanceCount: 0, photoCount: 0 }}
+                colorIndex={5}
+                upcomingCount={0}
+              />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={120}>
+            <div className="p-4">
+              <ErrorState title={strings.crew.activity.loadError} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "CrewPhotoGallery (활동사진)",
+      note: "팀장 요청. private Storage 버킷 + 서명 URL이라 `/sample`에서는 URL을 발급할 수 없습니다 — 그래서 default 패널이 보여주는 것은 실제로 존재하는 상태인 '서명 실패' 칸(빈 자리를 남기지 않고 안내를 띄운다)입니다. 사진을 누르면 원본 비율 확대와 삭제(권한이 있을 때)가 열립니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={360}>
+            <div className="p-4">
+              <CrewPhotoGallery photos={SAMPLE_PHOTOS} />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={280}>
+            <div className="grid grid-cols-3 gap-2 p-4">
+              {[0, 1, 2, 3, 4, 5].map((index) => (
+                <Skeleton key={index} className="aspect-square w-full" />
+              ))}
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={300}>
+            <div className="p-4">
+              <CrewPhotoGallery photos={[]} />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={120}>
+            <div className="p-4">
+              <ErrorState title={strings.crew.photos.loadError} />
+            </div>
           </PreviewFrame>
         ),
       },
