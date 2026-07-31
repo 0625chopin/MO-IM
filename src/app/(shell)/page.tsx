@@ -1,7 +1,10 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
+import { HotMeetupsContainer } from "@/components/meetup/HotMeetupsContainer";
+import { HotMeetupsSkeleton } from "@/components/meetup/HotMeetupsSkeleton";
 import { isAuthenticated } from "@/components/shell/auth-session";
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { Button } from "@/components/ui/button";
@@ -102,6 +105,18 @@ export default async function LandingPage() {
             ))}
           </ol>
         </div>
+      </section>
+
+      {/* ── 지금 활발한 모임(D-109) ──────────────────────────────────────
+          확정성 스케일 시연이 "이 제품이 어떻게 동작하는지"를 보여준 직후에 온다 — 그 설명이
+          추상적이라, 바로 아래에서 **실제로 지금 그렇게 돌아가고 있는 모임들**을 보여주는
+          순서가 맞다. 히어로 위로 올리지 않은 이유: 비로그인 방문자에게 첫 화면은 제품이
+          무엇인지여야 하고, 목록은 그 주장의 증거이지 주장 자체가 아니다.
+          공개 데이터만 담기므로 게스트 컨텍스트(`anon`)에서 그대로 조회된다. */}
+      <section className="mx-auto w-full max-w-4xl px-6 pb-20">
+        <Suspense fallback={<HotMeetupsSkeleton />}>
+          <HotMeetupsContainer showBrowseCta />
+        </Suspense>
       </section>
     </main>
   );

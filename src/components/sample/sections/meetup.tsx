@@ -1,5 +1,8 @@
 import type { RouteErrorKind } from "@/components/errors/route-error-kind";
 import { RouteErrorBoundaryPreview } from "@/components/errors/RouteErrorBoundaryPreview";
+import type { HotMeetupItem } from "@/components/meetup/hot-meetup-types";
+import { HotMeetupList } from "@/components/meetup/HotMeetupList";
+import { HotMeetupsSkeleton } from "@/components/meetup/HotMeetupsSkeleton";
 import type {
   MeetupDetailViewModel,
   MeetupParticipantGroupsView,
@@ -138,6 +141,83 @@ const RESCHEDULE_ROUTE_ERROR_ITEMS: Array<{ kind: RouteErrorKind; name: string; 
     kind: "conflict",
     name: "일정 변경 제안 — 취소된 Meetup 대상 (FR-065 AC2·AC3)",
     note: "대상 Meetup이 이미 취소됐거나 예정일이 지난 상태로 이 페이지에 직접 접근하면(isMeetupAttendanceOpen이 false) 이 분기로 떨어진다 — cancelMeetupAction의 'conflict' 의미와 같다. 정상 흐름에서는 Meetup 상세가 canProposeReschedule로 버튼 자체를 숨기므로 직접 URL 접근 방어 목적이 크다.",
+  },
+];
+
+
+/**
+ * "지금 활발한 모임"(D-109) 데모 데이터. 실제 `HotMeetupsContainer`가 만드는 모양을 손으로
+ * 채운 것이다(이 섹션의 다른 데모와 같은 패턴 — 표현 컴포넌트는 `lib/data`를 모른다).
+ *
+ * `intensity`를 1 → 0.72 → 0.55 → 0.19 → 0.06으로 벌려 뒀다. **잔물결 장치가 실제로 하는
+ * 일(순위만으로는 안 보이는 격차)이 데모에서 드러나야** 다음 사람이 이 장치를 지울지 말지
+ * 판단할 수 있다 — 다섯 개를 비슷한 값으로 채우면 막대가 다 비슷해져 왜 있는지 알 수 없다.
+ */
+const DEMO_HOT_MEETUPS: HotMeetupItem[] = [
+  {
+    id: "hot-1",
+    crewHref: "/crews/sample-crew-1",
+    crewName: "주말 러닝 클럽",
+    crewCategory: "운동",
+    colorIndex: 3,
+    title: "한강 10km 정기 러닝",
+    dateLabel: "8월 4일 (화)",
+    timeLabel: "오전 7:00",
+    attendingCount: 12,
+    capacity: 20,
+    intensity: 1,
+  },
+  {
+    id: "hot-2",
+    crewHref: "/crews/sample-crew-2",
+    crewName: "알고리즘 스터디",
+    crewCategory: "스터디",
+    colorIndex: 2,
+    title: "8월 첫째 주 문제 풀이",
+    dateLabel: "8월 6일 (목)",
+    timeLabel: "오후 7:30",
+    attendingCount: 6,
+    capacity: 8,
+    intensity: 0.72,
+  },
+  {
+    id: "hot-3",
+    crewHref: "/crews/sample-crew-3",
+    crewName: "보드게임 나이트",
+    crewCategory: "취미",
+    colorIndex: 7,
+    title: "신작 보드게임 합주",
+    dateLabel: "8월 8일 (토)",
+    timeLabel: null,
+    attendingCount: 9,
+    capacity: null,
+    intensity: 0.55,
+  },
+  {
+    id: "hot-4",
+    crewHref: "/crews/sample-crew-4",
+    crewName: "출사 모임",
+    crewCategory: "사진",
+    colorIndex: 10,
+    title: "새벽 안개 출사",
+    dateLabel: "8월 11일 (화)",
+    timeLabel: "오전 5:30",
+    attendingCount: 4,
+    capacity: 6,
+    intensity: 0.19,
+  },
+  {
+    id: "hot-5",
+    crewHref: "/crews/sample-crew-5",
+    crewName: "육아 정보 나눔",
+    crewCategory: null,
+    colorIndex: 5,
+    title: "동네 놀이터 번개",
+    dateLabel: "8월 12일 (수)",
+    timeLabel: "오후 4:00",
+    attendingCount: 3,
+    capacity: null,
+    intensity: 0.06,
   },
 ];
 
@@ -382,6 +462,40 @@ export const meetupSection = defineSection({
               className="min-h-0 items-start gap-3 rounded-lg border border-solid border-destructive/40 bg-destructive/5 p-4 text-left"
             />
           </div>
+        ),
+      },
+    },
+    {
+      name: "HotMeetupList — 지금 활발한 모임 (D-109)",
+      note: "메인(랜딩 `/` + 홈 `/home`)에 함께 놓이는 공개 크루 소개 목록입니다. 행 아래 잔물결 막대의 폭이 1위 대비 상대 활동량(intensity)이고, 절대 점수는 표현 층에 넘어오지 않습니다 — 순위 숫자만으로는 '1위가 압도적인지'를 알 수 없어 넣은 장치입니다. 데모는 그 격차가 보이도록 1 → 0.72 → 0.55 → 0.19 → 0.06으로 벌려 뒀습니다. 3행은 시간 미정 + 정원 없음, 5행은 카테고리 없음 분기입니다. 막대는 aria-hidden이고 순서 정보는 순위 텍스트가 전달합니다(WCAG 1.4.1). 게스트(랜딩)에서만 showBrowseCta로 '크루 둘러보기'가 붙습니다 — default 패널이 그 상태입니다. place·description은 이 경로로 아예 오지 않습니다(D-109 노출 경계).",
+      panels: {
+        default: (
+          <PreviewFrame height={520}>
+            <div className="mx-auto w-full max-w-2xl p-4">
+              <HotMeetupList items={DEMO_HOT_MEETUPS} showBrowseCta />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={420}>
+            <div className="mx-auto w-full max-w-2xl p-4">
+              <HotMeetupsSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={280}>
+            <div className="mx-auto w-full max-w-2xl p-4">
+              <HotMeetupList items={[]} />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={280}>
+            <div className="mx-auto w-full max-w-2xl p-4">
+              <HotMeetupList items={[]} error />
+            </div>
+          </PreviewFrame>
         ),
       },
     },

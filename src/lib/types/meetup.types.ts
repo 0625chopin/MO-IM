@@ -84,3 +84,39 @@ export interface MeetupScheduleChange {
 export type AttendanceJoinResult =
   | { success: true; changed: boolean }
   | { success: false; reason: "full" | "forbidden" };
+
+/**
+ * 메인 화면(랜딩 `/` + 홈 `/home`) "지금 활발한 모임" 카드 한 줄 (D-109).
+ *
+ * **`Meetup`의 부분집합이 아니라 별개 타입이다.** 크루 정보(이름·카테고리·색)를 함께 담고,
+ * 반대로 **`place`·`description`·`pollId`·`createdAt`은 일부러 없다** — 이 타입이 표현하는
+ * 것은 "공개 크루의 예정된 모임을 비소속자·게스트에게 보여줄 때 허용된 필드 집합"이고, 그
+ * 경계는 `public.hot_public_meetups` RPC가 유일한 통로다(D-048이 세운 "Meetup 콘텐츠
+ * 비노출"을 넓히되 오프라인 집결지는 계속 감춘다).
+ *
+ * **`Meetup`을 재사용하지 않은 이유**: `Meetup`을 그대로 쓰면 `place`를 `null`로 채워 넘겨야
+ * 하는데, 그러면 "정말 장소가 없는 모임"과 "노출이 금지돼 비운 것"이 타입에서 구분되지 않는다.
+ * 나중에 이 목록을 다른 화면에 재사용하는 사람이 `place`가 비어 있는 것을 데이터 결손으로
+ * 오해해 채워 넣을 수 있다 — 필드를 아예 두지 않으면 그 실수가 컴파일 단계에서 막힌다.
+ */
+export interface HotMeetup {
+  id: Id;
+  crewId: Id;
+  crewName: string;
+  /** 공개 크루만 반환되므로 항상 값이 있다 — `crew_directory_summary`의 private 분기와 다르다. */
+  crewCategory: string | null;
+  /** `crews.color_key`. `crewPaletteVars`(`src/lib/crew-palette.ts`)에 그대로 넘긴다. */
+  crewColorKey: number;
+  title: string;
+  date: ISODateString;
+  startTime: string | null;
+  attendingCount: number;
+  /** null이면 정원 제한 없음(D-013). */
+  capacity: number | null;
+  /**
+   * 최근 7일 크루 활동의 가중 합성값(3·게시글 + 2·투표 + 1·채팅). **순위 근거일 뿐 표시용
+   * 수치가 아니다** — 개별 카운트로 역산되지 않도록 합성해 둔 값이라 그대로 화면에 숫자로
+   * 찍으면 의미 없는 정보를 노출하는 셈이 된다. UI는 순위(1~5)만 쓴다.
+   */
+  activityScore: number;
+}

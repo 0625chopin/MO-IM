@@ -3,6 +3,7 @@ import "server-only";
 import type {
   AttendanceJoinResult,
   AttendanceStatus,
+  HotMeetup,
   Id,
   Meetup,
   MeetupAttendance,
@@ -11,7 +12,7 @@ import type {
 
 import { type DataResult, err, ok } from "../contracts";
 
-import { toMeetup, toMeetupAttendance, toMeetupScheduleChange } from "./mappers";
+import { toHotMeetup, toMeetup, toMeetupAttendance, toMeetupScheduleChange } from "./mappers";
 import { createSupabaseServerClient } from "./server";
 
 /**
@@ -271,4 +272,27 @@ export async function listMeetupScheduleChanges(meetupId: Id): Promise<MeetupSch
     .order("changed_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(toMeetupScheduleChange);
+}
+
+/**
+ * 메인 화면 "지금 활발한 모임" 목록 (D-109, FR-014 인접 — 크루 탐색과 같은 "공개 데이터로
+ * 서비스를 소개하는" 계열이다).
+ *
+ * **이 함수는 RLS를 타지 않는다.** `meetups_select_members`(활성 크루원만)로는 원리적으로
+ * 크루 경계를 넘는 목록을 만들 수 없어 `public.hot_public_meetups` SECURITY DEFINER RPC를
+ * 쓴다 — 노출 경계(공개·활성 크루 / 예정된 확정 모임 / `place`·`description` 제외 / 크루당
+ * 1건)는 **전부 그 함수 본문이 강제하며 이 레이어는 아무것도 필터링하지 않는다.** 필터를
+ * 여기서 흉내 내면 RPC와 두 곳에 규칙이 생겨 어긋난다(NFR-036과 같은 이유).
+ *
+ * **게스트도 호출한다** — 랜딩(`/`)은 비로그인 방문자용이라 `anon` 컨텍스트로 실행된다.
+ * `meetup_directory_summary`(D-048)가 `anon`을 의도적으로 배제한 것과 달리 이 RPC만 예외로
+ * `anon` EXECUTE를 가진다. 세션 유무로 결과가 달라지지 않는다(둘 다 같은 공개 목록).
+ *
+ * 실패 시 던진다 — 다른 읽기 함수와 같은 관례이며, 호출 컨테이너가 오류 상태로 바꾼다.
+ */
+export async function listHotPublicMeetups(limit = 5): Promise<HotMeetup[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("hot_public_meetups", { p_limit: limit });
+  if (error) throw error;
+  return (data ?? []).map(toHotMeetup);
 }

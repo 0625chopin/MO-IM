@@ -9,6 +9,7 @@ import type {
   CrewMembershipRole,
   CrewMembershipStatus,
   CrewVisibility,
+  HotMeetup,
   Invitation,
   InvitationStatus,
   JoinRequest,
@@ -32,7 +33,26 @@ import type {
   VoteChoice,
 } from "@/lib/types";
 
-import type { Tables } from "./database.types";
+import type { Database, Tables } from "./database.types";
+
+/**
+ * `public.hot_public_meetups` RPC의 반환 행 타입 (D-109).
+ *
+ * **`Returns`를 그대로 쓰지 않고 nullable 세 컬럼을 다시 씌운다 — I-132 때문이다.**
+ * `generate_typescript_types`는 RPC 반환 테이블 컬럼의 nullability를 표현하지 못해
+ * `capacity`·`crew_category`·`start_time`을 전부 non-null(`number`/`string`)로 내보내는데,
+ * 실제로는 셋 다 null이 올 수 있다(`meetups.capacity`는 D-013 "정원 없음",
+ * `meetups.start_time`은 시간 미정, `crews.category`는 스키마상 NOT NULL이지만 RPC 시그니처가
+ * 보장하지 않는다). 생성 타입을 그대로 믿으면 `capacity`가 null인 모임에서 런타임에만 터진다.
+ */
+type HotMeetupRow = Omit<
+  Database["public"]["Functions"]["hot_public_meetups"]["Returns"][number],
+  "capacity" | "crew_category" | "start_time"
+> & {
+  capacity: number | null;
+  crew_category: string | null;
+  start_time: string | null;
+};
 
 /**
  * DB 행(snake_case) → 도메인 타입(camelCase) 매퍼 모음(NFR-034·035).
@@ -160,6 +180,30 @@ export function toMeetup(row: Tables<"meetups">): Meetup {
     attendingCount: row.attending_count,
     status: row.status as Meetup["status"],
     createdAt: row.created_at,
+  };
+}
+
+/**
+ * `public.hot_public_meetups` RPC 한 행 → `HotMeetup` (D-109).
+ *
+ * 다른 매퍼와 달리 `Tables<...>`(테이블 행)가 아니라 **RPC 반환 행**을 받는다 — 이 목록은
+ * 테이블 select가 아니라 SECURITY DEFINER 함수로만 얻을 수 있기 때문이다. 컬럼명이
+ * `meetup_date`인 것도 RPC 시그니처를 따른 것이다(`date`는 반환 테이블 정의에서 예약어
+ * 충돌을 피하려고 바꾼 이름이며, 도메인 타입에서는 다시 `date`로 돌린다).
+ */
+export function toHotMeetup(row: HotMeetupRow): HotMeetup {
+  return {
+    id: row.id,
+    crewId: row.crew_id,
+    crewName: row.crew_name,
+    crewCategory: row.crew_category,
+    crewColorKey: row.crew_color_key,
+    title: row.title,
+    date: row.meetup_date,
+    startTime: row.start_time,
+    attendingCount: row.attending_count,
+    capacity: row.capacity,
+    activityScore: row.activity_score,
   };
 }
 
