@@ -1,6 +1,7 @@
 export * from "./board.types";
 export * from "./chat.types";
 export * from "./common.types";
+export * from "./crew-photo.types";
 export * from "./crew.types";
 export * from "./invitation.types";
 export * from "./join-request.types";

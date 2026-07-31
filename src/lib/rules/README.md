@@ -19,7 +19,8 @@
   아니라 `PermissionAction`에서 이미 제외돼 33행이 대상이다. 그중 FR-032("자기 게시글
   수정·삭제") 1행이 "타인 게시글 삭제"와의 대칭을 위해 `post:update_own`·`post:delete_own`
   두 액션으로 갈려 `PermissionAction`·`PERMISSION_MATRIX`는 33행이 아니라 **34개 액션**이다
-  (1:1 대응이 아님 — 3일차 교차검증에서 BOARD가 지적). 이 34개 액션 전부를
+  (1:1 대응이 아님 — 3일차 교차검증에서 BOARD가 지적). 이후 댓글 3행(Task 041)과 활동 사진
+  3행(D-111)이 더해져 현재는 **40개 액션**이다. 이 액션 전부를
   `Record<PermissionAction, Record<UserRole, "allow"|"conditional"|"deny">>` 리터럴로 옮기고,
   "○"(조건부 허용) 셀만 각주 1~5(`isSelf`·`hasOwnerSuccessorOrDisband`·`crewVisibility`·
   `targetRole`·`isProposalAuthor`, 전부 `permission.types.ts`의 `PermissionCheckContext` 그대로)로

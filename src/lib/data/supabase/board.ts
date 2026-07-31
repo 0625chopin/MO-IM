@@ -136,6 +136,13 @@ export async function findOpenRescheduleProposal(targetMeetupId: Id): Promise<Po
 
 export interface ListPostsPageQuery {
   type?: PostType;
+  /**
+   * 여러 타입을 한 번에 거를 때 쓴다. 크루 홈이 같은 `posts` 테이블을 "모임투표"(제안글 2종)와
+   * "게시판"(`general`) 두 갈래로 나눠 보여주면서 필요해졌다 — 모임투표 쪽은
+   * `meetup_proposal`·`meetup_reschedule_proposal` **둘 다**를 한 목록에 담아야 하는데 단일
+   * `type`으로는 표현할 수 없다. `type`과 함께 주면 `types`가 우선한다(둘 다 쓰지 않는 게 낫다).
+   */
+  types?: readonly PostType[];
   /** 1부터 시작. */
   page?: number;
   pageSize?: number;
@@ -164,7 +171,8 @@ export async function listPostsByPage(
     .select("*", { count: "exact" })
     .eq("board_id", boardId)
     .is("deleted_at", null);
-  if (opts.type) query = query.eq("type", opts.type);
+  if (opts.types && opts.types.length > 0) query = query.in("type", [...opts.types]);
+  else if (opts.type) query = query.eq("type", opts.type);
 
   const { data, error, count } = await query
     .order("created_at", { ascending: false })

@@ -16,6 +16,10 @@
  * 빠져 있었다. `comment:update_own`·`comment:delete_own`·`comment:delete_any`를 더해 실제
  * 액션 수는 34개에서 **37개**가 됐다.
  *
+ * **팀장 요청(D-111, 2026-07-31)으로 활동 사진 3행이 더해져 이제 40개다** —
+ * `photo:create`·`photo:delete_own`·`photo:delete_any`. 3.3절 매트릭스에 대응 행이 없는
+ * 신규 기능이라 게시글 3분할과 같은 값으로 새로 열었다(근거는 `permission.types.ts` 주석).
+ *
  * React·Next·데이터 레이어를 import하지 않는다(zone 1, `eslint.config.mjs`).
  * 데이터(예: 크루 공개 범위, 강퇴 대상 role)는 전부 `context` 인자로 받는다 —
  * 이 함수가 직접 크루·멤버십을 조회하지 않는다.
@@ -47,7 +51,7 @@ const ROLES = [
 /**
  * 3.3절 33행(회원가입·로그인 2행 제외) 중 FR-032 1행을 `post:update_own`·
  * `post:delete_own` 두 액션으로 나누고, Task 041(FR-033)이 댓글 수정·삭제 3행을 더한
- * 37개 액션 전부. 열 순서는 표와 동일
+ * 40개 액션 전부(D-111의 사진 3행 포함). 열 순서는 표와 동일
  * (비회원·일반회원·크루원·임원·오너·관리자). `Record<PermissionAction,
  * Record<UserRole, Allowance>>` 타입 자체가 "액션 하나라도 빠지면 컴파일
  * 에러"를 강제한다 — 매트릭스 누락을 컴파일 타임에 잡는다.
@@ -289,6 +293,34 @@ const PERMISSION_MATRIX: Record<PermissionAction, Record<UserRole, Allowance>> =
     crew_owner: "allow",
     system_admin: "allow",
   },
+  // 활동 사진 업로드 — 팀장 요청 신설. post:create와 같은 값(크루원만, 관리자는 크루 콘텐츠를
+  // 직접 만들지 않는다).
+  "photo:create": {
+    guest: "deny",
+    member: "deny",
+    crew_member: "allow",
+    crew_staff: "allow",
+    crew_owner: "allow",
+    system_admin: "deny",
+  },
+  // 자기가 올린 사진 삭제. isSelf는 checkPermission에서 별도 확인(post:delete_own과 대칭).
+  "photo:delete_own": {
+    guest: "deny",
+    member: "deny",
+    crew_member: "allow",
+    crew_staff: "allow",
+    crew_owner: "allow",
+    system_admin: "allow",
+  },
+  // 타인이 올린 사진 삭제 — 임원 이상(운영 목적)·관리자.
+  "photo:delete_any": {
+    guest: "deny",
+    member: "deny",
+    crew_member: "deny",
+    crew_staff: "allow",
+    crew_owner: "allow",
+    system_admin: "allow",
+  },
   // 모임 제안글 작성 — FR-034.
   "poll:create_proposal": {
     guest: "deny",
@@ -408,6 +440,8 @@ const OWN_SCOPED_ACTIONS: ReadonlySet<PermissionAction> = new Set([
   // Task 041(FR-033, 21일차 BOARD) — post:update_own/delete_own과 같은 이유.
   "comment:update_own",
   "comment:delete_own",
+  // 활동 사진(팀장 요청 신설) — 같은 이유.
+  "photo:delete_own",
 ]);
 
 /**

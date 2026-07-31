@@ -330,6 +330,26 @@ export const ko = {
     home: {
       title: "크루 홈",
       memberCount: "크루원 {count}명",
+      /**
+       * 크루 홈 탭(팀장 요청) — 모임투표·게시판·활동내역·활동사진·크루원·채팅을 하위 라우트로
+       * 흩어 놓지 않고 크루 홈 한 화면에서 전환한다. **위 docstring이 "탭 라벨은 `nav.board`
+       * 등을 그대로 참조한다"고 적어 둔 관례를 여기서 되돌린다** — `nav.board`("게시판")는
+       * 이제 이 앱에서 두 개의 서로 다른 것을 가리키게 됐기 때문이다(모임 제안·투표가 오가는
+       * 자리와, 자유롭게 글을 쓰는 자리). 같은 문자열을 두 뜻으로 재사용하면 한쪽 라벨을
+       * 고칠 때 반드시 다른 쪽이 함께 틀어진다.
+       */
+      tabs: {
+        votes: "모임투표",
+        posts: "게시판",
+        activity: "활동내역",
+        photos: "활동사진",
+        members: "크루원",
+        chat: "채팅",
+      },
+      /** 탭 목록 자체의 접근성 이름(`<nav aria-label>`). */
+      tabsLabel: "크루 메뉴",
+      /** 크루원이 아닌 방문자가 탭 URL을 직접 열었을 때. */
+      tabForbidden: "크루원만 볼 수 있는 내용이에요",
       /** D-007·FR-012 AC2 — private 크루의 비소속자에게 보이는 전부. */
       privateNotice: {
         title: "초대 전용 크루예요",
@@ -378,6 +398,86 @@ export const ko = {
         },
       },
     },
+    /**
+     * 크루 활동내역(팀장 요청) — "지금까지 이 크루가 뭘 했는가"를 지난 모임 타임라인으로
+     * 보여준다. 원천은 `meetups`이며 새 테이블이 없다: 확정된 모임이 지나간 것 자체가 활동
+     * 기록이라 별도 이벤트 로그를 만들 이유가 없다(같은 사실을 두 곳에 적으면 어긋난다).
+     */
+    activity: {
+      title: "활동내역",
+      description: "지금까지 함께한 모임이에요",
+      empty: "아직 지나간 모임이 없어요",
+      emptyDescription: "모임투표에서 첫 모임을 제안해 보세요",
+      loadError: "활동내역을 불러오지 못했어요",
+      /** 요약 지표 3종. */
+      stats: {
+        meetupCount: "함께한 모임",
+        attendanceCount: "누적 참석",
+        photoCount: "활동 사진",
+        unitCount: "{count}회",
+        unitPeople: "{count}명",
+        unitPhotos: "{count}장",
+      },
+      /** 타임라인 행. 취소된 모임은 목록에서 빼지 않고 배지로 구분한다(있었던 일이므로). */
+      attendees: "참석 {count}명",
+      cancelledBadge: "취소됨",
+      photoLink: "사진 {count}장",
+      /** 아직 오지 않은 모임이 있을 때 타임라인 위에 붙는 안내. */
+      upcomingNotice: "예정된 모임 {count}건은 캘린더에서 볼 수 있어요",
+    },
+
+    /**
+     * 크루 활동 사진(팀장 요청). 저장은 private Storage 버킷이고 열람은 서명 URL이다 —
+     * `lib/data/supabase/crew-photo.ts` docstring 참고.
+     */
+    photos: {
+      title: "활동사진",
+      description: "활동하며 찍은 사진을 함께 봐요",
+      empty: "아직 올라온 사진이 없어요",
+      emptyDescription: "첫 사진을 올려보세요",
+      loadError: "사진을 불러오지 못했어요",
+      countLabel: "사진 {count}장",
+      /** 서명 URL 발급에 실패한 항목(오브젝트가 사라진 경우 등). */
+      unavailable: "사진을 불러올 수 없어요",
+      uploadedBy: "{name} 올림",
+      upload: {
+        button: "사진 올리기",
+        dialogTitle: "활동 사진 올리기",
+        dialogDescription: "JPG·PNG·WebP·GIF, 한 장에 5MB까지 올릴 수 있어요.",
+        fileLabel: "사진 파일",
+        captionLabel: "설명(선택)",
+        captionPlaceholder: "언제, 어디서 찍은 사진인가요?",
+        meetupLabel: "관련 모임(선택)",
+        meetupNone: "모임과 연결하지 않음",
+        submit: "올리기",
+        submitPending: "올리는 중…",
+        /** 성공 후 버튼이 이 문구로 바뀐다(`crew.members.invite.sentNotice`와 같은 관례) —
+         *  다이얼로그를 코드가 닫지 않고 사용자가 닫는다. */
+        uploadedNotice: "올렸어요",
+        errors: {
+          sessionExpired: "로그인이 만료됐어요. 다시 로그인해 주세요.",
+          fileRequired: "사진 파일을 선택해 주세요",
+          tooLarge: "사진은 5MB까지 올릴 수 있어요",
+          unsupportedType: "JPG·PNG·WebP·GIF 이미지만 올릴 수 있어요",
+          captionTooLong: "설명은 500자까지 쓸 수 있어요",
+          notAllowed: "사진을 올릴 권한이 없어요",
+          crewArchived: "해산된 크루에는 사진을 올릴 수 없어요",
+          failed: "사진을 올리지 못했어요. 다시 시도해 주세요.",
+        },
+      },
+      delete: {
+        button: "삭제",
+        confirmTitle: "사진을 삭제할까요?",
+        confirmDescription: "삭제하면 되돌릴 수 없어요.",
+        submitPending: "삭제하는 중…",
+        errors: {
+          notAllowed: "이 사진을 삭제할 권한이 없어요",
+          notFound: "이미 삭제된 사진이에요",
+          failed: "삭제하지 못했어요. 다시 시도해 주세요.",
+        },
+      },
+    },
+
     /**
      * SC-14 멤버 관리 페이지(F009·F010·F012~F015, F032, Task 017A). 역할 정렬 목록·초대
      * 다이얼로그·가입 신청 승인/반려 탭·임원 임명 문구를 모은다.
@@ -969,8 +1069,36 @@ export const ko = {
   },
 
   board: {
-    list: {
+    /**
+     * **같은 `posts` 테이블이 두 개의 화면으로 갈렸다(팀장 요청).** `meetup_proposal`·
+     * `meetup_reschedule_proposal`(투표가 달린 제안글)은 "모임투표"로, `general`(자유글)은
+     * "게시판"으로 부른다 — 원래 이 둘은 `/crews/{id}/board` 한 목록에 섞여 있었고 그 목록
+     * 전체를 "게시판"이라고 불렀다. 아래 `list.*`는 **두 갈래가 공유하는** 문구(페이지네이션·
+     * 총 건수·오류)만 남기고, 갈래마다 달라지는 제목·빈 상태·쓰기 버튼은 `votes.*`·`free.*`가
+     * 갖는다. 목록 컴포넌트(`BoardList`)는 그중 어느 쪽을 쓸지 props로 받는다 — 컴포넌트가
+     * 문자열을 직접 고르면 같은 컴포넌트를 두 벌로 복제해야 한다.
+     */
+    votes: {
+      title: "모임투표",
+      description: "모임을 제안하고 함께 정해요",
+      empty: "아직 올라온 모임 제안이 없어요",
+      writeButton: "모임 제안하기",
+    },
+    free: {
       title: "게시판",
+      description: "크루원끼리 자유롭게 이야기해요",
+      empty: "아직 등록된 글이 없어요",
+      writeButton: "글쓰기",
+    },
+    list: {
+      /**
+       * `/crews/{id}/board` 라우트(모임 제안글과 자유글이 섞인 전체 목록)의 제목. 원래 값은
+       * "게시판"이었는데, 그 단어를 이제 자유글 탭이 가져갔으므로(`free.title`) 여기서는
+       * 그 목록이 실제로 담고 있는 것 — 이 크루의 글 전부 — 를 이름으로 쓴다. 크루 홈 탭이
+       * 주 진입점이 된 뒤에도 이 라우트는 남는다: 글 상세·글쓰기에서 "목록으로" 돌아갈 때
+       * 글 유형을 몰라도 반드시 그 글이 있는 목록이 여기이기 때문이다.
+       */
+      title: "글 전체",
       empty: "아직 등록된 글이 없어요",
       writeButton: "글쓰기",
       typeFilterAll: "전체",
@@ -1044,7 +1172,7 @@ export const ko = {
       deletedDescription: "작성자가 삭제했거나 더 이상 볼 수 없는 게시글이에요",
       lockedNotice: "투표가 시작되어 더 이상 수정할 수 없어요",
       shareToChat: "채팅에 공유",
-      backToList: "게시판으로",
+      backToList: "목록으로",
       deleteConfirmTitle: "게시글을 삭제할까요?",
       deleteConfirmDescription: "삭제하면 되돌릴 수 없어요.",
     },

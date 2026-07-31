@@ -129,6 +129,50 @@ export async function listMeetupsByCrews(opts: ListMeetupsQuery): Promise<Meetup
   return (data ?? []).map(toMeetup);
 }
 
+export interface ListPastMeetupsQuery {
+  /** 기준일(오늘). 이 날짜보다 **먼저 끝난** 모임만 지나간 것으로 본다. */
+  before: string;
+  limit?: number;
+}
+
+/**
+ * 크루 활동내역(팀장 요청) — 이미 끝난 모임을 최신순으로. `listMeetupsByCrews`와 달리
+ * **취소된 모임도 포함한다**: 활동내역은 "무슨 일이 있었나"의 기록이라 취소도 있었던 일이고,
+ * 화면이 배지로 구분한다. 캘린더(FR-061)가 취소를 기본 제외하는 것과 목적이 다르다.
+ *
+ * "끝났다"의 기준은 `end_date < before`다 — `date`(시작일)로 판정하면 오늘 진행 중인 다일
+ * 모임이 이미 지나간 것으로 목록에 올라온다.
+ */
+export async function listPastMeetupsForCrew(
+  crewId: Id,
+  opts: ListPastMeetupsQuery,
+): Promise<Meetup[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("meetups")
+    .select("*")
+    .eq("crew_id", crewId)
+    .lt("end_date", opts.before)
+    .order("end_date", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(opts.limit ?? 50);
+  if (error) throw error;
+  return (data ?? []).map(toMeetup);
+}
+
+/** 아직 끝나지 않은(오늘 포함) 확정 모임 수. 활동내역 상단의 "예정된 모임" 안내에 쓴다. */
+export async function countUpcomingMeetupsForCrew(crewId: Id, from: string): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("meetups")
+    .select("id", { count: "exact", head: true })
+    .eq("crew_id", crewId)
+    .eq("status", "confirmed")
+    .gte("end_date", from);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /** 참석자 목록 조회(FR-068). */
 export async function listAttendance(meetupId: Id): Promise<MeetupAttendance[]> {
   const supabase = await createSupabaseServerClient();
