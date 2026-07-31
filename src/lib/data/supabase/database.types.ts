@@ -1284,6 +1284,20 @@ export type Database = {
           id: string
         }[]
       }
+      poll_eligible_voter_progress: {
+        Args: { p_poll_id: string }
+        Returns: {
+          current_membership_status: string
+          has_voted: boolean
+        }[]
+      }
+      poll_eligible_voters_with_status: {
+        Args: { p_poll_id: string }
+        Returns: {
+          current_membership_status: string
+          profile_id: string
+        }[]
+      }
       poll_vote_tally: {
         Args: { p_poll_id: string }
         Returns: {

@@ -7,8 +7,7 @@ import {
   castVote,
   getCrewMembership,
   getPollById,
-  listEligibleVotersWithCurrentStatus,
-  listVotes,
+  listEligibleVoterProgress,
 } from "@/lib/data";
 import { type DataResult, err } from "@/lib/data/contracts";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
@@ -88,6 +87,16 @@ export async function castVoteAction(
   // 100% 프로덕션 코드다 — Task 034가 실제 트리거를 붙이면 이 블록은 그대로 남기거나 그
   // 트리거 핸들러로 옮기기만 하면 된다.
   //
+  // **34일차(I-089 후속)** — 이 아래에서 대상자·투표자를 신원 기반(`listEligibleVotersWith
+  // CurrentStatus`+`listVotes`)으로 각각 조회하던 것을 `listEligibleVoterProgress`(익명 RPC)
+  // 하나로 바꿨다. 기존 방식은 투표자 본인 세션의 RLS(`poll_eligible_voters`·`poll_votes`
+  // 둘 다 "본인 OR staff/owner"만 SELECT 허용)에 걸려, 일반 크루원이 투표할 때마다 자기
+  // 자신 1행만 보여 `remaining`이 항상 0으로 계산됐다 — 다른 크루원이 몇 명 남았든 상관없이
+  // 그 시점에 poll이 조기 종료되는 결함이었다(FR-041·D-022 위반, `polls_guard_decision_
+  // integrity` 트리거가 최종 판정값 자체는 진실로 덮어써 위조는 없었지만 "기회를 뺏긴
+  // 시점의 진실"이 확정된다는 점에서 안전하지 않았다). 자세한 경위는
+  // `docs/ISSUES.draft.BOARD.md`·`docs/DECISIONS.draft.BOARD.md` 참고.
+  //
   // **I-049 해소(Task 032, 18일차)** — 이 블록 전체를 try/catch로 감싼다. 위 `castVote`가
   // 이미 성공해(`result.ok`) 표가 DB에 반영된 뒤이므로, 이 시점 이후의 어떤 실패(자동 종료
   // 판정 예외 — `getPollTallyForDecision`의 `tally_hidden` 불변식 위반, 스냅샷 정합성 오류,
@@ -96,12 +105,8 @@ export async function castVoteAction(
   // 자동 종료가 실패해도 poll은 여전히 `open`이라 트리거①(기한 도래)이 결국 마무리한다 —
   // 여기서 재시도하지 않고 로깅만 한다.
   try {
-    const [voters, votes] = await Promise.all([
-      listEligibleVotersWithCurrentStatus(input.pollId),
-      listVotes(input.pollId),
-    ]);
-    const votedProfileIds = new Set(votes.map((v) => v.voterId));
-    const remaining = countRemainingVoters(voters, votedProfileIds);
+    const progress = await listEligibleVoterProgress(input.pollId);
+    const remaining = countRemainingVoters(progress);
     if (shouldAutoCloseByAllVoted(remaining)) {
       // 자동 종료라 종료 주체는 없다(closedBy: null, D-035와 같은 규약 — createPostAction의
       // 자동 판정과 대칭).

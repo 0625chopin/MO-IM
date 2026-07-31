@@ -2,7 +2,7 @@
 
 개발 중 발견한 **미결 이슈와 개선사항**을 기록한다. 이 파일이 이슈 번호의 **단일 소스**다.
 
-- **다음 이슈 번호: I-164** (등재할 때마다 이 줄을 갱신한다. **28일차부터 팀원은 이 파일에
+- **다음 이슈 번호: I-168** (등재할 때마다 이 줄을 갱신한다. **28일차부터 팀원은 이 파일에
   새 `### I-NNN` 헤딩을 직접 붙이지 않는다** — `docs/ISSUES.draft.<NAME>.md`에 번호 없이 쓰고
   회차 마감에 팀장이 번호를 부여해 병합한다. 기존 블록 안의 상태·진행 기록 갱신은 새 번호를
   만들지 않으므로 팀원이 직접 해도 된다. 단일 소스:
@@ -626,10 +626,12 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
 
 ### I-038 · 크루명·소개 글자 수 상한과 금칙어 목록이 요구사항에 없다
 
-- **상태**: 열림 — **상한(글자 수)은 완전 확정·적용됨(28일차 D-083 값 확정 → 29일차 DB CHECK
-  마이그레이션 적용 → 33일차 BOARD가 `pg_constraint` 재조회로 재확인, 아래 "33일차 갱신" 참고).
-  금칙어(목록 내용·우회 표기 대응 정책)만 (C) 외부 입력(법무·운영 확인) 대기로 남아 열림을
-  유지한다** — 33일차에 이 둘을 분리하는 제안을 냈다(아래 "33일차 — 분할 제안").
+- **상태**: **해결됨(34일차)** — 상한(글자 수)은 28일차 D-083 값 확정 → 29일차 DB CHECK
+  마이그레이션 적용 → 33일차 BOARD가 `pg_constraint` 재조회로 재확인까지 이미 완료돼 있었고
+  (아래 "33일차 갱신" 참고), 남은 범위(금칙어 목록 내용·우회 표기 대응 정책)는 34일차에
+  사용자가 팀 재량으로 위임 → CREW가 A안(현행 데모 6단어 목록 동결, 우회 표기 대응 신설 안 함)을
+  권고 → **팀장이 그 자리에서 승인해 이 회차에 닫는다.** 상한·금칙어 두 축의 전체 이력은
+  아래 각 절에 그대로 보존한다.
 - **영역**: 데이터 / 요구사항
 - **제보**: CREW (2026-07-24, 7일차 — Task 016B 크루 개설 화면)
 - **내용**: FR-010은 크루 개설 입력 항목으로 크루명·소개·카테고리·공개 범위를 명시하고 "E3
@@ -682,6 +684,30 @@ status='expired'` 처리 + `crew_memberships` 짝 상태를 B-1 `declined` 재�
   **별도 완료 이력**(새 이슈 번호 없이, 이 블록의 "29일차 갱신" 절로 이미 충분)로 남긴다 —
   즉 새 이슈 번호를 만들자는 제안이 아니라 **이 번호의 제목·상태 요약에서 "상한"을 빼고
   "금칙어"만 남기자는 제안**이다(번호 신설은 D-082상 팀장 소관이라 여기서는 하지 않는다).
+- **34일차(CREW) — 정책 확정 제안.** 사용자가 이번 회차에 "I-038을 팀 재량으로 확정"이라고
+  결정 권한 자체를 팀에 위임했다(값이 아니라 권한 위임 — 법무·운영 확인 대기가 팀 결정으로
+  대체됐다). `requirements.md` FR-010 원문을 다시 읽고 확인한 것: 원문이 요구하는 것은
+  "E3 금칙어 포함 → 거부"라는 **예외 흐름의 존재**뿐이고, 목록의 완전성이나 우회 표기 대응
+  수준은 원문 어디에도 없다 — 즉 **원문은 "목록이 하나 있어 일부를 거부한다"로 충족되고,
+  "포괄적 사전"이나 "우회 탐지"까지는 요구하지 않는다.** 이 관찰을 근거로 3안을 비교했다
+  (전체 비교·근거는 `docs/DECISIONS.draft.CREW.md` 참고, 요약만 여기 남긴다):
+  - **A(권고) — 현행 데모 목록(6단어) 동결, 우회 표기 대응 신설 안 함.** 근거: 운영 부담·오탐
+    위험·우회 표기의 구조적 무한성(사전 기반 필터는 원리상 완결 불가) + v0.2 신고 기반 사후
+    처리(FR-080·082)가 이미 이중 방어선으로 존재. 구현 변경 0건.
+  - **B — 목록을 더 포괄적인 사전으로 확장, 우회 표기 대응은 안 함.** 목록을 "누가 무슨
+    근거로 늘렸는가"에 법무적 근거가 없어 원문에 없는 것을 팀이 창작하는 위험.
+  - **C — 목록 확장 + 우회 표기 정책(초성 분해·유니코드 정규화 등)까지 구현.** 범위가 가장
+    크고 FR-010 원문이 요구하지 않는 것을 넘어서 만들어 넣는 것이라 채택하지 않는다.
+  - **권고: A.** 구현 범위는 "미구현(현행 유지)"이므로 이번 회차에 코드·DDL을 넣지 않았다.
+- **34일차 확정(팀장 승인)**: **A안을 승인한다.** 팀장이 FR-010 원문(`requirements.md:484`,
+  "E3 금칙어 포함 → 거부")과 `BANNED_WORDS`(`crew-name-validation.ts:19`, 6단어)를 직접 대조해
+  CREW의 인용이 정확함을 확인했고, 근거 ③(사전 기반 필터의 구조적 무한성 — "더 큰 사전으로도
+  해소되지 않는다")을 결정의 중심 근거로 명시했다. `src/lib/rules/crew-name-validation.ts`·
+  `crew-description-validation.ts` 두 파일 docstring에 "34일차 팀 재량 확정(A안) — 목록 동결,
+  우회 표기 대응 신설 안 함"과 근거 요약을 남겼다(코드 로직·값 변경은 없음, `BANNED_WORDS` 6단어
+  그대로). **이 번호(I-038)를 이번 회차에 닫는다** — 상한·금칙어 두 축 모두 확정·적용
+  완료. 결정문 정본화(번호 부여)는 팀장이 마감에 `docs/DECISIONS.draft.CREW.md`를 병합해
+  처리한다.
 
 ### I-039 · 권한 매트릭스에 "채팅방 열람" 자체를 가리키는 행이 없다
 
@@ -4186,6 +4212,8 @@ function admin_list_reports"}`. 원인은 `AdminReportsContainer`
 영향은 아직 미확인이다(게이트 자체는 `notFound()`로 정상 작동해 관리자 아닌 사용자는
 404를 본다 — `AdminGateLayout` 자체 로직 확인 완료). 다음 회차 후보로 새로 등재(아래
 I-115).
+
+### I-096 · `polls_guard_decision_integrity`(I-089 핫픽스)가 `open→cancelled` 전이를 다루지
 않아 `disband_crew`(FR-013 AC1)의 투표 일괄 취소가 조용히 무력화돼 있었다 — 이번에 수정
 
 - **상태**: 닫힘 — **이번 회차(22일차, Task 044) 수정 완료**. 마이그레이션
@@ -7604,7 +7632,11 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
 
 ### I-159 · `invitations`의 archived-크루 차단이 RLS가 아니라 트리거 단일 지점에만 의존한다 — `join_requests`와 defense-in-depth 비대칭
 
-- **상태**: 열림 — **(B)**. 오늘은 안전(nested 호출자 0건 실증). 이중화 여부는 팀장 판단.
+- **상태**: **해결됨(34일차)** — RLS 이중화는 **나이브 안·좁은 대안 모두 기각, DDL 0건**.
+  트리거(`invitations_guard_response_transition`) 단일 방어를 그대로 유지하고, 대신
+  `docs/design/rls-regression-checklist-33/README.md`에 이 트리거의 archived 차단을 확인하는
+  회귀 항목을 추가해 "이득이 불확실한 권한 경계 수정보다 회귀 감지"를 선택했다. 아래 "34일차
+  갱신" 참고.
 - **영역**: 스키마 / RLS·트리거 (NFR-011, FR-013·FR-021) / `invitations_update_invitee_or_staff` 정책, `invitations_guard_response_transition` 트리거
 - **제보**: CORE (33일차, I-153 처분 중 "같은 결함 클래스가 다른 테이블에도 있는지" 전수 확인의 부산물 — `docs/design/rls-regression-checklist-33/README.md` §5)
 - **내용**: `join_requests_update_requester_or_staff` RLS 정책은 USING·WITH CHECK **양쪽**에
@@ -7626,10 +7658,46 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   `private.is_crew_active(crew_id)`를 추가해 이중화한다. **단 RLS는 status로 조건 분기를 할 수
   없으므로** "거절(declined)은 archived에서도 허용한다"는 기존 규칙까지 함께 막힐 위험이 있다 —
   트리거만큼 정밀할 수 없다는 것이 이 이중화의 근본 제약이다. 착수 여부·설계는 팀장 판단.
+- **34일차 갱신(CREW) — 위험을 추론이 아니라 실측으로 확정했다.** `begin...rollback` +
+  `set local role authenticated` + 실제 invitee(`fb70ff1c-...`) JWT claims로(서비스롤 미사용,
+  32일차 교훈 2) 검증한 결과:
+  - **나이브 이중화(join_requests와 완전히 같은 패턴, USING·WITH CHECK 양쪽에 그대로 추가)는
+    경고대로 거절을 막는다** — archived 크루 초대에 대한 invitee의 거절 UPDATE가 조용히
+    0행 처리됨을 실측(에러 없이 USING이 행을 필터링). **이 안은 기각한다.**
+  - **좁은 대안(WITH CHECK 한 곳에만 `private.is_crew_active(crew_id) OR status = 'declined'`,
+    USING은 원본 유지)은 수락만 막고 거절은 막지 않음을 표현식 단위 검증 + 실제 UPDATE 양쪽으로
+    확인했다.** 다만 nested 우회 시나리오에서의 방어력은 트리거가 WITH CHECK보다 먼저 실행돼
+    실측 불가(한계로 기록).
+  - 실측 전문·SQL 원문·결과표: `docs/design/invitation-defense-symmetry-34/README.md`. **DDL은
+    이번 회차에 적용하지 않았다** — 모든 정책 변경은 트랜잭션 안에서만 존재했고 `rollback`으로
+    원복을 재확인했다.
+- **34일차 확정(팀장) — 좁은 대안도 기각, DDL 전면 보류.** 근거 셋:
+  1. **`expired` 구멍**: `invitations_status_check`가 허용하는 4개 값(`pending`·`accepted`·
+     `declined`·`expired`) 중 좁은 대안의 `OR status = 'declined'` 예외는 `expired`를 포함하지
+     않는다 — archived 크루에서 `expired`로의 전이도 함께 막힌다. 지금은 `'expired'`를 쓰는 SQL
+     경로가 저장소에 0건이라 무해하지만(D-073 "만료는 상태 전이가 아니라 조회 필터링",
+     `invitation.ts:36`), **그 무해함이 D-073에 의존한다** — 나중에 만료 배치가 생기면 나이브
+     안에서 실증한 것과 같은 "조용한 0행" 실패가 재현된다.
+  2. **층 선택이 근본적으로 틀렸다**: status 조건 분기는 트리거가 이미 정확히 하고 있고
+     (기준선 실측 1번이 증명 — 거절 통과, 수락 차단), RLS는 조건 분기를 구조적으로 표현하지
+     못하는 층이다. 조건부 규칙을 그 층에 옮기면 표현 못 하는 부분마다 새 예외 항이 새어
+     나온다(`declined` 다음은 `expired`) — 이중화가 아니라 join_requests와도 형태가 다른
+     **세 번째 패턴**을 만드는 것이라 애초의 "대칭성 확보" 명분도 성립하지 않는다.
+  3. **이득이 관측 불가능**: BEFORE UPDATE 트리거가 WITH CHECK보다 먼저 실행돼 이 방어가 실제로
+     작동하는 장면을 볼 방법이 없다 — 이득은 "트리거가 미래에 회귀하면"에만 발생한다. 그
+     리스크는 DDL이 아니라 **회귀 감지**로 막는다: `docs/design/rls-regression-checklist-33/
+     README.md`에 "`invitations_guard_response_transition`이 살아 있고 archived 크루의
+     accepted 전이를 막는가 / declined 전이는 통과시키는가"를 항목으로 추가했다(D-082 위반
+     아님 — 기존 문서에 항목만 보탰다, 새 번호 없음).
+  - **처분**: 나이브·좁은 대안 모두 **채택하지 않는다. DDL 0건.** 실측 데이터(3안 비교, `expired`
+    구멍 포함)는 지우지 않고 위 그대로 보존한다 — 다음에 같은 제안이 다시 나올 때 재실측 없이
+    참고하기 위함이다. 결정문 정본화(번호 부여)는 팀장이 마감에 `docs/DECISIONS.draft.CREW.md`를
+    병합해 처리한다.
 
 ### I-160 · `getRealtimeAuthTokenAction`이 "세션 없음"과 "세션 조회 에러"를 구분하지 않고 둘 다 `null`로 뭉갠다 — `refreshAuth`의 재시도 판단이 그 위에 서 있다
 
-- **상태**: 열림 — **(B)**. 이번 회차에 **의도적으로 고치지 않았다**(아래 근거).
+- **상태**: **해결됨(34일차, CORE 제안 → 팀장 코드 직접 검증 → 승인·적용)** — 아래 "34일차
+  갱신" 참고.
 - **영역**: 실시간 / 인증 (NFR-008) / `src/lib/realtime/get-realtime-auth-token.ts` · `broadcast.ts`의 `refreshAuth`
 - **제보**: CORE (33일차, 팀장이 배정한 BOARD I-082 수정 정적 리뷰 중 발견)
 - **내용**: `getRealtimeAuthTokenAction`은 `if (error || !data.session) return null;`로 **"세션이
@@ -7646,6 +7714,22 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   회차 마감 직전에 인증 계약을 바꾸는 것은 팀장 판단으로 금지했다 — 같은 회차에 I-082 1차 수정이
   회귀(최악 155초 블로킹)를 만들었고 그것을 잡은 직후였다. 범위가 I-082 수정보다 넓다.
 - **후속 후보**: 위 반환 계약 확장. 착수 여부는 팀장 판단.
+- **34일차 갱신(CORE 제안 → 팀장 승인·적용)**: 원 후속 후보(`{token}|{error}|{noSession}` 반환
+  계약 확장)를 채택하지 않았다 — 유일한 호출부(`broadcast.ts`의 `refreshAuth`)를 코드로 추적한
+  결과, 예외를 만나면 재시도하는 `catch` 경로가 33일차(`setAuth` 예외 대응)부터 이미 있어서
+  **`getRealtimeAuthTokenAction`이 `error`를 삼키지 않고 던지기만 하면 그 기계를 그대로 탄다는
+  것을 확인했다.** 그래서 반환 타입을 넓히지 않고 1줄만 고쳤다: `error`는 던지고, `null`은
+  "확인된 세션 없음"만 뜻하도록 좁혔다. `broadcast.ts`는 무변경이다. 팀장이 `broadcast.ts:122`
+  (`const delays = retryOnNull ? ... : ...`)가 **예외 종류가 아니라 `retryOnNull` 플래그로만**
+  스케줄을 고른다는 것을 코드로 직접 재검증해 ① 최초 초기화 경로는 예외가 나도 여전히
+  `[150, 400, 800]`ms(합 1.35초) 스케줄을 타 33일차 155초 회귀 클래스가 재발하지 않고, ② 주기적
+  갱신 경로는 지금까지 `null`이면 무조건 즉시 포기하던 것이 이제 5초·30초·2분 재시도를 타며,
+  ③ 이 재시도가 `authReady`를 막지 않아(주기 갱신은 초기화 완료 후에만 도는 `setInterval`
+  콜백) 블로킹이 생기지 않음을 확인하고 승인했다. `DataResult`/`forbidden` 계약은 이 함수
+  (읽기, `src/lib/realtime/`)에 적용 대상이 아님을 I-050 근거로 확정(계약 문서 손대지 않음).
+  `npx tsc --noEmit`·`npm run lint` 둘 다 이 파일 기준 신규 오류·경고 0건(다른 파일의 기존
+  이슈(BOARD의 (A) 수정 관련 `poll.ts`·`cast-vote.ts`)와 무관함을 확인). 제안 전문:
+  `docs/DECISIONS.draft.CORE.md`.
 
 ### I-161 · `refreshAuth` docstring이 "주기적 갱신은 재시도하지 않는다"고 단정했으나 다섯 번째 갈래(`setAuth` throw)에는 해당하지 않았다
 
@@ -7663,11 +7747,31 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   명시(*"주기적 갱신은 재시도가 아예 없다가 아니라 `token===null`일 때만 재시도가 없다가 정확한
   서술이다"*) ② `null`의 의미를 단정하지 않고 I-160(구분 불가)을 가리키게 함 ③ `authReady` 보호가
   **최초 초기화 1회에만** 적용됨을 `getClient()` 주석에 명시.
-- **남은 것(경미)**: `INITIAL_NULL_RETRY_DELAYS_MS = [150, 400, 800]`의 **값 자체에 실측 근거가
-  없다.** BOARD의 "강제 null 조건에서 5.9초 만에 성공" 측정은 **구 스케줄(5초 백오프) 기준**이라
-  실제 쿠키 전파 시간을 알려주지 않는다 — 임의값이다. `docs/ISSUES.md` I-082 "남은 리스크"에는
-  이 한계가 정직하게 적혀 있으나 **코드 docstring은 확정적 어조**라 두 곳의 어조가 어긋난다
-  (CORE 지적). 다음에 이 파일을 만질 때 docstring에 한 줄 보탠다.
+- **남은 것(경미) — 34일차(BOARD) 갱신, 어조 정합 재확인**: `INITIAL_NULL_RETRY_DELAYS_MS =
+  [150, 400, 800]`의 **값 자체에는 여전히 실측 근거가 없다** — 이 사실은 안 바뀌었다. 다만
+  위 CORE 지적이 근거로 든 "5.9초 만에 성공" 수치는 **1차 수정(구 스케줄, 5초 백오프) 기준**이라
+  이미 낡은 값이다 — 그 직후 팀장 교차검증이 잡은 155초 회귀로 **2차 수정**이 `retryOnNull`
+  전용의 별도 스케줄(`INITIAL_NULL_RETRY_DELAYS_MS`)을 도입했고, 그 재시도 실측값은 188ms·
+  453ms·838ms 간격·총 ~1.5초다(`docs/ISSUES.md` I-082 33일차 "팀장 교차검증" 절 참고).
+  **CORE 교차검증용 시점 확정**: `INITIAL_NULL_RETRY_DELAYS_MS` 상수 자체와 그 옆의
+  "이 값은 임의값이다" caveat 문단은 **2차 수정에서 함께 신설됐다** — 1차 수정 시점에는
+  `retryOnNull`도 `AUTH_REFRESH_RETRY_DELAYS_MS`(5초·30초·2분)를 그대로 썼고 caveat도
+  없었다. 즉 CORE의 원 지적("코드 docstring은 확정적 어조")은 **1차 수정 시점의 코드
+  상태**를 근거로 성립했을 수밖에 없다(그 시점엔 지적할 별도 상수·caveat 자체가 없었으므로,
+  지적이 가리키는 대상은 정황상 이 상수의 전신인 `retryOnNull` 재사용 코드였을 것이다) —
+  이후 같은 33일차 안에서 BOARD가 2차 수정으로 caveat을 이미 붙였고, CORE의 "남은 것" 텍스트만
+  그 갱신을 반영하지 못한 채 남아 있었다. `git show`로 33일차 커밋의 `broadcast.ts` diff를
+  직접 열어보면 이 순서(caveat 신설이 2차 수정 안에 포함됨)를 확인할 수 있다.
+  **한 줄 확정**: 이 값들이 겨냥하는 시간 규모는 "로그인 직후 세션 쿠키 전파 경합" 하나뿐이며
+  ms~수백 ms 규모다 — 위 ~1.5초는 이 스케줄 자체가 소진되는 시간일 뿐 자연 쿠키 전파 지연의
+  실측값이 아니다(그 값은 여전히 간접 검증만 됐다). **어조 정합**: `broadcast.ts`의
+  `INITIAL_NULL_RETRY_DELAYS_MS` 선언부 docstring이 "이 값 자체는 임의값이다 — 실제 쿠키
+  전파 시간을 측정해서 정한 것이 아니다"라고 이미 같은 문장으로 이 한계를 명시하고 있어,
+  CORE가 지적한 "코드 docstring은 확정적 어조" 문제는 34일차 재확인 시점에는 재현되지
+  않는다 — 이 블록과 코드 docstring이 이제 같은 사실(값은 임의·1.5초는 스케줄 소진 시간일
+  뿐·자연값은 간접 검증)을 같은 어조(임의성을 인정하되 상한 1.35초라 위험은 낮음)로 서술한다.
+  **값을 실측 기반으로 바꾸는 것은 이번 회차 범위 밖이다** — 그럴 근거가 쌓이면 팀장 승인을
+  먼저 받는다.
 
 ### I-162 · Mock `applyMeetupReschedule`이 도입 시점부터 데이터 배럴에서 한 번도 재노출되지 않은 죽은 코드였다 — 발견 즉시 해소
 
@@ -7721,3 +7825,522 @@ domain-error-channel-069.md` 계열처럼 조사용으로 만든 픽스처에 "�
   대조했다 — 안 했으면 결론이 거짓이 됐다. **32일차 교훈 3**(*"재사용한 기존 데이터에 검증 조건과
   무관한 접근 경로가 섞이면 성공이 가짜일 수 있다"*)이 그대로 적용된 자리다.
   → **실렌더 절차에 "현재 로그인 세션이 계획서가 지정한 계정인지 먼저 확인한다"를 넣는다.**
+
+### I-164 · `poll_eligible_voters` 직접 조회가 RLS로 role별 다른 행 수를 반환해 "대상자 수"·"정족수" 표시가 일반 멤버에게 조용히 축소돼 보인다(I-089/D-054 Tier A 실렌더 중 발견, 34일차)
+
+- **상태**: **해결됨(같은 회차, 34일차, BOARD)** — 팀장이 (A) 릴리스 차단으로 재분류, 수정
+  배정을 받아 처리했다. 아래 원 내용은 발견 당시 그대로 보존하고, 해소 내용은 맨 아래
+  "해소(34일차)" 절에 추가한다.
+- **영역**: 투표 표시 / RLS / `src/lib/data/supabase/poll.ts`의
+  `listEligibleVotersWithCurrentStatus` → `src/lib/rules/poll-eligibility.ts`의
+  `countQuorumEligibleVoters` → `PollPanelContainer`가 조립하는 `eligibleVoterCount`·
+  `quorumRequired`·`quorumMet`
+- **제보**: BOARD (34일차, I-089/D-054 Tier A 실렌더 — `docs/design/display-layer-audit-33/
+  README.md` §9가 지목한 poll 2건을 SQL 진실값과 대조하던 중 발견)
+- **내용**: `listEligibleVotersWithCurrentStatus`는 `poll_eligible_voters` 테이블을
+  `SECURITY DEFINER` RPC 없이 PostgREST로 **직접** 조회한다. 그 테이블의 실제 SELECT RLS
+  정책(`poll_eligible_voters_select_self_or_staff`, `pg_policies`로 확인)은 `profile_id =
+  auth.uid()` **또는** "그 크루의 staff/owner"만 허용한다 — **일반 멤버(member)는 자기 자신의
+  스냅샷 행 1개만 볼 수 있다.** 그 결과 `countQuorumEligibleVoters`가 세는 배열 길이가
+  role에 따라 갈린다: staff/owner는 전체 대상자 수를 정확히 보고, 일반 멤버는 항상 "1"을
+  본다(`ceil(1/3)=1`이 `quorumRequired`로 그대로 굳는다).
+- **재현(SQL로 원인 확정, 추정 아님)**: poll `622cb2f7-144f-4d45-974f-ee46dfd414ef`(홈쿠킹
+  클럽, 대상자 4명)를 `chopin0625@gmail.com`(그 크루 role=member)으로 브라우저에서 열람 —
+  화면에 "참여 4명 / 대상 1명", "정족수 1명"이 표시됨(SQL 진실값은 대상 4명·정족수 2명).
+  같은 계정이 알고리즘 스터디에서는 staff라 그 크루의 poll(`2433fd02-…`)은 "대상 5명"으로
+  정확히 표시됨 — role 차이가 원인임을 대조로 확인. 추가로 `begin`…`rollback` 트랜잭션 안에서
+  `request.jwt.claims`로 `auth.uid()`를 `chopin0625`(`30f44dd9-…`)로 시뮬레이션해 같은 조건의
+  SQL을 직접 실행 — service role 기준 4행과 달리 **RLS 시뮬레이션에서는 정확히 1행만
+  반환됨**을 확인해 "RLS가 원인"이 추정이 아니라 SQL로 재현된 사실임을 검증했다.
+- **비교(정상 작동하는 대조군)**: 같은 화면의 찬성/반대/기권/참여자 수는 `getPollTally`→
+  `public.poll_vote_tally` RPC(`SECURITY DEFINER`, RLS 우회)를 거치므로 role과 무관하게
+  정확했다 — **같은 화면 안에서 어떤 숫자는 RPC 경유라 맞고, 어떤 숫자는 원본 테이블 직접
+  조회라 role에 따라 조용히 틀리는** 비대칭 구조다.
+- **D-054 원 우려와의 관계**: `poll.status`/`poll.result`(부결/가결 배지) 자체는 트리거가
+  확정한 DB 값을 그대로 쓰므로 이번 실측에서 위조·오염은 없었다(Tier A의 원래 목적은
+  충족) — 이 결함은 판정값 자체가 아니라 **판정을 뒷받침하는 근거 숫자("대상자 수"·
+  "정족수")**가 틀리는 것이라 D-054가 찾던 결함과는 종류가 다르다. 다만 방향이 "정족수
+  요구치를 실제보다 낮게 보여준다"는 쪽이라(`required`가 과소평가) "정족수 충족"이 실제보다
+  쉽게 표시될 수 있는 오차이며, 신뢰도 문제로는 가볍지 않다. 이번 poll 2건은 우연히
+  `participant ≥ 진짜 required`라 배지 자체는 틀리지 않았지만, 참여자가 적은 poll에서는
+  "정족수 충족" 배지가 잘못 표시될 수 있는 구조다.
+- **영향 범위(미확인, 다음 사람 검증 필요)**: 같은 함수·같은 RLS가 `open` 상태
+  `PollTally`(진행 중 집계)에도 그대로 쓰인다 — 코드 경로상 **진행 중인 poll에서도 일반
+  멤버 전원에게 "대상자 수"·"정족수"가 항상 틀리게 보일 것으로 추정**되지만, 이번 회차엔
+  실측 대상 poll 2건이 둘 다 `closed_*`라 `open` 화면으로는 확인하지 못했다.
+- **왜 이번에 수정하지 않았는가**: 이번 배정은 "신규 데이터 생성 0건" Tier A 실렌더였다 —
+  수정은 `listEligibleVotersWithCurrentStatus`가 `poll_eligible_voters`를 직접 쿼리하는 대신
+  `SECURITY DEFINER` 경유(예: `poll_vote_tally`처럼 RPC화)로 바꾸는 스키마/데이터 레이어
+  변경이라 이 회차 범위를 넘는다. 근거 문서:
+  `docs/design/poll-display-verification-34/README.md` §6.2.
+- **후속 제안(발견 당시 서술 — 아래 해소가 (a)를 채택했다)**: (a) `listEligibleVotersWith
+  CurrentStatus`를 `SECURITY DEFINER` RPC로 옮기거나, (b) `poll_eligible_voters` SELECT
+  RLS를 "그 poll이 속한 크루의 active 멤버 전원"으로 완화(현재는 staff/owner만) — 어느
+  쪽이든 담당·우선순위는 팀장 판단. `open` 상태 poll에서의 재현 여부 확인도 다음 사람 몫으로
+  남긴다.
+
+- **해소(같은 회차, 34일차, BOARD)** — **(a) 채택, (b)는 기각**. 기각 근거: `poll_eligible_
+  voters`가 staff/owner 전용인 이유는 마이그레이션 원문 주석(`20260725004204_rls_poll_
+  policies.sql:88`)에 "D-025 스냅샷 — 발송 상태 부기 컬럼이라 일반 크루원에게는 노출하지
+  않는다"고 명시돼 있다 — RLS를 통째로 넓히면 `notified_at`/`notify_attempts`까지 전원에게
+  노출돼 D-025를 직접 위반한다. **로스터(`crew_memberships`)는 이미 role 무관 공개**
+  (`crew_memberships_select_self_or_fellow_member`, 확인됨)라 "이미 공개된 것의 부분집합"
+  논증이 성립할 것 같았지만, `poll_eligible_voters`·`poll_votes`는 로스터와 다른 이유로
+  의도적으로 더 좁게 잠긴 별개 테이블임을 원문으로 확인해 그 논증을 기각했다.
+  - **RPC 신설**: `private.poll_eligible_voters_with_status(p_poll_id)` + 얇은 `public`
+    INVOKER 래퍼(029B 패턴, D-077 관례 B 명시 REVOKE) — `profile_id`+`current_membership_
+    status`만 반환(`notified_at`/`notify_attempts`는 SELECT 목록에 없어 D-025 위반 없음),
+    게이트는 `private.is_active_crew_member`(staff 제한 없음 — 그 제한은 부기 컬럼용이었고
+    이 함수는 그 컬럼을 안 돌려주므로 불필요). 마이그레이션:
+    `20260730145738_poll_eligible_voters_with_status_rpc_i089.sql`.
+  - **소비자 4곳 중 3곳(`PollPanelContainer`·`decideAndClosePoll`·`withdraw-poll.ts`)은 코드
+    변경 없이 자동 해소** — 전부 `listEligibleVotersWithCurrentStatus` 하나만 거치므로 그
+    함수 내부만 RPC 호출로 바꿨다. 4번째 소비자(`cast-vote.ts`)는 별개 결함이라 아래 새 이슈로
+    분리했다.
+  - **실측(서비스롤 아님, `set local role authenticated` + 실제 JWT claims, `begin`…
+    `rollback`)**: member(`30f44dd9-…`, 홈쿠킹 클럽 role=member) 관점 poll `622cb2f7-…` —
+    **수정 전 1 → 수정 후 4**(진짜 값과 일치). staff(같은 계정, 알고리즘 스터디 role=staff)
+    관점 poll `2433fd02-…` — **수정 전후 둘 다 5**(회귀 없음). `withdraw-poll.ts` 알림
+    수신자도 별도 실측: member(`fb70ff1c-…`) 관점 poll `2433fd02-…`에서 수정 후 수신자
+    **4명**(자기 자신 제외 전원, 수정 전이었다면 0명이었을 것 — 아래 새 이슈의 "함께 해소"
+    절 참고).
+  - **영향 범위 확정**: `open` 상태 poll도 `listEligibleVotersWithCurrentStatus`를 통해
+    같은 RLS를 타므로 구조적으로 동일하게 결함이 있었을 것 — 다만 이번 회차 DB에 `open`
+    poll이 0건이라(62건 전부 closed) 실물 재현은 못 했다. **이 한계는 코드 리뷰로 대체했다는
+    사실과 함께 정직하게 남긴다** — SQL 레벨 정적 대조가 나중에 뒤집힌 전례(I-158, 11일
+    방치)가 있으므로 다음 사람이 실 `open` poll이 생기면 다시 확인하는 것을 권한다.
+  - **검증**: `npx tsc --noEmit` 0 errors, `npm run lint` 0 errors, `npm test` 6 files/41
+    tests pass, `mcp__supabase__generate_typescript_types`로 `database.types.ts` 재생성.
+  - **후속 — `INNER JOIN`의 침묵 탈락 교정(같은 회차, 팀장 지적)**: 최초 배포본은
+    `poll_eligible_voters`×`crew_memberships`를 `INNER JOIN`했다 — 스냅샷 대상자의 멤버십
+    행이 없으면(D-003 불변식 위반) 원본 TS처럼 예외로 멈추는 대신 그 행을 조용히 지운 채
+    반환했다. 그 지워진 행 수가 곧바로 `countQuorumEligibleVoters`(정족수 분모)로 들어가므로
+    **지금 고치는 결함(RLS의 조용한 축소)과 같은 실패 형태를 JOIN 레벨에서 재도입**한
+    것이었다 — 이번 회차 CREW의 나이브 RLS 실측이 남긴 "에러 없는 조용한 0행은 아무도 못
+    본다"는 교훈과 같은 종류다. `LEFT JOIN` + `cm.profile_id is null`이면 `raise
+    exception`(crew·profile·poll id 포함)으로 원본과 같은 실패 행동을 보존하도록
+    `20260730151125_poll_i089_rpcs_fix_silent_inner_join.sql`로 교정했다(기존 두 마이그레이션은
+    수정하지 않고 새 마이그레이션을 추가했다 — 원격 기록 버전은 되돌리지 않는다).
+  - **최종 실측 일람(교정 후 재확인, `poll_eligible_voter_progress` 포함 두 RPC 전부)**:
+    - member(30f44dd9) 관점 poll `622cb2f7-…` 대상자 수: **4**(교정 전후 동일).
+    - staff(같은 계정) 관점 poll `2433fd02-…` 대상자 수: **5**(교정 전후 동일, 회귀 없음).
+    - `prosecdef`(`pg_proc`) 실측: `private.poll_eligible_voters_with_status`=true,
+      `private.poll_eligible_voter_progress`=true, `public.poll_eligible_voters_with_status`
+      =false, `public.poll_eligible_voter_progress`=false — 4개 전부 의도대로(private=
+      DEFINER, public=INVOKER). `pg_get_functiondef`가 `SECURITY INVOKER`를 명시적으로
+      적었어도(원본 마이그레이션 소스에 있음) **기본값이라 카탈로그 덤프에는 표기되지 않는다**
+      — `prosecdef`로 직접 확인해야 한다는 팀장 지적을 실측으로 따랐다.
+    - `has_function_privilege` 실측: `anon`은 4개 함수(private 2·public 2) 전부 `execute`
+      `false`, `authenticated`는 전부 `true` — D-077 관례 B(명시적 REVOKE 후 GRANT) 그대로.
+    - **비크루원 게이트 실증**: 홈쿠킹 클럽 비멤버(`fb70ff1c-…`)로 두 RPC 모두 호출 →
+      `P0001: not authorized to view this poll (crew members only)`로 거부 확인(양쪽 다).
+    - **마이그레이션 개수·MD5**: 로컬 `supabase/migrations/*.sql` 131개, 원격
+      `supabase_migrations.schema_migrations` 131행 — **개수 일치**. `version_name.sql`
+      형식으로 정렬해 이어붙인 문자열의 MD5가 로컬·원격 **양쪽 다
+      `e802d326fbaab241affab1b0bb3afa0a`로 일치**(로컬은 `ls | sort`, 원격은 SQL
+      `string_agg(... order by version)`로 각각 계산 후 대조).
+
+- **CORE 재검증 기록(34일차, 팀장 지시)** — 3차 마이그레이션(LEFT JOIN 선검사)의 서면화·예외 도달성·로컬↔배포 바이트 대조를 CORE가 독립 확인했다. 원문을 아래에 보존한다.
+
+  **34일차 재검증 — I-089 후속 3차 마이그레이션(LEFT JOIN 선검사) 서면화·도달성·바이트 대조**
+
+  **배경**: 34일차 (A) 작업으로 신설된 두 RPC(`poll_eligible_voters_with_status`·
+  `poll_eligible_voter_progress`) 초안이 INNER JOIN이라 스냅샷 대상자의 멤버십 행이 없으면
+  조용히 빠지는 문제를 발견해 3번째 마이그레이션(`20260730151125_poll_i089_rpcs_fix_silent_
+  inner_join.sql`, LEFT JOIN 선검사 + `raise exception`)으로 고쳤다. 재소환된 이 세션은 그
+  결과를 문서·코드에 반영하고 실측으로 재확인하는 잔여 작업을 받았다.
+
+  1. **`poll.ts` 독스트링 정정** — `listEligibleVotersWithCurrentStatus` 위 주석이 "RPC 내부가
+     INNER JOIN이라 못 찾으면 조용히 빠진다"고 적어 둔 것을 "LEFT JOIN으로 먼저 결손을 확인해
+     있으면 `raise exception`으로 멈추고, 없으면 원래 INNER JOIN 결과를 그대로 반환한다"로
+     고쳤다 — 배포된 정의와 서술을 일치시켰다.
+  2. **예외 도달성** — 3차 마이그레이션 SQL을 전문으로 읽어 확인: 두 함수 모두 `select ...
+     into v_missing_profile_id ... if v_missing_profile_id is not null then raise exception
+     ...`가 `return query` **앞**에 있다. `raise exception`이 `return query` 뒤에 놓여 도달
+     불가능한 배치가 아니다 — 코드 순서상 실행되면 반드시 `return query`보다 먼저 평가된다.
+  3. **로컬 파일 ↔ 배포 정의 바이트 대조**:
+     - `private.poll_eligible_voters_with_status`: `pg_get_functiondef`로 배포본을 전문
+       조회해 3차 마이그레이션 파일의 함수 본문(`declare`~`end;`)과 줄 단위로 대조 — **일치**.
+       헤더부(`LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO ''`)만
+       PostgreSQL의 정규화된 pretty-print 표기라 로컬 SQL의 `language plpgsql / stable /
+       security definer / set search_path = ''` 4줄과 표기가 다를 뿐 내용은 동일하다.
+     - `private.poll_eligible_voter_progress`: **비교 보류**. 같은 회차에 BOARD가 이 함수에
+       `order by 1, 2`를 넣는 마이그레이션을 별도로 적용 중이라, 팀장의 "적용 완료" 확인 전에
+       비교하면 그 변경분과 뒤섞여 오판정할 위험이 있다는 인수인계 지시에 따라 지금은 하지
+       않았다. `list_migrations` 조회 결과 해당 `order by` 마이그레이션은 아직 목록에 없다
+       (34일차 3차 마이그레이션 이후 신규 항목 없음) — 아직 적용 전으로 보인다.
+  4. **회귀 확인** — `npx tsc --noEmit` 통과(출력 없음), `npm test` 41개 전부 통과(6개 파일).
+     이번 세션에서 코드 변경은 `poll.ts` 독스트링 1건뿐이라 회귀 위험 자체가 낮았다.
+
+  새로 발견된 결함은 없다 — 3차 마이그레이션이 실제로 인수인계 서술대로 배포돼 있음을
+  확인하고 문서를 실제 동작에 맞춘 것이 이번 세션의 전부다.
+
+### I-165 · `cast-vote.ts`의 종료 트리거③이 일반 멤버가 투표할 때마다 다른 크루원의 투표 기회를 뺏고 poll을 조기 종료한다 — 위 결함 조사 중 발견한 더 심각한 별개 결함(34일차)
+
+- **상태**: **해결됨(같은 회차, 34일차, BOARD)** — 팀장이 (A) 릴리스 차단으로 분류.
+- **영역**: 투표 / 종료 트리거③(D-022) / `src/lib/actions/cast-vote.ts`
+- **제보**: BOARD (34일차, 위 `poll_eligible_voters` 결함의 "호출부 조사" 중 발견)
+- **내용**: `poll_votes` SELECT RLS(`poll_votes_select_self_or_staff`)도 위 결함과 정확히
+  같은 형태(`본인 OR staff/owner`)다. `cast-vote.ts`는 투표 성공 직후 **투표자 본인 세션**으로
+  `listEligibleVotersWithCurrentStatus`+`listVotes`를 호출해 미투표자 수를 계산하고, 0이면
+  `decideAndClosePoll`을 불러 poll을 조기 종료 시도한다(D-022 트리거③). 일반 멤버
+  (`crew_member`, `permission.ts`에서 투표 권한 `allow` 확인)가 투표하면 두 조회 다 "자기
+  자신 1행"만 봐서 `countRemainingVoters`가 **항상 0**을 반환한다(FR-041 "대상자 전원의
+  투표 기회"·D-022 "진짜 미투표자 0명" 위반의 근본 원인).
+- **관측 가능한 영향은 세 갈래로 갈린다(CREW 독립 조사 병합, 34일차)** — BOARD는 처음에
+  "그 순간 poll이 항상 닫힌다"로 적었는데, CREW가 같은 클래스를 독립적으로 전수조사하며
+  `decideAndClosePoll` 호출 뒤 `closePoll`의 `polls` UPDATE가 실제로 `polls_update_proposal_
+  author_or_staff` RLS를 통과하는지까지 추적해 세 경우로 갈랐다 — **BOARD의 원인 분석(두
+  조회 동시 축소 → remaining 0)과 CREW의 사후 경로 분석(그 뒤 RLS 통과 여부)이 서로 다른
+  부분을 봤고, 합쳐야 완전한 그림이다**:
+  1. **마지막 투표자가 staff/owner** — 애초에 이 결함이 발동하지 않는다(그 role은 RLS
+     축소를 안 받는다, 위 결함 항목과 동일 메커니즘). 영향 없음.
+  2. **마지막 투표자가 제안자 본인(non-staff)** — `polls_update_proposal_author_or_staff`가
+     "제안글 작성자 본인"을 허용하므로 `closePoll`의 UPDATE가 통과한다. **실제로 poll이
+     조기 종료된다 — 관측 가능한 회귀.**
+  3. **그 외 일반 멤버(제안자 아님, staff/owner 아님)** — `decideAndClosePoll`은 호출되지만
+     `closePoll`의 UPDATE가 RLS로 거부된다. `cast-vote.ts`의 이 블록 전체가 `try/catch`로
+     감싸여 있어(I-049) 이 실패는 `console.error`로만 남고 삼켜진다 — **poll의 최종 상태는
+     안 바뀌지만(트리거①이 나중에 정상 마무리), 진단 로그에 자동 종료 실패 흔적이 남는다.**
+  **CREW의 시나리오(remaining이 과대평가돼 `decideAndClosePoll`이 아예 안 불린다)는 틀렸다**
+  — `listVotes` 축소만 보고 `listEligibleVotersWithCurrentStatus`(대상자 명단)는 온전하다고
+  가정했는데, 실제로는 **두 조회가 동시에 축소돼 정확히 반대 방향(remaining 과소평가, 0으로
+  귀결)**으로 갔다(BOARD가 SQL로 직접 재현, 아래 "재현" 절). 팀장이 두 분석을 대조해 이
+  판정을 확정했다.
+- **재현(SQL, `begin`…`rollback`, 데이터 변경 없음)**: poll `622cb2f7-…`(대상자 4, 전원
+  투표 완료)로 member RLS를 시뮬레이션 — `poll_eligible_voters`·`poll_votes` 둘 다 1행만
+  반환(위 결함과 같은 메커니즘). poll `2433fd02-…`(대상자 5, 2명만 투표: staff 1·member 1)로
+  "만약 미투표 member 1명(`c64e5973-…`)이 지금 투표했다면"을 순수 SELECT로 계산 —
+  **진짜 remaining=2**(owner+member 각 1명). 즉 진짜 값 2 vs 결함 값 0의 대조를 실물
+  데이터로 확보했다.
+- **"무결성 트리거가 있어 안전하다"는 결론이 아니다(팀장 지적, 기록으로 남긴다)**: `polls_
+  guard_decision_integrity` 트리거가 최종 `status`/`result`를 SQL 진실값으로 덮어써 위조된
+  판정값이 저장되지는 않는다 — 하지만 그 "진실"은 **"기회를 뺏긴 시점의 진실"**이다. 정확한
+  값이 잘못된 시점에 확정되는 것이고, 이 결함 자체는 무결성 트리거가 아무 신호도 주지 않는다
+  (트리거는 "판정이 데이터와 일치하는가"만 보지 "그 시점에 판정해도 되는가"는 보지 않는다).
+  다음에 이 파일을 보는 사람이 "트리거가 있으니 안전"으로 오독하지 않도록 남긴다.
+- **해소**: `poll_eligible_voter_progress`라는 **별도의 익명 RPC**를 새로 만들었다(신원 반환
+  안 함) — `poll_voter_ids`(신원 반환) 안을 1차로 검토했으나 팀장이 재식별 위험을 지적해
+  기각했다: `poll_vote_tally`(찬반기권 집계, 이미 role 무관 공개)와 결합하면 소규모 poll
+  (D-031 5명 미만 특례가 있을 만큼 흔한 경로)에서 상대의 선택이 역산된다(투표자 2명 중
+  본인 제외 1명이면 그 선택이 확정적으로 드러남). 그래서 `current_membership_status`·
+  `has_voted` 두 값만 반환하고 `profile_id`·`choice`는 **애초에 SELECT하지 않는다**(D-003
+  보호). 판정(active AND NOT 투표함, 그 개수)은 SQL로 옮기지 않고 여전히
+  `lib/rules/poll-eligibility.ts`의 `countRemainingVoters`(vitest 커버)가 한다(NFR-036,
+  판정 로직 한 벌) — 시그니처를 `(voters, votedProfileIds)`에서 `(entries: {status,
+  hasVoted}[])`로 바꿔 신원 매칭 자체를 없앴다(유일한 소비자가 `cast-vote.ts`뿐이라 다른
+  영향 없음, vitest 4개 케이스 갱신).
+  이 설계 결정(신원-투표여부 분리, 재식별 벡터 봉쇄)은 `docs/DECISIONS.draft.BOARD.md`에
+  새 결정으로 기록했다. 마이그레이션:
+  `20260730145758_poll_eligible_voter_progress_rpc_i089.sql`.
+- **함께 해소**: `withdraw-poll.ts`(FR-046 철회 알림)도 같은 원인(`listEligibleVotersWith
+  CurrentStatus` 재사용)으로 조용히 결함이 있었다 — `poll:close_early`가 `crew_member:
+  "conditional"`(제안자 본인)이라 일반 멤버도 자기 제안글을 철회할 수 있는데, 그 경로가
+  이 함수로 알림 수신자를 뽑는다. 위 `poll_eligible_voters_with_status` RPC 교체로 자동
+  해소됨을 실측 확인(위 항목 참고, member 관점 수신자 0→4).
+- **실측(서비스롤 아님)**: poll `2433fd02-…`를 member(`c64e5973-…`)로 `poll_eligible_voter_
+  progress` 직접 호출 — 5행(active·미투표 3, active·투표함 2), 신원 컬럼 없음(응답에
+  `profile_id` 자체가 없어 어느 행이 누구인지 구조적으로 못 붙인다). `countRemainingVoters`
+  적용 시 remaining=3(진짜 값과 일치, 결함 상태였다면 0). **`cast-vote.ts`의 실제 실행
+  경로(투표 제출→트리거③ 체크)는 open poll이 DB에 0건이라 종단간으로 재현하지 못했다** —
+  RPC 응답·순수 함수 재계산으로 대체 검증했고, 이 한계를 그대로 적는다(I-158 전례).
+- **정적 검증**: `npx tsc --noEmit` 0 errors, `npm run lint` 0 errors, `npm test` 6
+  files/41 tests pass(시그니처 변경분 포함).
+- **후속 — `INNER JOIN` 침묵 탈락 교정 후 재확인**: 위 결함 항목과 같은 마이그레이션
+  (`20260730151125_...`)이 `poll_eligible_voter_progress`도 함께 고쳤다(`LEFT JOIN`+예외,
+  근거는 위 항목 참고). 교정 후 poll `2433fd02-…`를 member(`c64e5973-…`)로 재호출 —
+  **5행(active·미투표 3, active·투표함 2), 교정 전과 동일**(스냅샷 불변식이 이번엔 깨지지
+  않아 안전장치가 조용히 통과했을 뿐 — 깨졌다면 여기서 예외가 났을 것이라는 게 이번 수정의
+  요점이다).
+- **CREW 독립 조사 병합(34일차, 팀장 판단)** — 같은 결함을 CREW가 팀장 배정 "RLS 역할별 행 축소 결함 클래스 전수조사" 중 독립적으로 발견했다. **별도 번호를 부여하지 않고 이 항목에 병합한다** — 원인 분석(BOARD: 두 조회 동시 축소 → remaining 0)과 사후 경로 분석(CREW: 그 뒤 `closePoll`이 RLS를 통과하는가)이 서로 다른 부분을 봤고 합쳐야 완전한 그림이기 때문이다. CREW 원문을 아래에 그대로 보존한다.
+
+  **CREW 원문 — `poll_votes` 직접 조회가 role별로 축소돼 `cast-vote.ts`의 자동 종료 트리거③이 제안자의 투표만으로 poll을 조기 종료시킨다 — `poll_eligible_voters`(BOARD 처분 중)와 같은 결함 클래스, 착수는 BOARD가 함께 흡수**
+
+  - **상태**: **팀장 승인, BOARD가 `poll_eligible_voters` 수정과 함께 처리한다 — CREW는 별도
+    착수하지 않는다(중복 회피).** `cast-vote.ts`의 `listVotes` 호출을 신규 `listVoterIds`
+    (SECURITY DEFINER RPC 경유)로 교체하는 것이 이미 승인된 수정안에 포함돼 있다. 아래 내용은
+    BOARD 수정의 배경 근거로 남긴다.
+  - **영역**: 데이터 접근 레이어 / RLS 경계 / `src/lib/data/supabase/poll.ts`의 `listVotes` ·
+    `src/lib/actions/cast-vote.ts`(트리거③ 게이트) · `src/lib/actions/poll-auto-close.ts`
+    (`decideAndClosePoll`) · `src/lib/rules/poll-eligibility.ts`의 `countRemainingVoters`
+  - **제보**: CREW (34일차 — 팀장이 배정한 "RLS 역할별 행 축소 결함 클래스 앱 전체 전수조사"
+    중, BOARD의 `poll_eligible_voters` 확정 결함과 같은 클래스를 찾다가 발견). **34일차 팀장이
+    두 차례 정정**(① 메커니즘 방향 ② 영향 범위 — "정족수 무력화"는 성립하지 않음, 상세는
+    `docs/design/rls-narrowed-read-audit-34/README.md` §2, 아래는 최종 정정 서술).
+  - **내용**: `poll_votes_select_self_or_staff`(본인 행 OR staff/owner)와
+    `poll_eligible_voters_select_self_or_staff`는 **구조적으로 완전히 동일한** 축소 패턴이고,
+    `cast-vote.ts`의 트리거③(FR-043) 게이트는 **이 둘을 같은 호출에서 동시에** 쓴다:
+    ```ts
+    const [voters, votes] = await Promise.all([
+      listEligibleVotersWithCurrentStatus(input.pollId), // poll_eligible_voters, 축소됨
+      listVotes(input.pollId),                            // poll_votes, 축소됨
+    ]);
+    const votedProfileIds = new Set(votes.map((v) => v.voterId));
+    const remaining = countRemainingVoters(voters, votedProfileIds);
+    if (shouldAutoCloseByAllVoted(remaining)) {
+      await decideAndClosePoll(input.pollId, null);
+    }
+    ```
+    방금 투표한 사람이 staff/owner가 아니면 **두 조회가 함께 자기 1행으로 축소**된다 — `voters` =
+    [자기], `votedProfileIds` = {자기} → 유일한 후보(자기)는 이미 투표했으므로
+    **`remaining = 0`이 항상 성립** → `decideAndClosePoll`이 **매번** 호출된다(다른 사람의 투표
+    여부와 무관하게).
+  - **영향 범위(세 갈래로 좁혔다, `poll_vote_tally_for_decision`·`polls_guard_decision_integrity`·
+    `compute_poll_decision` 원문까지 `pg_get_functiondef`로 직접 읽고 추적)**:
+    - **투표자가 staff/owner** → 이 호출 경로 전체가 축소되지 않는다 — **영향 없음**(원래
+      의도대로 "진짜 전원 완료" 때만 닫힌다).
+    - **투표자가 제안자 본인(staff 아님) → 관측 가능한 회귀, 단 "값 위조"가 아니라 "시점" 문제다.**
+      `poll_vote_tally_for_decision`은 "제안자 본인"이면 무조건 판정 준비됨으로 본다(FR-043
+      AC3 조기 종료 권한을 위한 정상 설계). `closePoll`도 제안자를 허용하므로
+      (`polls_update_proposal_author_or_staff`) UPDATE가 **실제로 성공해 poll이 조기 종료된다.**
+      **저장되는 판정 값 자체는 위조되지 않는다** — `polls_guard_decision_integrity`(BEFORE
+      UPDATE 트리거)가 새 status가 `closed_*`면 클라이언트 값을 버리고
+      `compute_poll_decision`(SECURITY DEFINER)의 재계산 결과로 통째로 덮어쓰고, 이 함수는
+      `poll_eligible_voters`·`crew_memberships`를 RLS 축소 없이 직접 세어 정족수를 다시 계산해
+      미달이면 무조건 `closed_invalid`로 강제한다. **실제 결함은 아직 투표하지 않은 다른
+      크루원이 기회를 잃고, 그 결과 대개 정족수 미달로 `closed_invalid` 처리되는 조기 종료다**
+      (FR-041 투표 기회·D-022 미투표자 정의 실질 위반) — "정족수가 위조된 값으로 통과된다"는
+      최초 서술은 틀렸다(철회).
+    - **투표자가 제안자도 staff도 아닌 일반 크루원** → `v_decision_ready`의 "진짜 전원 완료"
+      조건만 남는데 이건 SECURITY DEFINER라 축소 없이 정확하다. 미완료면 `tally_hidden`을 통해
+      예외가 던져지고 바깥 `try/catch`가 조용히 흡수하거나, `closePoll`이 결국 RLS로 거부돼
+      `DataResult`의 `err("conflict", …)`를 반환한다 — **`cast-vote.ts`가 이 반환값을 검사하지
+      않아**(`await decideAndClosePoll(...)`만 하고 `.ok` 미확인) 결함 유무와 무관하게 완전히
+      조용한 무동작이다.
+  - **실측 여부**: 실 DB 픽스처로 재현하지 않았다 —
+    `crew_memberships_guard_self_insert_request`/`crew_memberships_guard_self_transition` 트리거가
+    self-service 경로 밖의 직접 INSERT/UPDATE로 "활성 일반 멤버"를 만드는 것을 막아, 예산 안에서
+    크루+게시판+투표+대상자 스냅샷 전체를 갖춘 픽스처를 완결하지 못했다. 대신 `pg_get_functiondef`로
+    `poll_vote_tally_for_decision`·`polls_guard_decision_integrity`·`compute_poll_decision`·
+    `computeQuorum`·`decidePollOutcome`·`closePoll`·`cast-vote.ts` 원문을 전부 직접 읽고, 팀장이
+    독립적으로 같은 원문들을 두 차례 대조해 방향·범위를 정정했다. **I-158 전례**(정적 대조만으로
+    "구조적으로 안전"이라 판단했다가 11일 뒤 뒤집힘)를 감안하면 이 결론은 "팀장 교차검증을 두
+    차례 거친 높은 확신의 코드 추적"이지 "실측 확정"은 아니다.
+  - **판정 기준(방법론 교훈, 두 차례 정정에서 남긴다)**: ① 같은 함수 안에서 축소되는 조회를 여러
+    개 합성해 쓸 때는 각 조회를 독립적으로 평가하지 말고 합성된 결과로 판정한다. ② **"클라이언트가
+    계산한 값이 그대로 저장된다"고 가정하지 않는다** — 이 프로젝트는 판정을 DB 트리거가 다시
+    계산해 덮어쓰는 구조(D-054·I-089 방어, `polls_guard_decision_integrity`가 그 예)를 쓴다.
+    클라이언트 계산이 틀렸음을 확인해도, 그 값이 재계산 트리거로 덮어써지지 않고 실제로 저장되는지
+    확인하기 전에는 "저장된 값이 틀렸다"로 넘어가면 안 된다.
+  - **처분**: BOARD가 `poll_eligible_voters` 수정(029B 2단 구조 — `private.*` SECURITY DEFINER +
+    `public.*` 얇은 INVOKER 래퍼)에 이 건도 함께 흡수한다 — `listVotes` 호출을 신규
+    `listVoterIds`(SECURITY DEFINER RPC 경유)로 교체. **CREW는 따로 착수하지 않는다.**
+  - **관련**: BOARD의 `poll_eligible_voters` 확정 결함(같은 회차), I-049(closePoll RLS 거부 처리
+    — DataResult 거부는 로그되지 않음), I-158(정적 대조만으로 안전 판정했다가 뒤집힌 전례),
+    `docs/design/rls-narrowed-read-audit-34/README.md`(전수조사 전문, §2가 정정 서술).
+
+  ---
+
+
+### I-166 · 두 익명·비식별 RPC를 같은 세션에서 위치(순번)로 zip하면 `profile_id ↔ has_voted`가 100% 복원된다 — 신원·투표여부 분리 설계가 곁채널로 무력화됨(34일차, BOARD)
+
+- **상태**: **해결됨(같은 회차, 34일차, BOARD)**.
+- **영역**: 투표 / D-003 개인 선택 비공개 / `private.poll_eligible_voters_with_status`·
+  `private.poll_eligible_voter_progress`
+- **제보**: CREW (34일차) — 3회 반복 재현. 팀장이 BOARD에 최종 블로커로 배정.
+- **내용**: 위 두 항목의 해소로 만든 `poll_eligible_voters_with_status(profile_id, status)`와
+  `poll_eligible_voter_progress(status, has_voted)`는 각자 신원과 투표 여부를 분리해
+  반환하도록 설계됐다(바로 위 "함께 해소" 절 · `docs/DECISIONS.draft.BOARD.md` 참고) — "두
+  RPC를 함께 호출해도 조합할 열쇠(공통 식별자)가 없다"는 것이 그 설계의 핵심 전제였다. 그런데
+  두 함수 모두 `poll_eligible_voters` × `crew_memberships`를 **동일한 조건으로 `ORDER BY`
+  없이 JOIN**했으므로, 같은 `poll_id`에 대한 두 호출이 동일한 쿼리 플랜·물리적 스캔 순서를
+  안정적으로 재현했다 — **행 순서 자체가 암묵적인 공통 식별자였다.** 같은 세션에서 두 RPC를
+  호출해 반환된 행을 순번으로 짝지으면(zip) `profile_id`(with_status)와 `has_voted`
+  (progress)가 재조립돼, "공통 식별자가 없다"던 설계 전제가 성립하지 않았다. D-003("개인
+  선택은 비공개, 집계만 공개") 위반 — 신원과 투표 여부를 명시적 컬럼으로 묶지 않아도 위치
+  상관만으로 같은 결과에 도달한다.
+- **이 계열 회귀로는 3회 연속이다**: 32일차 I-151, 33일차 155초 회귀에 이어, 34일차 안에서만
+  BOARD가 스스로 만들고 스스로 닫은 이 재식별 회귀까지 — **RLS/RPC를 촘촘하게 좁힐수록
+  "직접 노출은 막았지만 곁채널(위치·시간·상관)로 새는" 유형의 결함이 반복해서 나타난다.**
+  다음 사람이 신원-분리형 익명 RPC를 새로 설계할 때는 "같은 커넥션·세션에서 다른 익명 RPC와
+  조합해도 안전한가"를 설계 체크리스트에 넣을 것을 제안한다.
+- **재현(SQL, `set local role authenticated` + 실제 JWT claims, `begin`…`rollback`)**: 대상자
+  5명(status 전원 active, 투표 여부 혼재) poll `cfab3b3f-…`을 member(`fb70ff1c-…`)로 두 RPC를
+  같은 트랜잭션에서 순서대로 호출해 `row_number() over ()`로 순번을 매겨 위치로 join —
+  **수정 전(151125 배포본, ORDER BY 없음) 기준으로 CREW가 3회 반복 재현한 100% 복원**이
+  이 결함의 근거다. 수정 후 재현 결과는 아래 "해소" 절 참고.
+- **해소**: `private.poll_eligible_voter_progress`의 최종 `return query`에 `order by 1, 2`
+  (`current_membership_status, has_voted` — 반환하는 컬럼 전부)를 추가했다. **1차 논증
+  ("with_status와 정렬 기준이 달라서 안전")은 팀장 지적으로 기각** — "다르다"는 것만으로는
+  무상관을 보장하지 않고(두 기준이 부분적으로 상관되면 확률적 복원 여지가 남는다), 이는
+  이번 회차에 이미 한 번 틀렸던 "공통 컬럼이 없으니 결합 불가" 논증과 같은 종류의 약한
+  논증이다. **실제 근거는 정규형(canonical form) 논증**이다 — `order by 1, 2`가 반환 컬럼
+  전부를 전순 정렬하므로 출력이 `(status, has_voted)` 다중집합만으로 결정되고, 스캔
+  순서·물리적 배치·호출 이력이 출력 순서에 전혀 남지 않는다. 순서가 운반하는 정보량이
+  0이라 다른 결과와 어떻게 zip해도 복원할 것이 없다 — "정렬 기준이 달라서 안전"이 아니라
+  "순서 채널 자체가 제거돼서 안전"하다. `poll_eligible_voters_with_status` 쪽은 변경하지
+  않았다(정규형을 만들 필요가 있는 쪽은 순서가 곁채널이 되는 `progress` 하나뿐이다).
+  무작위화(`random()` 등)는 채택하지 않았다 — 반복 호출로 통계적 복원이 가능해지고
+  `STABLE` 표시와도 어긋난다. 다음 사람이 이 함수에 반환 컬럼을 추가하면 `order by`도 그
+  컬럼까지 확장해야 한다 — 하나라도 빠지면 그 컬럼에 대해 정규형이 깨져 순서 채널이
+  되살아난다. 마이그레이션:
+  `20260731010558_poll_eligible_voter_progress_order_by_anti_reidentification.sql`.
+  - **재식별 반증(수정 후, 같은 poll `cfab3b3f-…`, member `fb70ff1c-…`, 같은 절차)**: 위치
+    zip 결과 `[false, true, true, true, true]` vs 실제 진실값(서비스 롤로 확인)
+    `[true, true, true, true, false]`(순서는 `with_status` 반환 순 profile_id 기준) — **5행
+    중 2행이 불일치**(1번째·5번째 행), 더 이상 100% 복원이 아님을 실측으로 확인.
+  - **"3행은 일치했다"는 방어 실패가 아니다 — 해석을 명시한다.** 나머지 3행이 우연히 맞은
+    것은 서비스 롤로 진실값을 미리 알고 대조했기 때문에만 보이는 사후 정보다. 실제 공격자는
+    진실값을 모른다 — 정규형 논증대로 정렬 후 출력 순서의 정보량은 0이므로, 공격자에게는
+    "이 zip이 맞다"와 "저 zip이 맞다"를 구분할 근거가 전혀 없다. "5행 중 몇 행이 맞았는가"는
+    검증자만 관측 가능한 우연이지 공격자가 쓸 수 있는 신호가 아니다 — 옳은 질문은 "진실값을
+    모르는 공격자가 어느 zip이 맞는지 알아낼 방법이 있는가"이며 답은 없다(정보량 0). 그
+    다중집합 값 자체는 D-003이 이미 공개를 허용한 집계라 우연히 겹치는 것도 새 노출이
+    아니다. 수정 전 결함의 핵심은 "우연 일치 비율"이 아니라 **위치가 항상 100% 신뢰 가능한
+    조인 키였다는 것**이었고, 그 신뢰 가능성(정보량)이 이번 수정으로 정확히 0이 됐다.
+  - **회귀 없음**: 두 RPC 모두 role(member/staff/owner) 무관하게 반환 행 수가 그대로다 —
+    poll `e04551dc-…`(대상자 4)는 member(`914d5f56-…`)·owner(`cffdcdce-…`) 둘 다 4행,
+    poll `cfab3b3f-…`(대상자 5)는 member(`fb70ff1c-…`)·owner(`20a56163-…`) 둘 다 5행.
+  - **정의·권한 실측**: `pg_get_functiondef`로 배포 정의에 `order by 1, 2`가 실제로 포함됨을
+    확인, 로컬 마이그레이션 파일의 함수 본문(`$function$` ~ `$function$` 사이)과 배포 정의를
+    바이트 단위로 대조해 **1341바이트로 완전 일치**(헤더 줄만 Postgres의 표준 재직렬화 표기
+    차이 — `RETURNS TABLE(...)` 한 줄 표기, `STABLE SECURITY DEFINER` 병합, `SET search_path
+    TO ''` 표기 — 이고 본문은 100% 동일). `prosecdef`: `private.poll_eligible_voter_progress`
+    =true, `public.poll_eligible_voter_progress`=false(그대로, INVOKER 래퍼 무변경).
+    `search_path`: 양쪽 다 `search_path=""`(그대로). `has_function_privilege`: `anon`=false,
+    `authenticated`=true(양쪽 함수, 그대로 — D-077 관례 B, CREATE OR REPLACE로 시그니처
+    불변이라 기존 REVOKE/GRANT가 유지됨).
+  - `get_advisors(security)` 재확인 — 기존에 있던 `auth_leaked_password_protection`
+    (이 결함과 무관, Auth 설정) 외 신규 WARN 0건.
+  - **코드 변경 없음**: `countRemainingVoters`(`src/lib/rules/poll-eligibility.ts`)는 순서
+    무관하게 필터·개수만 세므로 규칙·타입·테스트·TS 코드는 한 줄도 바뀌지 않았다(`git status`로
+    확인).
+  - **정정(같은 회차 내)**: 위 실측 직후 이 마이그레이션(`20260731010558`)의 주석을 팀장
+    지적으로 두 차례 더 고쳤는데, **이미 원격에 적용된 파일을 로컬에서 사후 편집**하는
+    실수를 저질렀다 — `pg_get_functiondef`/카탈로그에는 주석이 저장되지 않아 함수 자체는
+    안전했지만, `supabase_migrations.schema_migrations.statements`는 주석을 포함한 SQL
+    원문 전체를 저장하므로 로컬 파일과 원격 기록이 조용히 갈라졌다(로컬 md5 ≠ 원격 md5,
+    팀장이 원격을 직접 읽어 발견). 아래 새 이슈 항목 참고. 처리: `20260731010558`은 적용
+    당시 원문(원격 `statements[1]`과 byte-for-byte 동일, md5 `2710dbfd41df8c9517b0decd
+    76650e9a` 양쪽 일치 확인)으로 되돌리고, 정정된 논증은 **새 마이그레이션**
+    `20260731013305_poll_eligible_voter_progress_order_by_comment_correction.sql`로
+    추가했다(함수 정의는 100% 동일한 `create or replace` 재실행 — 멱등, `order by 1, 2`
+    포함 배포 결과 무변경을 `pg_get_functiondef`로 재확인). 이 파일도 로컬↔원격
+    `statements[1]` md5가 `1639b43a2464ebf0602856fce7d4b419`로 양쪽 일치.
+- **CREW 독립 재검증(34일차, 팀장 지시)** — BOARD와 **다른 poll·다른 프로필**로 재현해 결과가 데이터셋에 우연히 의존한 것이 아님을 확인했다. LEFT JOIN 불변식 위반 예외는 **BOARD 실측에 없던 시나리오**(실제 `delete`로 재현)라 이 회차에 처음 실물로 확인됐다. CREW 원문을 아래에 그대로 보존한다.
+
+  **CREW 원문 — CREW 재검증 — BOARD의 재식별 반증 수정(`order by 1, 2`)·LEFT JOIN 예외·마이그레이션 MD5, 34일차 잔여 3건**
+
+  CREW가 지난 세션(34일차)에 실측으로 잡아낸 재식별 결함(두 RPC를 같은 세션에서 위치 zip하면
+  `profile_id ↔ has_voted` 100% 복원)을 BOARD가 `20260731010558_poll_eligible_voter_progress_
+  order_by_anti_reidentification.sql`로 고친 뒤, 팀장 지시로 CREW가 독립적으로 재검증했다.
+  **서비스롤 미사용** — 전부 `set local role authenticated` + `request.jwt.claims`로 실제 세션을
+  흉내냈고, 쓰기가 있는 항목은 `begin`…(명시적 `commit` 없이 세션 종료로 롤백, 롤백 후 개수
+  질의로 잔존 0건을 재확인)으로 처리했다. BOARD가 자기 검증에 쓴 poll·프로필과 **다른 poll**
+  (`2433fd02-…`, 대상자 5명 중 미투표 3·투표함 2)과 **다른 프로필**(member `c64e5973-…`, staff
+  `30f44dd9-…`)로 재현해 결과가 데이터셋에 우연히 의존한 것이 아님을 확인했다.
+
+  **1. 재식별 반증 재실측** — with_status·progress 두 RPC를 같은 트랜잭션에서 3회 반복 호출해
+  `row_number() over ()`로 위치 zip:
+
+  - `with_status` 반환 순서(고정, 3회 동일): `20a56163`(진실 false) → `30f44dd9`(true) →
+    `c64e5973`(false) → `f1692173`(false) → `fb70ff1c`(true)
+  - `progress` 반환 순서(고정, 3회 동일, `order by 1,2` 적용 후): `false, false, false, true, true`
+  - 위치로 zip한 추측 vs 실제 진실값: **5행 중 3행 일치(60%), 2행 불일치(40%)** — 2번째 행
+    (`30f44dd9`, 추측 false / 진실 true)과 4번째 행(`f1692173`, 추측 true / 진실 false)이
+    틀렸다. **3회 반복 모두 동일한 결과**(같은 2개 위치가 매번 틀림, 무작위 노이즈가 아니라
+    결정적 비상관임을 확인) — 수정 전 CREW 자신의 100% 복원과 대조하면 **더 이상 위치 zip이
+    신원을 안정적으로 복원하지 못함**을 수치로 확인했다. (BOARD의 자체 검증은 poll `cfab3b3f-…`
+    로 5행 중 2행 불일치, CREW는 poll `2433fd02-…`로 5행 중 2행 불일치 — 다른 poll·다른
+    프로필로도 같은 급의 붕괴가 재현됨.)
+
+  **2. LEFT JOIN 예외 발화 확인** — `begin`(commit 없이 세션 종료로 롤백) 안에서 poll
+  `2433fd02-…`의 스냅샷 대상자 중 1명(`f1692173-…`, 일반 member)의 `crew_memberships` 행을
+  직접 `delete`해 D-003 스냅샷 불변식을 인위적으로 깼다. 이 시나리오는 **BOARD의 기존 실측에
+  없던 것**이다 — BOARD의 `ISSUES.draft.BOARD.md` 항목은 "비크루원 게이트"(`not authorized to
+  view this poll`) 예외만 실측했고, "크루원이지만 스냅샷 대상자의 멤버십 행이 없는" LEFT JOIN
+  불변식 위반 예외는 코드 리뷰로만 확인돼 있었다.
+
+  - 삭제 전 대상 행 수: 1. 삭제 후: 0.
+  - 일반 크루원 관점(member `c64e5973-…`, 삭제된 사람과 다른 사람)으로 두 RPC 호출 → **둘 다
+    즉시 `raise exception`으로 멈춤**, 메시지: `crew f202047b-2478-43bd-a30c-60f082ccba8e 의
+    멤버십(f1692173-8785-4555-b17e-3050b8167b81)을 찾을 수 없다 — poll
+    2433fd02-6864-4167-b52f-5d70bb66cb98 스냅샷과 불일치.` — **crew_id·profile_id·poll_id
+    셋 다 메시지에 포함됨을 확인.**
+  - 임원 관점(staff `30f44dd9-…`)으로 같은 두 RPC 호출 → **동일한 메시지로 동일하게 멈춤**(게이트가
+    `is_active_crew_member`뿐이라 role과 무관하게 막히는 것을 확인 — 설계대로).
+  - 롤백 후(별도 질의, 명시적 `commit` 없이 세션 종료) 잔존 확인: 대상 행 수 **정확히 1**(0도
+    2도 아님 — 삭제가 되돌아왔고 중복 행도 안 생겼다).
+  - 회귀 없음 재확인: 롤백 후 새 세션에서 같은 poll을 **member**(`c64e5973-…`)로 두 RPC 호출 →
+    `with_status` 5행·`progress` 5행 정상 반환(예외 없음, 값도 삭제 전과 동일). **staff**
+    (`30f44dd9-…`)로도 동일하게 `with_status` 5행·`progress` 5행, 예외 없음 — 두 관점 모두
+    회귀 없음을 확인했다.
+
+  **3. 마이그레이션 개수·MD5 재확인** — 이번 회차 표준 방식(`version`만 쉼표로 이어붙여 MD5,
+  파일명 전체 아님)으로 재계산:
+
+  - 로컬 `ls supabase/migrations/*.sql | wc -l` = **132**, 원격
+    `select count(*) from supabase_migrations.schema_migrations` = **132** — 개수 일치.
+  - 로컬: 파일명에서 앞 14자리 버전만 추출·정렬 후 콤마로 결합, `md5sum` = 원격: `select
+    md5(string_agg(version, ',' order by version)) from supabase_migrations.schema_migrations`
+    — **양쪽 다 `5b66aa59935a2825a18da0cf399962c2`로 일치**. (참고: `echo`로 개행이 섞인 채
+    `md5sum`에 넘기면 다른 해시가 나온다 — `printf '%s'`로 개행 없이 넘겨야 정확히 일치한다,
+    실제로 처음 시도에서 이 함정에 걸려 재계산했다.) 팀장 지적대로 BOARD가 지난 세션에 계산한
+    `e802d326…`은 **파일명 전체 방식 + 당시 131개** 기준이라 이번 회차 표준(version만·132개)과
+    다르다 — 서로 다른 계산이 다른 값을 낸 것이지 불일치가 아니다.
+
+  **결론**: 세 항목 모두 BOARD의 수정이 의도대로 동작함을 독립 재현으로 확인했다. 새로 발견한
+  결함은 없다. LEFT JOIN 예외 발화는 BOARD의 기존 문서에 없던 시나리오(실제 삭제로 트리거)라
+  `docs/ISSUES.draft.BOARD.md`의 해당 항목에 "CREW가 실제 삭제로 재현 완료"를 보탤 가치가
+  있다고 판단하나, 그 파일은 BOARD 소유라 직접 고치지 않고 여기 남긴다.
+
+
+### I-167 · 적용된 마이그레이션 파일의 사후 편집을 현재 무결성 검증(개수 대조 + version만 이어붙인 MD5)이 구조적으로 탐지하지 못한다(34일차, 팀장 실측)
+
+- **상태**: **열림** — 이번 개별 사례는 해소했으나(되돌림 + 정정 마이그레이션 추가), **탐지
+  체계 자체의 구조적 결함은 미해결**이다. 후속 제안만 남긴다. (상태 표기 규칙: 이 파일의
+  열림 이슈 전수 추출은 `- **상태**:` 뒤가 `열림`으로 시작하는지로 판정한다 — 개별 사례가
+  닫혔어도 이슈 자체가 열려 있으면 `열림`으로 시작해야 집계에 잡힌다.)
+- **영역**: 마이그레이션 무결성 검증 절차 / `supabase/migrations/*.sql` ↔
+  `supabase_migrations.schema_migrations`
+- **제보**: 팀장 (34일차) — 바로 위 재식별 이슈 해소 직후, BOARD가 이미 원격에 적용된
+  `20260731010558_...sql`의 로컬 파일을 주석만(팀장의 논증 교체 지시에 따라) 두 차례
+  사후 편집했다.
+- **내용**: `poll_eligible_voter_progress`의 함수 로직은 `pg_proc`/`pg_get_functiondef`
+  기준으로는 안전했다 — SQL 주석은 카탈로그에 저장되지 않으므로 배포된 함수 정의·권한에는
+  아무 영향이 없었다. 하지만 **마이그레이션 기록은 다르다**: `supabase_migrations.
+  schema_migrations.statements`는 **주석을 포함한 SQL 원문 전체**를 저장한다. BOARD가
+  로컬 파일의 주석을 원격 적용 이후에 고치면서 로컬 파일과 이 기록이 조용히 갈라졌다 —
+  로컬에는 정정된 정규형 논증이, 원격 `statements[1]`에는 이미 기각된 옛 논증("다른
+  정렬 기준을 강제한다…")이 그대로 남는 상태가 됐다. 이번 회차가 다뤄 온 결함 계열과
+  정확히 같은 형태다: **RLS의 조용한 행 축소 → INNER JOIN의 조용한 탈락 → 위치 곁채널
+  재식별 → 이번엔 마이그레이션 기록 자체의 조용한 어긋남.** "촘촘하게 관리한다고 믿는
+  경계가 실제로는 조용히 새고 있었다"는 같은 교훈이 네 번째로 반복됐다.
+- **왜 이번 회차 검증이 이걸 못 잡는가**: BOARD가 이 마이그레이션 3건을 적용할 때 반복해서
+  쓴 무결성 확인은 (1) 로컬 파일 개수 = 원격 `schema_migrations` 행 개수 대조, (2)
+  `version_name.sql` 형식으로 정렬해 이어붙인 문자열의 MD5 대조였다(151125 마이그레이션
+  적용 시 최초로 확립, 이번 34일차에도 그대로 재사용). **둘 다 파일명·버전만 보고 파일
+  "내용"은 보지 않는다** — 그래서 이미 적용된 파일의 본문(주석이든 SQL이든)을 나중에
+  아무렇게나 고쳐도 개수·MD5 둘 다 계속 일치한다. 이번 사례가 걸린 유일한 경로는 팀장이
+  특정 파일의 원격 `statements`를 **직접 SELECT로 읽어 로컬과 대조**한 것뿐이었다 — 절차화된
+  검증이 아니라 우연한 수동 확인이었다.
+- **재현(이번 사례 자체가 재현 근거)**: `20260731010558`의 원격 `statements[1]` md5
+  `2710dbfd41df8c9517b0decd76650e9a` vs 그 시점 로컬 파일 md5(정정된 논증이 반영된 상태) —
+  불일치. 로컬 파일을 원격 원문으로 되돌린 뒤 재대조하면 `2710dbfd...`로 일치(위 항목
+  "정정" 절 참고). **개수 대조·`version`만 이어붙인 MD5 양쪽 다 이 사이 어느 시점에도
+  변화가 없었다** — 즉 이 갈라짐이 존재하는 동안에도 기존 검증 절차는 "이상 없음"을
+  보고했을 것이다.
+- **후속 제안**: 로컬 `supabase/migrations/*.sql` 파일 내용을 `schema_migrations.
+  statements`와 **직접 대조**하는 단계를 검증 절차에 추가한다.
+  - **다만 단순 whole-file MD5 대조로는 안 된다 — 이것도 실측으로 확인했다.** 한 번도
+    사후 편집된 적 없는 `20260724104430_revoke_public_from_cron_tables.sql`을 대조 대상으로
+    골라 원격 `statements[1]`과 비교했더니, 로컬 파일 전체 MD5(`cc633a9f6a50ca8ad2a36
+    dec95934db9`)와 원격 `statements[1]` MD5(`c74e5e7d25ae08371881f0dcedeb846b`)가
+    **다르다.** 문자 단위로 대조해보면 로컬 파일에는 주석 문단 사이에 빈 `--` 구분줄이
+    있는데 원격 `statements`에는 그 줄이 없다(줄바꿈/문단 구분이 저장 과정에서 정규화된
+    것으로 보인다) — **파일을 전혀 건드리지 않았는데도 whole-file MD5는 어긋난다.** 즉
+    "MD5가 다르면 사후 편집"이라고 단순화하면 이런 무변경 파일들이 전부 오탐으로
+    잡힌다. **문장(statement) 단위로 정규화(주석 포맷·줄바꿈 차이를 흡수)한 뒤 대조하는
+    절차가 필요하다** — 예를 들어 각 파일을 `psql`의 문장 분리 규칙으로 파싱해
+    `schema_migrations.statements`의 각 원소와 1:1 비교하거나, 최소한 SQL 실행문
+    본문(주석 제외)만 추출해 대조하는 방식이 필요하다. 이 정규화 규칙 설계는 이번 회차
+    범위 밖이다.
+  - **전수 감사는 이번 회차에 하지 않았다 — 미착수로 남긴다.** 이번 회차 종료 시점 기준
+    로컬 마이그레이션 133건(원격 `schema_migrations` 133행과 개수 일치, 실측 확인) 전부를
+    원격 `statements`와 대조해 다른 조용한 어긋남이 있는지 확인하는 작업은 이번 회차 범위를
+    넘는다. 다음 사람이 위 정규화 절차를 설계한 뒤 전수 대조를 실행하는 것을 제안한다.
+- **재발 방지(이번 사례에 한해 즉시 적용)**: 앞으로 이미 적용된 마이그레이션 파일은
+  **로컬에서도 사후 편집하지 않는다** — 주석 정정이 필요해도 새 마이그레이션을 추가한다
+  (이 원칙은 원래 `20260730151125`가 "원격 기록 버전은 되돌리지 않는다"로 이미 세워
+  뒀던 것인데, 이번에 "주석만이니 괜찮다"는 예외를 스스로 만들어 어겼다 — 예외를
+  두지 않는다).

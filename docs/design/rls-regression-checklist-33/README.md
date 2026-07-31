@@ -8,6 +8,18 @@ officer 분기를 `pg_trigger_depth() > 1`로 건너뛰기 때문). 팀장 결�
 
 이 문서의 각 SQL은 Supabase MCP `execute_sql`(또는 동등한 `psql`)로 그대로 실행 가능하다.
 
+**방법론 — 역할을 두 번 이상 전환하는 스크립트를 쓸 때(34일차, DESIGN, §6 작성 중 실제로
+걸렸던 함정)**: `reset role`은 세션 역할만 원복하고 **`request.jwt.claims`는 그대로 남는다** —
+둘은 별개 GUC다. 한 트랜잭션 안에서 페르소나 A → B로 갈아탄 뒤 "시스템 컨텍스트"(role 원복
+상태)로 되돌아가 검증용 정리 UPDATE를 하면, `auth.uid()`가 여전히 마지막으로 설정한 A(또는 B)의
+claims를 읽어 RLS·트리거가 **그 사람 것처럼** 판정한다 — 가짜 예외나 가짜 통과가 둘 다 나올 수
+있다. **역할을 되돌릴 때마다 `set local role`을 `reset`하는 것과 별개로
+`set local request.jwt.claims = '';`를 명시적으로 실행한다.** 32일차 교훈 2(서비스롤 금지)·
+3(가짜 양성 방지)과 같은 층위의 규칙이다 — **이번 회차(34일차)에 RLS 실측이 다섯 차례 이상
+있었고, 한 트랜잭션 안에서 페르소나를 갈아탄 스크립트는 전부 이 함정에 걸렸을 수 있으므로
+재점검 대상이다**(팀장 지시로 CREW가 자기 스크립트를 재점검 중). 실제로 이 문제가 §6 초안
+작성 중 발생한 사례는 아래 §6 "행동 검증" 절에 원인·재현과 함께 남아 있다.
+
 ---
 
 ## 1. 정책 조회 — `is_crew_active`가 USING·WITH CHECK 양쪽에 살아있는가
@@ -160,6 +172,187 @@ $function$
 없음)으로 **다른 방어 성격**을 가진다 — 세 경로 모두 "코드를 읽어서" 판단한 게 아니라 각 트리거의
 `pg_get_functiondef` 본문을 직접 대조하고, join_requests 건은 실제 `begin`…`rollback` 재현까지
 거쳤다.
+
+---
+
+## 6. `invitations` 트리거 단일 방어 — accepted는 막고 declined는 통과시키는가 (34일차, CREW 추가)
+
+I-159(33일차, CORE 발견 — §5 표 #2가 다룬 그 건)는 `invitations_update_invitee_or_staff` RLS에
+`private.is_crew_active`가 없어 archived 크루 초대 수락 차단이
+`invitations_guard_response_transition` 트리거 단일 지점에만 의존한다고 지적했다. 34일차에
+이 트리거를 RLS로 이중화하는 안(나이브·좁은 대안 둘 다)을 실측했고, 팀장이 **둘 다 기각**했다
+— 이득(트리거 회귀 방어)이 BEFORE UPDATE 트리거가 WITH CHECK보다 먼저 실행되는 구조상 RLS로는
+관측조차 안 되고, 나이브 안은 "거절은 archived에서도 허용" 규칙을 실제로 깨뜨렸다(좁은 대안도
+`invitations_status_check`의 `expired` 값을 못 커버하는 구멍이 있었다). 상세 근거는
+`docs/DECISIONS.draft.CREW.md`(병합 전) · `docs/ISSUES.md` I-159(해결됨) 참고.
+
+**결론**: DDL 이중화 대신 이 트리거 자체를 회귀 감지 대상에 넣는다 — 트리거가 조용히 무력화되면
+(재작성으로 조건이 빠지면) 이 체크리스트가 잡아야 한다.
+
+```sql
+select pg_get_functiondef('public.invitations_guard_response_transition'::regproc);
+```
+
+**기대 출력** (34일차 DESIGN 재확인 시점):
+
+```sql
+CREATE OR REPLACE FUNCTION public.invitations_guard_response_transition()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if pg_trigger_depth() > 1 or auth.uid() is null then
+    -- 신뢰된 중첩 호출(향후 시스템 경로) 또는 service_role 컨텍스트 — self-service 제한
+    -- 대상이 아니다(reports_guard_self_update_reason_only와 같은 컨벤션).
+    return new;
+  end if;
+
+  if new.crew_id is distinct from old.crew_id
+     or new.invitee_id is distinct from old.invitee_id
+     or new.inviter_id is distinct from old.inviter_id
+     or new.expires_at is distinct from old.expires_at
+     or new.created_at is distinct from old.created_at then
+    raise exception 'invitations: this update may only change status (FR-021)';
+  end if;
+
+  if new.status is distinct from old.status then
+    if old.status <> 'pending' then
+      raise exception 'invitations: only a pending invitation may be responded to (FR-021)';
+    end if;
+    if new.status not in ('accepted', 'declined') then
+      raise exception 'invitations: a pending invitation may only become accepted or declined (FR-021)';
+    end if;
+    if auth.uid() is distinct from old.invitee_id then
+      raise exception 'invitations: only the invitee may respond to this invitation (FR-021, 행위자 = 초대받은 회원)';
+    end if;
+    if old.expires_at <= now() then
+      raise exception 'invitations: this invitation has expired and can no longer be responded to (FR-021 E1)';
+    end if;
+    -- 31일차(CREW, archived 크루 쓰기 표면 감사 후속) — 수락(accepted)만 막는다. 거절
+    -- (declined)은 archived 크루에서도 허용한다(자기 정리, 무해).
+    if new.status = 'accepted' and not private.is_crew_active(new.crew_id) then
+      raise exception 'invitations: cannot accept an invitation to an archived crew (FR-013)';
+    end if;
+  end if;
+
+  return new;
+end;
+$function$
+```
+
+**판정 기준**: 본문에 `new.status = 'accepted' and not private.is_crew_active(new.crew_id)`
+(또는 동등한 조건)가 없으면 archived 크루 초대 수락 차단이 사라진 것 — **즉시 회귀**다. 덧붙여
+**`new.status not in ('accepted', 'declined')` 조건이 사라지면 `expired` 등 다른 상태로의
+전이가 가능해진다는 뜻**이다 — 이 조건도 함께 지켜봐야 한다(아래 "34일차 DESIGN 갱신" 참고).
+
+행동 검증 — **실행 가능한 스크립트로 교체**(34일차 DESIGN, §2와 같은 방식으로 브랜드뉴 스크래치
+크루 + invitee 신원 사용). **역할 전환마다 `request.jwt.claims`를 명시적으로 비우는 것이
+핵심이다** — `reset role`은 세션 역할만 되돌리고 이전 JWT claims는 그대로 남아, 그 다음
+"시스템 컨텍스트" UPDATE(아래 5번)에서도 트리거가 이전 호출자의 `auth.uid()`를 계속 읽어
+`old.status <> 'pending'` 오탐 예외를 낼 수 있다(34일차 DESIGN이 이 스크립트를 처음 작성할 때
+실제로 이 함정에 걸렸다가 원인을 찾아 고쳤다 — 아래에 그대로 남긴다):
+
+```sql
+begin;
+
+-- 1) 스크래치 크루(active) 생성
+insert into public.crews (id, name, description, category, visibility, color_key, owner_id, status)
+values ('33333333-3333-3333-3333-333333333333', 'I-159 트리거 검증', '', 'etc', 'public', 2,
+        '30f44dd9-1c0b-4b7f-a195-5a674c0d5d5a', 'active');
+
+-- 2) invitee에게 pending 초대 발급(크루가 아직 active이므로 정상 삽입)
+insert into public.invitations (id, crew_id, invitee_id, inviter_id, status, expires_at)
+values ('44444444-4444-4444-4444-444444444444', '33333333-3333-3333-3333-333333333333',
+        'fb70ff1c-3736-44ee-a4a3-96993a3c62ed', '30f44dd9-1c0b-4b7f-a195-5a674c0d5d5a',
+        'pending', now() + interval '1 day');
+
+-- 3) 오너 세션으로 크루를 archived로 전환
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"30f44dd9-1c0b-4b7f-a195-5a674c0d5d5a","role":"authenticated"}';
+update public.crews set status = 'archived' where id = '33333333-3333-3333-3333-333333333333';
+reset role;
+set local request.jwt.claims = '';  -- 함정 회피: 다음 블록이 이전 claims를 물려받지 않게 한다
+
+create temporary table i159chk_log(seq serial, step text, detail jsonb);
+
+-- 4) ① invitee가 declined로 UPDATE 시도 — 성공해야 정상(거절은 archived에서도 허용)
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"fb70ff1c-3736-44ee-a4a3-96993a3c62ed","role":"authenticated"}';
+update public.invitations set status='declined' where id='44444444-4444-4444-4444-444444444444';
+reset role;
+set local request.jwt.claims = '';
+
+insert into i159chk_log(step, detail) select 'decline_on_archived', jsonb_build_object(
+  'status', (select status from public.invitations where id='44444444-4444-4444-4444-444444444444'));
+
+-- 5) ①을 되돌리고(pending으로 — 시스템 컨텍스트, auth.uid() null이라 트리거가 스킵한다),
+--    ② invitee가 accepted로 UPDATE 시도 → 트리거가 예외를 던져야 정상
+update public.invitations set status='pending' where id='44444444-4444-4444-4444-444444444444';
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"fb70ff1c-3736-44ee-a4a3-96993a3c62ed","role":"authenticated"}';
+do $$
+begin
+  update public.invitations set status='accepted' where id='44444444-4444-4444-4444-444444444444';
+  perform set_config('app.i159chk_accept', jsonb_build_object('outcome','unexpected_success')::text, true);
+exception when others then
+  perform set_config('app.i159chk_accept', jsonb_build_object('sqlstate', sqlstate, 'message', sqlerrm)::text, true);
+end $$;
+reset role;
+set local request.jwt.claims = '';
+
+insert into i159chk_log(step, detail) select 'accept_on_archived', (current_setting('app.i159chk_accept'))::jsonb ||
+  jsonb_build_object('status_after', (select status from public.invitations where id='44444444-4444-4444-4444-444444444444'));
+
+select * from i159chk_log order by seq;
+
+rollback;
+```
+
+**기대 출력(34일차 DESIGN 실측 그대로)**:
+
+```json
+[
+  {"seq": 1, "step": "decline_on_archived", "detail": {"status": "declined"}},
+  {"seq": 2, "step": "accept_on_archived", "detail": {
+    "sqlstate": "P0001",
+    "message": "invitations: cannot accept an invitation to an archived crew (FR-013)",
+    "status_after": "pending"
+  }}
+]
+```
+
+`rollback` 이후 재확인: `select count(*) from public.crews where id='33333333-3333-3333-3333-333333333333'`
+= `0`, `select count(*) from public.invitations where id='44444444-4444-4444-4444-444444444444'` = `0`
+— 스크래치 흔적 0건.
+
+**34일차 CREW 실측 결과(기준선, 원문 보존)**: ①은 성공(`status` → `declined`), 트리거 본문은
+위 조건을 그대로 갖고 있음을 `pg_get_functiondef`로 확인(전문·픽스처는
+`docs/design/invitation-defense-symmetry-34/README.md` STEP A 참고). ~~②(수락이 실제로
+예외를 던지는 것)는 이 34일차 실측에서 직접 재현하지는 않았다 — 31일차 마이그레이션 원문과
+트리거 정의가 일치함을 정적 대조로 확인한 것에 그친다.~~ **34일차 DESIGN 교차검증이 위 스크립트로
+동적 재현해 이 한계를 해소했다** — `P0001`, `"invitations: cannot accept an invitation to an
+archived crew (FR-013)"`가 실제로 발생함을 확인(위 "기대 출력" 참고). 취소선 문장은 지우지
+않고 이력으로 남긴다.
+
+**34일차 DESIGN 갱신 — 왜 이 §6이 "MINOR가 아니었는가"**: 팀장이 I-159의 RLS 이중화 기각
+근거로 정확히 이 §6("이득은 회귀 감지로 막는다")을 들었다 — 그런데 교차검증 시점에 이 절의
+"행동 검증" 블록이 주석뿐인 빈 `begin...rollback`이라 **기각한 방어의 대체물이 실행되지
+않는 상태**였다. 위 스크립트로 그 공백을 채웠다 — 이제 이 절이 실제로 "다음 사람이 복붙해서
+돌리면 회귀를 잡는" 체크리스트 항목의 형태를 갖췄다.
+
+**부수 발견(34일차 DESIGN, I-159 결정문에도 반영 필요) — `expired` 구멍은 이미 트리거로도
+막혀 있다**: I-159 처분에서 팀장이 좁은 대안(`OR status = 'declined'`)도 `expired` 값을 못
+커버해 기각한 근거로 들었는데, 위 함수 본문의 `if new.status not in ('accepted', 'declined')
+then raise exception`이 **애초에 이 트리거 자체가 `expired`로의 전이를 막고 있다는 뜻**이다.
+즉 지금 이 구멍이 무해한 이유는 D-073("만료는 조회 필터링, 상태 전이 아님") 하나가 아니라
+**이 트리거의 상태 화이트리스트까지 이중**이다 — RLS 이중화가 없어도 방어가 이미 둘이라는
+뜻이라, 팀장의 기각 판정을 더 강하게 만드는 사실이다(`docs/design/crew-crosscheck-34/README.md`
+"② `expired` 구멍" 절에 이 발견의 실측 근거가 있다 — 트리거를 `alter table ... disable
+trigger`로 실제로 꺼서 WITH CHECK만 남긴 뒤 `status='expired'` UPDATE를 시도해 `42501`을
+직접 확보했다).
 
 ---
 

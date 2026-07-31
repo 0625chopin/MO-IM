@@ -69,6 +69,23 @@ export interface SnapshotVoterStatus {
 }
 
 /**
+ * 대상자 1인의 "현재 멤버십 상태 × 투표 여부"를 신원 없이 담은 익명 다중집합 원소
+ * (34일차, I-089 후속).
+ *
+ * 종료 트리거③(D-022 "미투표자 0명")의 입력이다. `SnapshotVoterStatus`와 다른 점은
+ * `profileId`가 없다는 것 하나뿐이다 — `poll_votes`(개인 선택, D-003)를 조인해서만 만들 수
+ * 있는 값이라 신원과 함께 반환하면 `poll_vote_tally`(찬반기권 집계, 이미 크루원 전체 공개)와
+ * 결합해 소규모 poll(D-031이 5명 미만 특례를 따로 둘 만큼 흔한 사용 경로)에서 상대의 선택이
+ * 역산되는 재식별 벡터가 생긴다(팀장 지적, 경위는 `docs/DECISIONS.draft.BOARD.md`) — 그래서
+ * 데이터 레이어(`poll_eligible_voter_progress` RPC)가 신원을 아예 떼고 이 값만 만든다.
+ * `countRemainingVoters`(`lib/rules/poll-eligibility.ts`)만 소비한다.
+ */
+export interface EligibleVoterProgress {
+  currentMembershipStatus: CrewMembershipStatus;
+  hasVoted: boolean;
+}
+
+/**
  * 정족수 판정 입력. D-032 — required = ceil(eligibleVoterCount / 3), floor 아님.
  * eligibleVoterCount·votedCount는 호출부가 D-022("스냅샷 ∩ 현재 투표 가능자")로
  * 이미 걸러서 넣는다 — 이 타입 자체는 그 필터링을 강제하지 않는다.
