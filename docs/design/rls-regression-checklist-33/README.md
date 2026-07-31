@@ -356,6 +356,187 @@ trigger`로 실제로 꺼서 WITH CHECK만 남긴 뒤 `status='expired'` UPDATE�
 
 ---
 
+## 7. `crews` 트리거 단일 방어 — archived 크루는 어떤 UPDATE도 무조건 막는가 (35일차, CREW 추가)
+
+I-066 잔여 범위(`crews_update_staff_or_owner` RLS의 archived defense-in-depth 미확인,
+§5 표 #3이 nested-우회 각도에서 이미 "갭 없음"으로 부분 확인해 둔 것)를 35일차에 I-159와 같은
+방법으로 마저 닫았다. **초판 결론("이중화 불필요, DDL 0건")은 같은 회차 안에서 BOARD 교차검증
++ 팀장 반론으로 정정됐다 — 아래 "35일차 재검토" 절 참고, 처분은 그쪽이 최신이다.** 상세
+근거·전수 대조: `docs/design/crews-archived-defense-35/README.md` §4.
+
+**결론**: 이 트리거가 조용히 무력화되면(재작성으로 `if old.status = 'archived' then raise
+exception` 조건이 빠지면) 이 체크리스트가 잡아야 한다.
+
+```sql
+select pg_get_functiondef('public.crews_guard_archived_immutable'::regproc);
+```
+
+**기대 출력** (35일차 실측 시점, 20일차 원 마이그레이션과 바이트 단위 일치):
+
+```sql
+CREATE OR REPLACE FUNCTION public.crews_guard_archived_immutable()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+begin
+  if old.status = 'archived' then
+    raise exception 'archived crews cannot be modified (FR-013, I-066)';
+  end if;
+  return new;
+end;
+$function$
+```
+
+**판정 기준**: 본문에 `if old.status = 'archived' then raise exception`(또는 동등한 조건)이
+없으면 archived 크루의 UPDATE 차단이 사라진 것 — **즉시 회귀**다. 이 함수는 `pg_trigger_depth()`
+조건이 없어야 정상이다 — 만약 향후 편집에서 `if pg_trigger_depth() > 1 then return new; end if;`
+류의 스킵 분기가 새로 생기면, 그 자체가 이 트리거를 invitations/join_requests 계열과 같은
+"nested 우회 가능" 상태로 낮추는 것이므로 **그 변경 자체가 회귀**다(추가하지 말아야 한다는
+뜻이지, 이 체크리스트가 그런 변경을 자동으로 막아주지는 않는다 — 사람이 diff를 읽어야 한다).
+
+행동 검증 — 실행 가능한 스크립트(35일차 CREW, §2·§6과 같은 방식 — 브랜드뉴 스크래치 크루 +
+오너 신원 사용, 트리거를 트랜잭션 안에서만 `disable`/`enable`해 "RLS 혼자였다면 통과했다"는
+것까지 값 변화로 확정):
+
+```sql
+begin;
+create temporary table crews35chk_log (seq serial, step text, detail jsonb);
+grant insert, select on crews35chk_log to authenticated;
+grant usage, select on crews35chk_log_seq_seq to authenticated;
+
+insert into public.crews (id, name, description, category, visibility, color_key, owner_id, status)
+values ('11111111-2222-3333-4444-555555555501', 'CREW-35 실측 크루', '', '취미', 'private', 5,
+        'fb70ff1c-3736-44ee-a4a3-96993a3c62ed', 'active');
+
+select set_config('request.jwt.claims', json_build_object('sub','fb70ff1c-3736-44ee-a4a3-96993a3c62ed','role','authenticated')::text, true);
+set local role authenticated;
+update public.crews set status='archived' where id='11111111-2222-3333-4444-555555555501';
+
+-- 트리거 켜진 채로 오너가 archived 크루를 편집 시도 — 차단되어야 정상
+do $$
+begin
+  update public.crews set color_key = 9 where id='11111111-2222-3333-4444-555555555501';
+  insert into crews35chk_log(step, detail) select 'trigger_on', jsonb_build_object('outcome','unexpectedly_succeeded');
+exception when others then
+  insert into crews35chk_log(step, detail) select 'trigger_on', jsonb_build_object('outcome','blocked','sqlstate', sqlstate, 'message', sqlerrm);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+alter table public.crews disable trigger trg_crews_guard_archived_immutable;
+
+select set_config('request.jwt.claims', json_build_object('sub','fb70ff1c-3736-44ee-a4a3-96993a3c62ed','role','authenticated')::text, true);
+set local role authenticated;
+do $$
+begin
+  update public.crews set color_key = 9 where id='11111111-2222-3333-4444-555555555501';
+  insert into crews35chk_log(step, detail) select 'trigger_off_rls_only', jsonb_build_object('outcome','succeeded');
+exception when others then
+  insert into crews35chk_log(step, detail) select 'trigger_off_rls_only', jsonb_build_object('outcome','blocked','sqlstate', sqlstate, 'message', sqlerrm);
+end $$;
+
+reset role;
+select set_config('request.jwt.claims', '', true);
+alter table public.crews enable trigger trg_crews_guard_archived_immutable;
+
+select * from crews35chk_log order by seq;
+rollback;
+```
+
+**기대 출력(35일차 CREW 실측 그대로)**:
+
+```json
+[
+  {"seq": 1, "step": "trigger_on", "detail": {
+    "outcome": "blocked", "sqlstate": "P0001",
+    "message": "archived crews cannot be modified (FR-013, I-066)"
+  }},
+  {"seq": 2, "step": "trigger_off_rls_only", "detail": {"outcome": "succeeded"}}
+]
+```
+
+`trigger_off_rls_only`가 `"succeeded"`가 아니라 `"blocked"`로 바뀐다면, 그 사이 누군가
+`crews_update_staff_or_owner`에 archived 조건을 실제로 추가한 것이다(반대 방향 회귀 감지 —
+"이중화가 조용히 생겼다"도 이 스크립트가 잡는다). `rollback` 이후 재확인:
+`select count(*) from public.crews where id='11111111-2222-3333-4444-555555555501'` = `0`,
+`select tgenabled from pg_trigger where tgname='trg_crews_guard_archived_immutable'` = `'O'`
+(정상 활성 상태로 복귀) — 스크래치 흔적 0건.
+
+**35일차 재검토(같은 회차, BOARD 교차검증 fail → 팀장 반론 → CREW 재실측) — 위 결론 정정**:
+BOARD가 "이중화해도 이득을 관측할 방법이 없다"는 문장이 문자 그대로는 거짓이라고 지적했다 —
+트리거가 실제로 drop/disable되는 회귀 시나리오에서는 RLS가 남아 발화·관측된다는 것이다. 팀장이
+"USING은 스캔 단계에서 BEFORE UPDATE 트리거보다 먼저 걸리므로, 나이브 이중화(USING까지 포함)는
+archived UPDATE를 RLS 단계에서 조용한 0행으로 만들어 트리거 자체가 발동하지 않게 된다 — 그러면
+지금의 명시적 `P0001`이 사라지고 앱 계층은 `err("not_found")`로 오판한다(I-159 STEP B와 같은
+클래스의 비용)"는 논거를 실측하라고 지시했다. **실측 결과 팀장 논거가 맞았다** — 나이브 전면
+이중화(USING+WITH CHECK 양쪽)는 실제로 조용한 0행을 만들었다(rows_affected=0, 예외 없음).
+
+**그런데 WITH CHECK 전용 좁은 이중화로 다시 실측하면 결과가 달라진다**: `USING`은 원본 그대로
+두고 `WITH CHECK`에만 `private.is_crew_active(id)`를 추가하면, ① 트리거가 살아있는 오늘은
+`USING`이 행을 걸러내지 않으므로 트리거가 여전히 먼저 발동해 `P0001`이 그대로 나온다(비용 0,
+대조군과 완전히 동일) ② 트리거를 회귀 시뮬레이션으로 끈 상태에서는 `WITH CHECK`이 즉시
+`42501`(`"new row violates row-level security policy"`)로 받쳐 쓰기를 막는다(조용한 0행도
+조용한 성공도 아닌, 명시적 예외) ③ 활성 크루 편집은 정상적으로 성공한다(회귀 없음). 즉
+**"이득을 관측할 방법이 없다"는 나이브 이중화에 대해서는 틀렸고, WITH CHECK 전용 이중화에
+대해서는 애초에 다른 질문이 된다**(비용 0 + 이득은 회귀 시점에 즉시·자동으로 관측 가능,
+사람이 이 체크리스트를 수동으로 돌릴 때까지 기다릴 필요가 없다). 전문·SQL 원문:
+`docs/design/crews-archived-defense-35/README.md` §4. **35일차 최종 갱신 — 적용 완료.**
+BOARD 독립 교차검증(4/4 pass) → `audit_compare.py`(134/134, 신규 불일치 0건) → 적용 후 회귀
+3종(archived 편집 `P0001` 유지·활성 크루 정상·`updateCrewInfo` `forbidden` 유지) 전부 통과해
+팀장이 조건부 승인한 대로 마이그레이션 `20260731025523_crews_update_staff_or_owner_archived_
+with_check_backstop_i066.sql`을 적용했다(사후 편집 금지, I-167). 이 §7의 체크리스트 자체는
+적용 이후에도 유지한다(RLS와 트리거가 동시에 잘못 편집되는 이중 회귀까지는 못 막으므로) —
+아래 스크립트로 `crews_guard_archived_immutable`의 정의가 그대로인지는 계속 확인하고,
+`crews_update_staff_or_owner`의 `with_check`에 `private.is_crew_active(id)`가 여전히
+있는지는 §1과 같은 방식(`pg_policies` 직접 조회)으로 확인하면 된다.
+
+---
+
+## 8. `poll_eligible_voter_progress` 재식별 방어(D-101) — 함수 정의 대조가 실측 %-zip보다 우선한다 (35일차, BOARD)
+
+I-166(34일차)이 확정한 방어는 `private.poll_eligible_voter_progress`의 `order by 1, 2`가
+반환 컬럼(`current_membership_status`, `has_voted`) **전부**를 덮는 전순 정렬이라는 사실
+하나에 의존한다(D-101, 정규형 논증 — 출력이 두 컬럼의 다중집합만으로 결정돼 물리적 스캔
+순서·호출 이력이 출력 순서에 전혀 남지 않는다).
+
+**35일차 BOARD가 open poll에서 위치 zip 실측을 반복하다가 CREW 교차검증으로 정정된 교훈**:
+5행짜리 poll에서 "위치 zip 추측이 진실값과 몇 행 일치했는가"는 **방어 여부를 판별하지
+못한다.** 3false/2true(또는 2false/3true) 분할 5행을 canonical 정렬 후 위치로 zip하면
+가능한 일치 수는 초기하분포로 정확히 `{1, 3, 5}`뿐이고 확률은 각각 `{0.3, 0.6, 0.1}`이다
+— **"5행 중 2행 불일치(3/5 일치)"는 방어가 있든 없든 가장 나오기 쉬운 최빈값(P=0.6)**이라
+관측만으로는 방어 작동의 증거가 되지 못한다(반대로 5/5 완전 일치도 P=0.1로 드물지만 0은
+아니라 "우연"으로 넘길 수 있다 — 둘 다 판별력이 없다는 뜻이지 결과가 틀렸다는 뜻은
+아니다). 표본을 훨씬 키우지 않는 한(대상자 수가 적은 poll이 이 프로젝트의 정상 범위라
+표본을 키우기 어렵다) 실측 zip 시험은 우연과 방어 작동을 구분하지 못한다.
+
+**그래서 이 방어를 재확인하는 유일한 신뢰 가능한 방법은 함수 정의 대조다** — 아래를
+실행해 `order by`가 **반환 컬럼 전부**를 여전히 덮는지 확인한다:
+
+```sql
+select pg_get_functiondef('private.poll_eligible_voter_progress(uuid)'::regprocedure);
+```
+
+**판정 기준**: `returns table (current_membership_status text, has_voted boolean)`이고
+본문 마지막 `return query ... order by 1, 2;`가 그대로면 안전(정규형 유지, 순서의 정보량
+0). 앞으로 이 함수에 반환 컬럼이 추가되는데 `order by`가 그 컬럼까지 확장되지 않으면(예:
+컬럼 3개로 늘었는데 `order by 1, 2`만 남아 있으면) 새 컬럼에 대해서만 정규형이 깨져 그
+컬럼이 다시 위치 채널이 될 수 있다 — 이게 이 항목이 잡아야 할 회귀다.
+
+**대조군 — `poll_eligible_voters_with_status`는 애초에 `ORDER BY`가 없다(확인됨, 35일차
+BOARD)**: `pg_get_functiondef`로 직접 조회한 결과 이 함수 본문엔 정렬절이 전혀 없다. 35일차
+초안이 "profile_id 알파벳순으로 안정적으로 보인다"고 적었던 것은 **함수가 보장하는 성질이
+아니라 현재 실행계획(인덱스 스캔 순서 등)의 부수 효과일 뿐이다** — 쿼리 플래너가 바뀌면
+경고 없이 달라질 수 있다. 이 함수는 `profile_id`를 평문 반환하므로 그 자체의 순서 불안정은
+D-003/D-101 위반이 아니지만(신원이 이미 공개돼 있어 순서가 새로 흘릴 정보가 없다), **후속
+위험 한 줄**: 나중에 누군가 이 함수의 반환 순서가 안정적이라고 가정하고 위치 기반으로
+동작하는 UI·로직(예: "항상 같은 순서로 나오니 인덱스로 매칭해도 된다")을 얹으면, 쿼리
+플래너 변경 한 번으로 조용히 깨지는 결함을 심는 셈이다 — 새 이슈로 올릴 정도는 아니지만
+다음에 이 함수를 소비하는 코드를 리뷰할 때 남겨 둔다. 상세 근거:
+`docs/design/open-poll-verification-35/README.md` §5.
+
+---
+
 ## 확인한 것 (33일차, CORE)
 
 - `pg_policies`에서 `join_requests_update_requester_or_staff`의 `qual`·`with_check` 직접 조회(§1)

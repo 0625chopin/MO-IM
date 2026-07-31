@@ -49,6 +49,7 @@
 
 | 절차 | 무엇을 보장하는가 | 트리거 조건 | 소요 시간 | CI 이관 |
 | --- | --- | --- | --- | --- |
+| `docs/design/migration-integrity-audit-35/README.md` §6 (`audit_compare.py`) | 로컬 `supabase/migrations/*.sql`이 원격 `schema_migrations.statements`와 여전히 일치한다 — 이미 적용된 파일이 사후 편집으로 조용히 갈라지지 않았다(I-167) | 신규 마이그레이션 추가 시, 매 회차 마감 전(권장) | 5~15분(원격 덤프 `dump_remote_statements.sql` 1회 실행 + 로컬 스크립트 즉시 대조. 신규 불일치가 나오면 §4 방식의 라이브 DB 대조가 추가로 필요해 그만큼 늘어난다) | 부분(덤프+대조는 스크립트화 가능하지만 새 불일치의 원인 판정 — 정정 마이그레이션이 이미 있는지, 라이브 DB가 안전한지 — 은 사람이 확인) |
 | `docs/design/rls-regression-checklist-33/README.md` §1~§4 | `join_requests` 승인의 archived-크루 차단이 RLS 한 곳에서 계속 살아있다 | §4 명시: 관련 정책·`is_crew_active`·officer 트리거 수정 시, 분기별 정기 점검(권장) | 10~15분 | 가능 |
 | `docs/decisions/insert-axis-audit-102-103.md` | INSERT/ALL RLS 정책이 self-service 컬럼값을 계속 제한한다 | 신규 INSERT 정책 추가 시(자매 문서 §7이 회귀 체크리스트로 지정) | 15~20분 | 부분(쿼리는 스크립트화 가능, 판정은 사람) |
 | `docs/decisions/delete-truncate-axis-audit-111-112.md` §7 | DELETE 정책·TRUNCATE GRANT·FK CASCADE 우회가 새 테이블에서도 막혀 있다 | 신규 테이블 추가 시, self-service RLS 추가 시 | 20~40분 | 가능 |
@@ -71,9 +72,10 @@
 
 ## 3. 요약 — 분류 결과
 
-- **총 재사용 절차**: 19개 파일, 20개 절차(§1 3개 + §2 17개)
-- **릴리스 전 필수 / 조건부**: 3 / 17
-- **CI 이관**: 가능 6 · 부분 9 · 불가 5(대시보드 클릭·이메일함 확인·소켓 육안 관찰·CDP 수동
+- **총 재사용 절차**: 20개 파일, 21개 절차(§1 3개 + §2 18개 — 35일차 CORE가
+  `migration-integrity-audit-35` 1건 추가)
+- **릴리스 전 필수 / 조건부**: 3 / 18
+- **CI 이관**: 가능 6 · 부분 10 · 불가 5(대시보드 클릭·이메일함 확인·소켓 육안 관찰·CDP 수동
   계측처럼 구조적으로 사람만 할 수 있는 단계 포함) — "가능"으로 표시된 것도 **R-002(CI 없음)
   때문에 현재는 전부 수동 실행**이다. 이관 가능성과 실제 이관 여부는 별개다.
 - **해당 없음(종결된 1회성 조사 로그·순수 결정 기록)**: 48개 파일 — 재실행 트리거가 없어 이
