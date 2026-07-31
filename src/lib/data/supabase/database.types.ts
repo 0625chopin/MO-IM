@@ -1259,6 +1259,22 @@ export type Database = {
           status: string
         }[]
       }
+      hot_public_meetups: {
+        Args: { p_limit?: number }
+        Returns: {
+          activity_score: number
+          attending_count: number
+          capacity: number
+          crew_category: string
+          crew_color_key: number
+          crew_id: string
+          crew_name: string
+          id: string
+          meetup_date: string
+          start_time: string
+          title: string
+        }[]
+      }
       list_pending_invitations_for_self: {
         Args: never
         Returns: {

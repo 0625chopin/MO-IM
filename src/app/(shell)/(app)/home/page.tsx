@@ -2,6 +2,8 @@ import { Suspense } from "react";
 
 import { HomeCalendarSummaryContainer } from "@/components/calendar/HomeCalendarSummaryContainer";
 import { HomeCalendarSummarySkeleton } from "@/components/calendar/HomeCalendarSummarySkeleton";
+import { HotMeetupsContainer } from "@/components/meetup/HotMeetupsContainer";
+import { HotMeetupsSkeleton } from "@/components/meetup/HotMeetupsSkeleton";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { strings } from "@/lib/strings";
 
@@ -18,9 +20,14 @@ export default function HomeDashboardPage() {
   return (
     <main className="flex flex-1 flex-col gap-6">
       <PageHeader title={strings.home.dashboard.title} />
-      <div className="p-4">
+      <div className="flex flex-col gap-8 p-4">
         <Suspense fallback={<HomeCalendarSummarySkeleton />}>
           <HomeCalendarSummaryContainer />
+        </Suspense>
+        {/* D-109 — 공개 크루의 활발한 모임 소개. 위 "다가오는 모임"(내 크루 일정)과 성격이
+            다르므로 별도 `Suspense`로 감싼다: 한쪽이 느려도 다른 쪽은 먼저 보인다. */}
+        <Suspense fallback={<HotMeetupsSkeleton />}>
+          <HotMeetupsContainer />
         </Suspense>
       </div>
     </main>
