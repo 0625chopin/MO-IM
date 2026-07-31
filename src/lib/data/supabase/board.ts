@@ -202,8 +202,13 @@ export interface CreatePostInput {
 }
 
 /** `general` 게시글은 모임 제안 필드 4종·`targetMeetupId`를 전부 null로 고정한다(DB CHECK
- *  제약과도 일치). `meetup_reschedule_proposal`만 `targetMeetupId`를 싣는다. */
-export async function createPost(input: CreatePostInput): Promise<Post> {
+ *  제약과도 일치). `meetup_reschedule_proposal`만 `targetMeetupId`를 싣는다.
+ *
+ * **32일차(I-150 해소, BOARD)** — `createComment`(31일차, `../comment.ts`)·`updatePost`/
+ * `deletePost`(같은 파일, 아래)가 이미 쓰는 패턴으로 맞췄다. `posts_insert_members` RLS(D-030
+ * ③, archived 크루 등)가 여기서 거부될 수 있어 `throw error` 대신 `err("forbidden", …)`로
+ * 도메인 오류를 표현한다 — 새 헬퍼·새 오류 kind를 만들지 않는다. */
+export async function createPost(input: CreatePostInput): Promise<DataResult<Post>> {
   const supabase = await createSupabaseServerClient();
   const isProposal = input.type === "meetup_proposal" || input.type === "meetup_reschedule_proposal";
   const isReschedule = input.type === "meetup_reschedule_proposal";
@@ -223,8 +228,8 @@ export async function createPost(input: CreatePostInput): Promise<Post> {
     })
     .select("*")
     .single();
-  if (error) throw error;
-  return toPost(data);
+  if (error) return err("forbidden", error.message);
+  return ok(toPost(data));
 }
 
 export type UpdatePostInput = Partial<Pick<Post, "title" | "body">>;

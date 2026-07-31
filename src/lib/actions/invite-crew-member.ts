@@ -33,6 +33,12 @@ const INVITATION_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
  * 자동 생성한다(`docs/decisions/write-path-realdata-032.md`) — Mock 시절에는 이 동기화를
  * 이 액션이 직접 호출해야 했지만, 지금 호출하면 트리거가 이미 만든 행에 다시 INSERT를
  * 시도해 충돌한다.
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사)** — `evaluateInviteEligibility`는 crew.status를
+ * 보지 않는다. RLS(`invitations_insert_staff_or_owner`)의 `private.is_crew_active(crew_id)`
+ * 조건이 이미 SQL에서 막지만(데이터 정합성 문제는 아니다), 그 거부가 이 화면까지 오면 위
+ * `errors.blocked`(원래 "차단됐다"는 뜻으로 쓰던 문구)로 뭉뚱그려져 사유가 부정확했다 —
+ * archived와 사용자 차단은 다른 사유라 여기서 먼저 걸러 정확한 문구를 준다.
  */
 export interface InviteCrewMemberFormState {
   success?: boolean;
@@ -64,6 +70,10 @@ export async function inviteCrewMemberAction(
   const permission = checkPermission({ role, action: "crew:invite_member" });
   if (!permission.allowed) {
     return { formError: strings.crew.members.invite.errors.notAllowed };
+  }
+
+  if (crew.status !== "active") {
+    return { formError: strings.crew.members.invite.errors.crewArchived };
   }
 
   const invitee = await getProfileByHandle(handle);

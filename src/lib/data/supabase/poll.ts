@@ -1,6 +1,7 @@
 import "server-only";
 
 import type {
+  EligibleVoterProgress,
   Id,
   Poll,
   PollEligibleVoter,
@@ -78,69 +79,70 @@ export async function listEligibleVoters(pollId: Id): Promise<PollEligibleVoter[
 }
 
 /**
- * 대상자 스냅샷 × 현재 크루 멤버십 상태 조인. poll → post → board → crew 경로로 crewId를 찾은
- * 뒤(3단계 순차 조회 — Supabase embedded select 대신, `listCrewsByProfile`과 같은 이유로
- * 단순한 형태를 택했다) 그 크루의 `crew_memberships`와 조인한다. 스냅샷에 이름이 남은 사람은
- * 반드시 그 크루의 멤버십 행이 있어야 한다(Mock docstring과 동일 전제) — 못 찾으면 데이터
- * 정합성이 깨진 것이므로 `DataResult`가 아니라 예외로 알린다.
+ * 대상자 스냅샷 × 현재 크루 멤버십 상태 조인 — `poll_eligible_voters_with_status` RPC 경유
+ * (34일차, I-089 후속).
+ *
+ * **원래 원본 테이블 3단 순차 조회(`polls`→`posts`→`boards`→`poll_eligible_voters`→
+ * `crew_memberships`)였는데, `poll_eligible_voters_select_self_or_staff` RLS(본인 OR
+ * staff/owner)에 걸려 일반 멤버(member) 세션에서는 자기 자신 1행만 반환하는 결함이
+ * 있었다** — `PollPanelContainer`의 "대상자 수"·"정족수" 표시가 role별로 조용히 틀렸고,
+ * `cast-vote.ts`(트리거③)·`poll-auto-close.ts`(`decideAndClosePoll`)·`withdraw-poll.ts`
+ * (철회 알림 수신자) 전부 이 함수를 통해 같은 결함을 물려받았다. RPC(`private.
+ * poll_eligible_voters_with_status`, `20260730145738_poll_eligible_voters_with_status_
+ * rpc_i089.sql`)는 `is_active_crew_member`만 확인해 role과 무관하게 항상 전체 스냅샷을
+ * 반환한다 — `notified_at`/`notify_attempts`(D-025가 지키려는 발송 부기 컬럼)는 반환 목록에
+ * 없어 그 결정을 위반하지 않는다(반환하는 `profile_id` 집합도 이미 role 무관 공개인
+ * `crew_memberships` 로스터의 부분집합이라 새 노출이 아니다). 실측(role-시뮬레이션 SQL,
+ * 근거: `docs/design/poll-display-verification-34/README.md`): member 시점 1→4, staff
+ * 시점 5→5(회귀 없음).
+ *
+ * 스냅샷에 이름이 남은 사람은 반드시 그 크루의 멤버십 행이 있어야 한다(D-003 불변식) — RPC
+ * 내부는 LEFT JOIN으로 먼저 결손 여부를 확인해 있으면 `raise exception`(poll_id·profile_id
+ * 포함)으로 멈추고, 없으면 원래의 INNER JOIN 결과를 그대로 반환한다(34일차 3차 마이그레이션
+ * `20260730151125_poll_i089_rpcs_fix_silent_inner_join.sql`). **최초 버전(위 두 마이그레이션)은
+ * INNER JOIN뿐이라 멤버십 행을 못 찾으면 그 행이 조용히 빠지는 결함이 있었는데, 이 마이그레이션이
+ * 그것을 해소했다** — 지금 배포된 정의는 조용한 축소가 아니라 예외로 멈춘다. 이 불변식이
+ * 실제로 깨지는 사례는 아직 없었고(스냅샷 생성 후 멤버십 행 자체는 삭제되지 않는다, 상태만
+ * 바뀐다) 깨지면 이제 "전체 개수가 스냅샷 개수보다 작다"가 아니라 예외로 즉시 드러난다.
  */
 export async function listEligibleVotersWithCurrentStatus(
   pollId: Id,
 ): Promise<SnapshotVoterStatus[]> {
   const supabase = await createSupabaseServerClient();
-
-  const { data: poll, error: pollError } = await supabase
-    .from("polls")
-    .select("post_id")
-    .eq("id", pollId)
-    .maybeSingle();
-  if (pollError) throw pollError;
-  if (!poll) return [];
-
-  const { data: post, error: postError } = await supabase
-    .from("posts")
-    .select("board_id")
-    .eq("id", poll.post_id)
-    .maybeSingle();
-  if (postError) throw postError;
-  if (!post) return [];
-
-  const { data: board, error: boardError } = await supabase
-    .from("boards")
-    .select("crew_id")
-    .eq("id", post.board_id)
-    .maybeSingle();
-  if (boardError) throw boardError;
-  if (!board) return [];
-
-  const { data: voters, error: votersError } = await supabase
-    .from("poll_eligible_voters")
-    .select("profile_id")
-    .eq("poll_id", pollId);
-  if (votersError) throw votersError;
-  if (!voters || voters.length === 0) return [];
-
-  const voterIds = voters.map((v) => v.profile_id);
-  const { data: memberships, error: membershipError } = await supabase
-    .from("crew_memberships")
-    .select("profile_id, status")
-    .eq("crew_id", board.crew_id)
-    .in("profile_id", voterIds);
-  if (membershipError) throw membershipError;
-
-  const statusByProfileId = new Map((memberships ?? []).map((m) => [m.profile_id, m.status]));
-  return voters.map((voter) => {
-    const status = statusByProfileId.get(voter.profile_id);
-    if (!status) {
-      throw new Error(
-        `crew ${board.crew_id} 의 멤버십(${voter.profile_id})을 찾을 수 없다 — poll ${pollId} 스냅샷과 불일치.`,
-      );
-    }
-    return {
-      profileId: voter.profile_id,
-      currentMembershipStatus: status as SnapshotVoterStatus["currentMembershipStatus"],
-    };
+  const { data, error } = await supabase.rpc("poll_eligible_voters_with_status", {
+    p_poll_id: pollId,
   });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    profileId: row.profile_id,
+    currentMembershipStatus: row.current_membership_status as SnapshotVoterStatus["currentMembershipStatus"],
+  }));
+}
+
+/**
+ * 종료 트리거③(D-022 "미투표자 0명") 전용 — 신원 없는 익명 진행 상황(34일차, I-089 후속).
+ *
+ * `cast-vote.ts`가 투표 직후 이 값을 `countRemainingVoters`(`lib/rules/poll-eligibility.ts`)에
+ * 넘겨 미투표자 수를 판정한다. `listEligibleVotersWithCurrentStatus`처럼 신원을 반환하지
+ * **않는다** — `poll_votes`(개인 선택, D-003)를 내부에서 조인해 "투표했는가"만 표시하는데,
+ * 신원까지 함께 반환하면 `poll_vote_tally`(찬반기권 집계, 이미 크루원 전체 공개)와 결합해
+ * 소규모 poll(D-031 특례가 있을 만큼 흔한 사용 경로)에서 상대의 선택이 역산되는 재식별
+ * 벡터가 된다(팀장 지적, 34일차) — RPC(`private.poll_eligible_voter_progress`,
+ * `20260730145758_..._rpc_i089.sql`)가 애초에 `profile_id`·`choice` 둘 다 SELECT하지
+ * 않아 이 경로 자체가 없다. 판정(active AND NOT 투표함, 그 개수)은 여전히
+ * `countRemainingVoters` 순수 함수가 한다(NFR-036) — 이 함수는 "이 대상자가 투표했는가"라는
+ * 사실 하나를 붙여 줄 뿐이다.
+ */
+export async function listEligibleVoterProgress(pollId: Id): Promise<EligibleVoterProgress[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("poll_eligible_voter_progress", {
+    p_poll_id: pollId,
+  });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    currentMembershipStatus: row.current_membership_status as EligibleVoterProgress["currentMembershipStatus"],
+    hasVoted: row.has_voted,
+  }));
 }
 
 export async function listVotes(pollId: Id): Promise<PollVote[]> {

@@ -30,6 +30,14 @@ import { createSupabaseServerClient } from "@/lib/data/supabase/server";
 export async function getRealtimeAuthTokenAction(): Promise<string | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.getSession();
-  if (error || !data.session) return null;
+  // 34일차(I-160 해소) — "세션이 정말 없다"와 "세션 조회 자체가 일시 에러를 냈다"를 더 이상
+  // 같은 null로 뭉개지 않는다. error는 던진다 — 호출자(broadcast.ts의 refreshAuth)가 이미
+  // 예외를 만나면 재시도하는 catch 경로를 갖고 있어(33일차, setAuth 예외용으로 신설) 이
+  // 함수만 예외를 삼키지 않으면 그 재시도 기계를 그대로 탄다. 반환 타입은 넓히지 않는다 —
+  // null은 이제 "확인된 세션 없음"만을 뜻한다. 상세: docs/DECISIONS.draft.CORE.md.
+  if (error) {
+    throw new Error(`getRealtimeAuthTokenAction: 세션 조회 실패 — ${error.message}`);
+  }
+  if (!data.session) return null;
   return data.session.access_token;
 }

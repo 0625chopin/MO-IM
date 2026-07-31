@@ -1259,11 +1259,43 @@ export type Database = {
           status: string
         }[]
       }
+      list_pending_invitations_for_self: {
+        Args: never
+        Returns: {
+          created_at: string
+          crew_id: string
+          expires_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          status: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       meetup_directory_summary: {
         Args: { p_meetup_id: string }
         Returns: {
           crew_id: string
           id: string
+        }[]
+      }
+      poll_eligible_voter_progress: {
+        Args: { p_poll_id: string }
+        Returns: {
+          current_membership_status: string
+          has_voted: boolean
+        }[]
+      }
+      poll_eligible_voters_with_status: {
+        Args: { p_poll_id: string }
+        Returns: {
+          current_membership_status: string
+          profile_id: string
         }[]
       }
       poll_vote_tally: {

@@ -39,7 +39,9 @@ export interface CreateCommentInput {
   body: string;
 }
 
-export async function createComment(input: CreateCommentInput): Promise<Comment> {
+/** 31일차 — `./supabase/comment.ts`와 시그니처를 맞춘다(`DataResult<Comment>`, I-070과
+ *  같은 패턴). Mock 단계는 실패 경로가 없어 항상 `ok(...)`를 반환한다. */
+export async function createComment(input: CreateCommentInput): Promise<DataResult<Comment>> {
   const comment: Comment = {
     id: generateId("comment"),
     postId: input.postId,
@@ -49,7 +51,7 @@ export async function createComment(input: CreateCommentInput): Promise<Comment>
     deletedAt: null,
   };
   store.comments.push(comment);
-  return comment;
+  return ok(comment);
 }
 
 export type UpdateCommentInput = Pick<Comment, "body">;

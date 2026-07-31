@@ -195,3 +195,125 @@ CREW가 동시에 `product_value_check_constraints_083`(2026-07-30 03:36:54)을 
 - `join_requests_update_requester_or_staff` 정책 이름은 유지했다(narrowing 후에는 실질적으로
   staff-only이지만, 추적 편의를 위해 I-085 관례를 따라 이름을 바꾸지 않았다) — 다음에 이
   정책을 읽는 사람은 이름과 실제 동작이 다르다는 점을 감안해야 한다.
+
+## 8. 후속 — 진짜 병렬 실 HTTP 2개 레이스 실증 (30일차, CORE)
+
+**§7이 남긴 리스크(동시 접속 레이스 미재현)를 해소한다.** 22일차 BOARD가 확립한 "실계정 JWT +
+병렬 실 HTTP" 방식(`begin`…`rollback` 단일 세션 시뮬레이션이 아니라, 실제로 분리된 프로세스
+2개가 네트워크를 거쳐 같은 행을 동시에 두드리는 방식)을 그대로 적용했다.
+
+### 8.1 방법
+
+1. **JWT 확보**: `POST /auth/v1/token?grant_type=password`로 실계정 `0625chopin@gmail.com`
+   (핸들 `chopin_0625`, profile id `fb70ff1c-3736-44ee-a4a3-96993a3c62ed`)의 access token을
+   발급받았다. `user.id`가 기대한 profile id와 일치함을 확인했다.
+2. **신규 픽스처** — 보호 크루(`729ced18-2016-459a-94c3-e7959dfe808c`)는 쓰지 않았다:
+   - 크루 `06d62732-faef-4d22-80b7-f9558d58a5cc`(오너 `chopin0625`, `visibility=public`,
+     `status=active`) — `trg_crews_provision_owner_bootstrap`이 오너 멤버십·기본 보드·채팅방을
+     자동 생성했다.
+   - `crew_memberships`: 요청자(`chopin_0625`) 행 `status='requested'`, `role='member'` —
+     `crew_memberships_guard_self_insert_request` 트리거(I-120)가 `status='requested'` +
+     `role='member'` + 크루 `public`·`active`만 허용해, 이 조합으로만 직접 INSERT가 통과했다.
+   - `join_requests`: `id=9559838f-dbaf-495d-90b7-96a082d3c4fd`, `status='pending'`,
+     `requester_id=chopin_0625`.
+3. **병렬 호출**: 같은 `join_request.id`를 대상으로 `POST /rest/v1/rpc/withdraw_join_request`
+   (`{"p_id": "9559838f-..."}`)를 **셸 백그라운드(`&`) + `wait`로 두 프로세스에서 동시에** 호출하고,
+   각 응답을 별도 파일로 캡처했다.
+
+### 8.2 원시 결과
+
+두 호출 모두 HTTP `200`(RPC는 실패도 예외가 아니라 `reason_code`로 반환하는 설계이므로 HTTP
+레벨에서는 둘 다 "정상 응답"이다):
+
+| 호출 | HTTP | `ok` | `reason_code` | `status`(반환값) |
+| --- | --- | --- | --- | --- |
+| A | 200 | `false` | `not_found` | (null) |
+| B | 200 | `true` | (null) | `withdrawn` |
+
+**DESIGN 교차검증(30일차) 반영 — 재현 가능성을 위해 원시 근거를 인용한다.** 문서만으로는
+"진짜 병렬"인지 검증할 수 없다는 지적이 정당해, 실제 실행한 셸 명령과 두 호출의 raw 응답
+본문을 그대로 남긴다:
+
+```bash
+JR_ID="9559838f-dbaf-495d-90b7-96a082d3c4fd"
+(
+curl -s -w "\nHTTP_STATUS:%{http_code}\n" -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/withdraw_join_request" \
+  -H "apikey: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}" \
+  -H "Authorization: Bearer ${JWT}" \
+  -H "Content-Type: application/json" \
+  -d "{\"p_id\":\"${JR_ID}\"}" > i141_race_A.txt 2>&1
+) &
+PID_A=$!
+(
+curl -s -w "\nHTTP_STATUS:%{http_code}\n" -X POST "${NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/withdraw_join_request" \
+  -H "apikey: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}" \
+  -H "Authorization: Bearer ${JWT}" \
+  -H "Content-Type: application/json" \
+  -d "{\"p_id\":\"${JR_ID}\"}" > i141_race_B.txt 2>&1
+) &
+PID_B=$!
+wait $PID_A $PID_B
+```
+
+원시 응답 본문(각각 별도 파일로 캡처, 무편집):
+
+```
+# i141_race_A.txt
+[{"ok":false,"reason_code":"not_found","id":null,"crew_id":null,"requester_id":null,"message":null,"status":null,"decided_by":null,"decided_at":null,"created_at":null}]
+HTTP_STATUS:200
+
+# i141_race_B.txt
+[{"ok":true,"reason_code":null,"id":"9559838f-dbaf-495d-90b7-96a082d3c4fd","crew_id":"06d62732-faef-4d22-80b7-f9558d58a5cc","requester_id":"fb70ff1c-3736-44ee-a4a3-96993a3c62ed","message":"I141 레이스 실증 픽스처","status":"withdrawn","decided_by":null,"decided_at":null,"created_at":"2026-07-30T05:03:00.067924+00:00"}]
+HTTP_STATUS:200
+```
+
+**서버측 독립 근거(DESIGN이 `get_logs(api)`로 우회 검증)**: 두 `POST
+/rest/v1/rpc/withdraw_join_request` 요청(UA `curl/8.18.0`)의 서버 수신 타임스탬프가
+`1785387800188000`µs(`2026-07-30T05:03:20.188Z`)·`1785387800198000`µs
+(`2026-07-30T05:03:20.198Z`)로 **10ms 이내**였다 — 클라이언트 쪽 `wait` 종료 시각(§8.1의
+`date` 출력, 05:03:19.228Z 시작~05:03:19.572Z 종료)과 일관된 창(window) 안에 들어온다.
+순차 실행이었다면 두 PostgREST 요청이 이보다 뚜렷이 벌어졌을 것이다(각 요청은 JWT 검증 +
+RLS 평가 + PL/pgSQL 함수 실행을 거친다) — 10ms 이내 도착은 "셸에서 `&`로 백그라운드
+실행했다"는 주장이 문서 자체의 근거만으로도 성립함을 뒷받침한다.
+
+### 8.3 호출 후 DB 상태 (`count(*)` 실측)
+
+| 대상 | 값 |
+| --- | --- |
+| `join_requests.status`(대상 행) | `withdrawn` — 정확히 1건 |
+| `crew_memberships.status`(요청자 행) | `rejected` |
+| `crew_memberships.status`(오너 행) | `active`(무변경, 회귀 없음) |
+
+### 8.4 판정 — I-054·I-141이 요구한 세 조건
+
+1. **둘 다 성공하지 않았다**: `ok=true`는 정확히 1건(B), `ok=false`(`not_found`)가 1건(A) —
+   동시에 두 번 성공해 이중 처리되는 경우가 없었다.
+2. **부분 커밋이 0건이다**: A(`not_found`) 쪽은 `join_requests`도 `crew_memberships`도 건드리지
+   않았다 — RPC의 첫 UPDATE(`jr.status='pending'` 조건부)가 이미 0행 매치라 `v_row.id is null`
+   분기로 즉시 반환했고(§ 2 함수 본문 44~48행), `crew_memberships` UPDATE 문장 자체에 도달하지
+   않았다. "실패한 호출이 절반만 썼다"는 상태가 존재하지 않는다.
+3. **최종 상태가 일관된다**: `join_requests='withdrawn'` / `crew_memberships='rejected'` — 이는
+   **성공한 단일 호출(B)이 만들어냈을 상태와 바이트 단위로 같다.** I-141 원문(28일차)이 실측한
+   "어긋난 상태"(`withdrawn`/`requested`)는 재현되지 않았다.
+
+**결론**: `withdraw_join_request` RPC는 진짜 병렬 실 HTTP 레이스 아래에서도 원자성을 지킨다 —
+`jr.status='pending'` 조건부 UPDATE가 사실상 낙관적 잠금 역할을 해, 두 번째 도착한 요청은
+DB 레벨의 행 잠금(첫 UPDATE가 커밋될 때까지 두 번째 UPDATE가 대기)으로 안전하게
+`not_found`로 걸러진다. §7의 "동시 접속 레이스는 재현하지 않았다"는 문구는 이 절로 갱신한다 —
+**이제 재현했고, 결함이 없음을 확인했다.**
+
+### 8.5 픽스처 정리
+
+`join_requests`·`crew_memberships`(요청자·오너 둘 다) → `boards`·`chat_rooms`(오너 부트스트랩
+트리거가 자동 생성, FK `ON DELETE RESTRICT`라 먼저 지워야 함) → `crews` 순서로 삭제했다.
+정리 후 재실측: `crews_count=13`·`archived_count=0`·`profiles_count=21`·`leftover_crew=0` —
+회차 시작 기준선과 완전히 일치한다. 보호 크루(`729ced18-...`)·시드 데이터는 전혀 건드리지
+않았다.
+
+### 8.6 남긴 것
+
+- 이번 레이스는 정확히 2-way였다 — 3-way 이상 동시 요청은 시도하지 않았다. RPC의 조건부
+  UPDATE 구조상 N-way로 늘려도 같은 원리(첫 커밋만 승리)가 성립할 것으로 예상하지만, 실측하지
+  않은 이상 추정으로만 남긴다.
+- UI가 `not_found`(`ok:false`) 응답을 사용자에게 어떻게 보여주는지는 이번에도 확인하지
+  않았다 — DB·API 레벨 원자성까지가 이번 실증 범위다.

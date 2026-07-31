@@ -4,7 +4,7 @@ import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
 import { recordAuditLog } from "@/lib/audit/audit-log";
-import { createNotification, getCrewMembership, updateCrewMembershipStatus } from "@/lib/data";
+import { createNotification, getCrewById, getCrewMembership, updateCrewMembershipStatus } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck, isActiveMembership } from "@/lib/rules/crew-membership-transition";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
@@ -22,6 +22,13 @@ import { strings } from "@/lib/strings";
  * **FR-027 AC3(진행 중 투표의 강퇴자 표 무효화)는 이 액션이 아니라 DB 트리거가 처리한다** —
  * `crew_memberships_invalidate_votes_on_removal`(Task 040 신설)이 이 UPDATE의 부수효과로
  * 자동 실행된다. 이 액션은 그 결과를 별도로 확인하지 않는다(호출자가 몰라도 되는 내부 구현).
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사) — 진짜 결함을 막는다.** 위 docstring이 "DB가
+ * 이미 세부 업무 규칙 전부를 강제한다"고 적어 둔 `crew_memberships_guard_self_transition`의
+ * "남의 행" 분기(오너/임원이 남을 강퇴하는 경로)는 실제로는 crew.status를 검사하지 않는다 —
+ * archived 크루에서도 강퇴가 그대로 성공한다(문구 문제가 아니라 실제 데이터 변경). 이
+ * 액션이 최초 진입점이라 여기서 막는다. SQL 쪽 동급 방어는 이번 회차 범위 밖으로 별도
+ * 보고한다.
  */
 export interface RemoveCrewMemberFormState {
   formError?: string;
@@ -64,6 +71,11 @@ export async function removeCrewMemberAction(
   });
   if (!permission.allowed) {
     return { formError: strings.crew.members.remove.errors.notAllowed };
+  }
+
+  const crew = await getCrewById(crewId);
+  if (!crew || crew.status !== "active") {
+    return { formError: strings.crew.members.remove.errors.crewArchived };
   }
 
   const result = await updateCrewMembershipStatus(crewId, targetProfileId, "removed", reason);

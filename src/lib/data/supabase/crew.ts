@@ -83,12 +83,24 @@ export async function listCrews(opts: ListCrewsQuery = {}): Promise<CursorPage<C
  *
  * **⚠️ 플레이스홀더 필드를 신뢰하지 말 것**: 이 마스킹된 객체는 `CrewHomeContainer`의
  * `crew.visibility === "private"` 비소속 분기(`crew.name`만 읽는다)를 만족시키기 위한 것이지
- * "전체 상세"가 아니다. 오늘 이 폴백을 실제로 타는 소비자는 `CrewHomeContainer`뿐이다 —
- * `getCrewById`의 다른 소비자(`BoardListContainer`·`PostDetailContainer`·`CrewSettingsContainer`
- * 등)는 전부 `(app)/crews/[crewId]/layout.tsx`(활성 멤버십 게이트) 뒤에 있어 원본 select가
- * 항상 성공하므로 이 폴백에 도달하지 않는다. **이 전제가 깨지는 새 소비자**(멤버십 게이트
- * 없이 `getCrewById`를 부르는 코드)를 추가할 때는 이 함수가 private+비소속 조합에서 가짜
- * `description`/`category`/`colorKey`("", "", 0)를 줄 수 있다는 것을 반드시 재확인할 것.
+ * "전체 상세"가 아니다. `getCrewById`의 대다수 소비자(`BoardListContainer`·
+ * `PostDetailContainer`·`CrewSettingsContainer` 등)는 전부 `(app)/crews/[crewId]/layout.tsx`
+ * (활성 멤버십 게이트) 뒤에 있어 원본 select가 항상 성공하므로 이 폴백에 도달하지 않는다.
+ *
+ * **이 전제가 깨진 실제 사례(I-158, 32일차 발견 · 33일차 처분)**: `InvitationInboxContainer`가
+ * 멤버십 게이트 없이 이 함수를 부른다(초대함은 정의상 아직 비소속자에게 보여주는 화면이다) —
+ * 그 결과 `colorKey`의 가짜 `0`이 `CrewColorDot`까지 그대로 렌더됐다. **타입은 고치지 않기로
+ * 했다**(파급 범위가 이 함수 호출부 20곳 전체라 이 건 하나의 영향에 비해 과도하다는 판단,
+ * `docs/DECISIONS.draft.DESIGN.md` 참고) — 대신 `InvitationInboxContainer`가 `ownerId === ""`
+ * (같은 폴백이 채우는 또 다른 플레이스홀더)로 폴백 도달 여부를 직접 판별해 `colorKey`를
+ * 신뢰하지 않는다. **`""`가 안전한 이유는 `owner_id`가 `uuid` 타입이라 빈 문자열이 애초에
+ * 그 컬럼에 담길 수 있는 값이 아니기 때문이다**(`NOT NULL`만으로는 부족하다 — `description`도
+ * NOT NULL이지만 `DEFAULT ''::text`라 정상 크루도 진짜 빈 설명일 수 있어 센티넬로 쓰면 오탐이
+ * 난다, 33일차 CREW 교차검증). **이 방어는 그 파일에만 있고 이 함수 자신은 여전히 아무것도
+ * 강제하지 않는다** — 멤버십 게이트 없이 `getCrewById`를 부르는 다음 소비자를 추가할 때는 이
+ * 함수가 private+비소속 조합에서 가짜
+ * `description`/`category`/`colorKey`/`ownerId`("", "", 0, "")를 줄 수 있다는 것을 반드시
+ * 재확인할 것 — 이 경고를 대조하지 않은 것이 정확히 I-158이 반복된 경위다.
  */
 export async function getCrewById(id: Id): Promise<Crew | null> {
   const supabase = await createSupabaseServerClient();
@@ -114,6 +126,35 @@ export async function getCrewById(id: Id): Promise<Crew | null> {
     visibility: summary.visibility as CrewVisibility,
     colorKey: 0,
     ownerId: "",
+    // **불변식(31일차, I-070 교차검증 중 DESIGN 발견 → CORE 근거 정정 → CREW·팀장이 그 정정의
+    // 소비자 목록 자체가 불완전했음을 재차 지적 → CORE 32일차 I-148 실측 재검증으로 최종
+    // 확정, 5단계 수정 이력) — 이 폴백이 반환하는 `status`는 항상 `"active"` 리터럴이지만,
+    // **거짓말이 아니다.** `private.crew_directory_summary`(구현체, `pg_get_functiondef`로
+    // 배포본 직접 확인)는 맨 앞에서 `if v_visibility is null or v_status <> 'active' then
+    // return; end if;`로 **status가 active가 아닌 크루는 visibility와 무관하게 무조건 0행을
+    // 반환한다.** 즉 `summaryRows`가 비어 있지 않아 이 객체가 실제로 만들어지는 시점엔, 그
+    // 크루의 진짜 `status`가 이미 `"active"`임이 RPC 자신의 가드로 보장돼 있다 — 이 폴백은
+    // archived 크루에 대해서는 **호출되는 게 아니라 도달 자체가 불가능**하다(호출하면 `summary`가
+    // `undefined`가 되어 104행에서 이미 `null`을 반환하고 끝난다).
+    //
+    // **I-148 재검증(32일차, CORE)** — 31일차엔 이 불변식을 문서로만 논증했으나, 이번엔
+    // `begin`…`rollback`으로 실측했다: private+archived 임시 크루(`00000000-…-000000000148`
+    // 패턴, 픽스처 아님)에 `invited` 상태 초대 대상자를 만들고 그 세션으로
+    // `select count(*) from crews`와 `select count(*) from crew_directory_summary(...)`를
+    // 각각 돌리면 **둘 다 0건**이다 — direct select는 RLS가 막고(private+비활성 멤버),
+    // RPC도 위 가드로 0행을 준다. 그 결과 `getCrewById`는 `null`을 반환하고,
+    // `evaluateInvitationResponseEligibility`의 `!crew` 분기가 정확한 `crew_unavailable`
+    // ("이 크루는 더 이상 존재하지 않아요")를 돌려준다 — **I-148이 주장한 "가짜 active를
+    // 믿고 범용 실패로 넘어간다"는 시나리오는 재현되지 않는다.** 31일차의 코드 읽기 기반
+    // 분석이 이 RPC 자신의 가드절을 놓쳤던 것이 원인이다(같은 프로젝트에서 반복된 패턴 —
+    // `crew_directory_summary` 관련 결함 보고는 여러 차례 "재검증하니 원래 정확했다"로
+    // 귀결됐다, `docs/decisions/crew-directory-summary-verification-hotfix.md` 참고).
+    // 상세 실측 로그와 `request-join-crew.ts` 등 나머지 소비자 재확인은
+    // `docs/design/nested-trigger-audit-32/README.md` 부록 참고.
+    //
+    // **이 함수에 `status`를 새로 소비하는 코드를 추가하기 전에**, 이 불변식(폴백 도달 =
+    // 크루가 실제로 active)이 유지되는지만 확인하면 된다 — `crew_directory_summary`의 가드절이
+    // 바뀌면(예: 향후 status 컬럼을 직접 반환하도록 확장) 이 폴백도 함께 갱신할 것.
     status: "active",
   };
 }

@@ -291,6 +291,16 @@ export const ko = {
           already_pending: "이미 대기 중인 신청이 있어요",
           banned: "이 크루는 재가입이 제한되어 있어요",
           withdrawFailed: "철회하지 못했어요. 다시 시도해 주세요.",
+          /** 31일차(CREW, archived 크루 쓰기 표면 감사) — `evaluateJoinRequestEligibility`는
+           *  crew.status를 보지 않아(공개 범위·멤버십만 판정) 여기까지 통과할 수 있다. DB
+           *  RPC(`create_join_request`)가 `crew_status <> 'active'`를 `reason_code='forbidden'`
+           *  으로 거부하면 이 문구를 쓴다 — 이전에는 이 분기 전체가 `already_pending`으로
+           *  잘못 라벨링됐다(그 키가 이미 위 사전 판정에서 소진되므로, DB 실패 시점에는
+           *  실제로 발생할 수 없는 사유였다). */
+          crewArchived: "해산된 크루예요. 가입 신청을 받지 않아요",
+          /** DB 실패 중 위 `crewArchived`(forbidden)가 아닌 나머지(not_found·conflict 경합)용
+           *  범용 폴백 — 다른 `errors.failed`류와 같은 관례. */
+          failed: "신청하지 못했어요. 다시 시도해 주세요.",
         },
       },
     },
@@ -321,6 +331,10 @@ export const ko = {
           /** FR-024 E1 — 오너 본인은 임명·해임 대상이 아니다. */
           targetIsOwner: "오너는 임명·해임 대상이 아니에요",
           failed: "처리하지 못했어요. 다시 시도해 주세요.",
+          /** 31일차(CREW, archived 크루 쓰기 표면 감사) — `setCrewMemberRoleAction`·DB 트리거
+           *  둘 다 crew.status를 보지 않아 archived 크루에서도 임원 임명·해임이 실제로
+           *  성공하는 결함이었다(`removeCrewMemberAction`과 같은 원인). 앱 레이어에서 막는다. */
+          crewArchived: "해산된 크루에서는 임원을 임명·해임할 수 없어요",
         },
       },
       /** FR-026 크루 탈퇴 — `MemberList`의 본인 행 전용 버튼. */
@@ -356,6 +370,11 @@ export const ko = {
           targetIsOwner: "오너는 강퇴 대상이 아니에요",
           targetInactive: "이미 크루를 떠난 크루원이에요",
           failed: "강퇴하지 못했어요. 다시 시도해 주세요.",
+          /** 31일차(CREW, archived 크루 쓰기 표면 감사) — `removeCrewMemberAction`·DB 트리거
+           *  (`crew_memberships_guard_self_transition`의 "남의 행" 분기) 둘 다 crew.status를
+           *  보지 않아 archived 크루에서도 강퇴가 실제로 성공하는 결함이었다. 앱 레이어에서
+           *  막는다(SQL 쪽은 이번 범위 밖, 별도 보고). */
+          crewArchived: "해산된 크루에서는 강퇴할 수 없어요",
         },
       },
       /** FR-020 크루원 초대 다이얼로그. 핸들 검색은 `UserSearchField`(계정 설정과 공유,
@@ -383,6 +402,12 @@ export const ko = {
            *  문구는 그 거부를 일반 오류로 감싼다 — "차단됐다"는 사실 자체를 노출하지
            *  않는다(requirements.md FR-020 정상 흐름 E3 "사유는 노출하지 않음"). */
           blocked: "이 사용자를 초대할 수 없어요",
+          /** 31일차(CREW, archived 크루 쓰기 표면 감사) — `evaluateInviteEligibility`도
+           *  crew.status를 보지 않는다. RLS(`invitations_insert_staff_or_owner`)의
+           *  `private.is_crew_active(crew_id)` 조건이 실제 경계이고, 예전에는 그 거부가 위
+           *  `blocked`("차단됐다"는 뜻으로 쓰던 문구)로 잘못 뭉뚱그려졌다 — archived와 차단은
+           *  서로 다른 사유라 새 키로 분리한다. */
+          crewArchived: "해산된 크루에는 초대를 보낼 수 없어요",
         },
       },
       /** FR-023 가입 신청 승인·반려 탭. `requests.status.*`는 `JoinRequestStatus` 값과 문구를
@@ -396,6 +421,13 @@ export const ko = {
         approveButton: "승인",
         rejectButton: "반려",
         submitPending: "처리하는 중…",
+        /** 33일차(CREW, I-152 처분 — D-089 UX 향상안 `join_requests` 축). archived 크루의
+         *  오너·임원이 `/members`에서 대기 중 가입 신청 목록은 볼 수 있지만(31일차에 되돌린
+         *  과잉 차단, `CrewMembersContainer` 33일차 절 참고) 승인·반려는 할 수 없다 —
+         *  D-089("해산=동결")가 이 신청들을 영원히 결정되지 않은 상태로 둔다는 사실을 오너가
+         *  이 화면에서 정직하게 알 수 있어야 한다(팀장 지시). 아래 `errors.crewArchived`(제출
+         *  시도 실패 문구)와 짝이지만, 이건 시도 전에 상시 보이는 안내라 `errors` 밖에 둔다. */
+        archivedNotice: "이 크루는 해산되어 가입 신청을 승인·반려할 수 없어요. 이 신청은 결정되지 않은 채로 남아요.",
         status: {
           approved: "승인됨",
           rejected: "반려됨",
@@ -408,6 +440,13 @@ export const ko = {
           /** FR-023 E1(동시성 — 다른 임원이 먼저 처리)·E2(신청자가 이미 철회)를 함께 담는다. */
           alreadyDecided: "이미 처리된 신청이에요",
           decideFailed: "처리하지 못했어요. 다시 시도해 주세요.",
+          /** 31일차(CREW, archived 크루 쓰기 표면 감사) — `decideJoinRequestAction`은 원래
+           *  crew.status를 전혀 보지 않았고, DB RLS(`join_requests_update_requester_or_staff`)·
+           *  트리거(`join_requests_sync_membership_on_decision`)도 crew 활성 여부를 검사하지
+           *  않아 승인하면 실제로 `crew_memberships`가 archived 크루에 새 active 멤버를
+           *  만드는 진짜 결함이었다(메시지 문제가 아니라 데이터 정합성 문제). 이 키를 앱
+           *  레이어에 추가해 막는다 — SQL 쪽 동급 방어는 이번 회차 범위 밖으로 별도 보고한다. */
+          crewArchived: "해산된 크루의 가입 신청은 처리할 수 없어요",
         },
       },
     },
@@ -482,6 +521,11 @@ export const ko = {
           /** FR-025 E1 — 대상이 활성 크루원이 아님(SQL 강제 경계, `crews_guard_owner_only_fields`). */
           targetInactive: "이미 크루를 떠난 크루원이에요",
           failed: "이양하지 못했어요. 다시 시도해 주세요.",
+          /** 31일차(CREW, archived 크루 쓰기 표면 감사) — I-070과 같은 트리거
+           *  (`crews_guard_archived_immutable`, `crews.owner_id` UPDATE도 이 트리거를 탄다)가
+           *  이미 SQL에서 막지만, 그 실패가 이 화면에서는 위 범용 `failed` 문구로만 보였다
+           *  (I-070과 동일한 "(b) 범용 실패 문구" 패턴). 이 키로 먼저 걸러 정확한 문구를 준다. */
+          crewArchived: "해산된 크루는 오너를 이양할 수 없어요",
         },
       },
       /** FR-013 크루 해산(D-009 후반, Task 040). 오너 전용, 되돌릴 수 없다 — 진행 중 투표·미래

@@ -39,9 +39,10 @@
 **Dialog와 Toast를 같은 "오버레이 합성" 범주로 묶지 않는다** — `ToastViewport`(`ui/toast.tsx`)에는
 배경을 어둡게 하는 백드롭 요소가 없다(콘텐츠 배경 토큰은 Dialog와 같은 `bg-popover
 ring-1 ring-foreground/10`이지만, 어두워진 배경 위가 아니라 살아있는 페이지 위에 직접 뜬다).
-Drawer(BottomSheet)는 별도로 확인하지 않았지만 `drawer.tsx`가 Dialog와 동일한 오버레이 구조
-(`bg-black/10` + `backdrop-blur-xs`, 콘텐츠 `bg-popover ring-1 ring-foreground/10`)라 Dialog
-확인으로 대표된다고 판단했다(코드 대조만, 실제 렌더는 미확인 — 아래 "확인하지 못한 것" 참고).
+Drawer(BottomSheet)는 `drawer.tsx`가 Dialog와 동일한 오버레이 구조(`bg-black/10` +
+`backdrop-blur-xs`, 콘텐츠 `bg-popover ring-1 ring-foreground/10`)라 29일차에는 Dialog 확인으로
+대표된다고 판단하고 코드 대조만 하고 넘어갔다 — **30일차에 이 대표성 가정 자체를 실측으로
+검증했다**(아래 "Drawer(BottomSheet) 포커스 링 실측 (30일차)" 절).
 
 **판정**: 5곳 모두 라이트·다크 양쪽에서 링이 "무너지지 않고"(사라지거나 배경에 묻히지 않고)
 한눈에 인지된다. 유일한 인상 차이는 **중립 링(`ring-ring`, 파괴적이 아닌 쪽)이 다크에서
@@ -50,11 +51,36 @@ Drawer(BottomSheet)는 별도로 확인하지 않았지만 `drawer.tsx`가 Dialo
 28일차에 불변으로 확정됨, 알파만 조정), **톤이 "무너졌다"고 판단할 근거는 없다** — 링은
 여전히 배경과 뚜렷이 구분되고 눈에 띈다. 별도 알파·색상 조정은 제안하지 않는다.
 
+## Drawer(BottomSheet) 포커스 링 실측 (30일차)
+
+29일차 판정은 `drawer.tsx`와 `dialog.tsx`의 오버레이 구조가 코드상 동일하다는 대조만으로
+Dialog 실측이 Drawer를 대표한다고 봤다. 이번엔 그 대표성 가정 자체를 실측으로 검증했다 —
+방법은 위와 동일(격리 dev 서버 + Playwright Chromium, `localStorage['mo_im-theme']` +
+전체 리로드로 테마 전환, 실제 키보드 `Tab` 이벤트로 포커스 이동).
+
+- `#overlays`의 BottomSheet 카드에서 "모임 상세 열기" 버튼을 클릭해 Drawer를 열었다. Base UI가
+  열림 직후 포커스를 Drawer popup 컨테이너(`role="dialog"`, `tabindex="-1"`)로 옮기는 것을
+  `document.activeElement` 확인으로 먼저 검증했다 — 이는 프로그램적 포커스라 `:focus-visible`
+  대상이 아니다.
+- 이어서 실제 키보드 `Tab`을 두 번 눌러 "참석" 버튼을 지나 "닫기"(`DrawerClose`, `Button`
+  컴포넌트) 버튼에 도달했다. `document.activeElement`의 `class`에 `focus-visible:ring-ring/70`이
+  포함된 것을 확인해 대상이 맞는지 재확인한 뒤, Drawer의 `dialog` 요소만 잘라 스크린샷했다
+  (Dialog "닫기" 케이스와 동일하게 재사용 `Button` 컴포넌트라 같은 토큰을 쓴다).
+
+| 표면 | 분류 | 라이트 | 다크 |
+| --- | --- | --- | --- |
+| Drawer(BottomSheet) "닫기" | **오버레이 합성**(어두워진 배경 위, `bg-black/10`+`backdrop-blur-xs`) | `light-drawer-close.png` — 카드 배경 위 링 뚜렷, Dialog 닫기와 인상 유사 | `dark-drawer-close.png` — 황갈 톤 링, 다른 다크 표면과 동일한 톤 상호작용 |
+
+**판정**: 29일차의 "코드 대조로 대표된다"는 가정이 실측으로도 확인됐다 — Drawer 닫기 버튼의
+포커스 링은 라이트·다크 양쪽에서 Dialog 닫기 버튼과 인상 차이 없이 뚜렷이 식별된다. 별도
+알파·색상 조정은 제안하지 않는다.
+
 ## 확인하지 못한 것
 
-- Drawer(BottomSheet) 자체의 실제 렌더는 스크린샷을 뜨지 않았다 — 코드 구조 대조(위 문단)로
-  Dialog와 동일 패턴임을 확인했을 뿐, 실측으로 대체한 것은 아니다.
-- 4곳 외 나머지 인터랙티브 원자(28일차에 함께 조정된 11개 파일 중 일부)는 이번에 직접 보지
-  않았다 — 대표 표면 5곳(버튼 2변형·오버레이 합성 1·비오버레이 부유 표면 1·폼 오류 합성)만
-  봤다.
+- **Drawer(BottomSheet) 자체는 30일차에 닫기(Close) 버튼 기준으로 실측했다**(위 절 참고) —
+  다만 Drawer 안의 다른 인터랙티브 요소(트리거 버튼·스와이프 핸들·"참석" 버튼)는 확인하지
+  않았다. 닫기 버튼은 다른 표면에서 이미 확인한 것과 같은 재사용 `Button` 컴포넌트라 대표성이
+  있다고 판단했지만, 스와이프 핸들처럼 `Button`이 아닌 요소는 이 실측이 커버하지 않는다.
+- 5곳(버튼 2변형·오버레이 합성 1·비오버레이 부유 표면 1·폼 오류 합성) + Drawer 닫기 외
+  나머지 인터랙티브 원자(28일차에 함께 조정된 11개 파일 중 일부)는 이번에 직접 보지 않았다.
 - 실기기·다른 브라우저 엔진(WebKit·Firefox)에서는 확인하지 않았다 — Chromium 단일 확인이다.

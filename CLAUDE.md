@@ -88,7 +88,7 @@ Next.js 16.2.11(App Router) + React 19.2.4 + TypeScript(strict) + Tailwind CSS v
 
 1. **표현/컨테이너를 분리합니다.** Mock 단계에도 컨테이너를 만듭니다. 표현 컴포넌트는 데이터를 props로만 받습니다.
 2. **구독을 인터페이스로 감쌉니다.** `subscribeToRoom(id, onEvent): Unsubscribe` 형태로 두어 Mock에서는 타이머를, 실데이터에서는 Supabase Realtime Broadcast를 꽂습니다.
-3. **`/sample` 4상태의 "오류"에 도메인 오류를 포함합니다.** 네트워크 실패뿐 아니라 RLS 403·정원 마감·동시 수정 충돌을 상태로 만듭니다.
+3. **`/sample` 4상태의 "오류"에 도메인 오류를 포함합니다.** 네트워크 실패뿐 아니라 RLS 403·정원 마감·동시 수정 충돌을 상태로 만듭니다. (`DataResult`/`forbidden` 계약은 **쓰기 함수** 대상입니다 — `src/lib/data/contracts.ts` docstring 참고. 읽기 함수(`T | null`/`T[]` 반환)의 RLS 0건 처리는 이 계약 대상이 아니며 별도 결정을 따릅니다, I-050.)
 4. **인증 경계는 레이아웃에서 처리합니다.** `proxy.ts`는 D-011로 v0.1 범위 밖입니다.
 
 쓰기 후 갱신은 **Server Action + `refresh()`** 패턴을 Mock 단계부터 씁니다. Next.js 16의 `updateTag`·`refresh()` 가 정확히 이 전환 시나리오를 위한 API라 나중에 조회부만 바꾸면 됩니다.

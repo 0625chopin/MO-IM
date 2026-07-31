@@ -3,7 +3,7 @@
 import { refresh } from "next/cache";
 
 import { getAuthSession } from "@/components/shell/get-auth-session";
-import { decideJoinRequest, getCrewMembership } from "@/lib/data";
+import { decideJoinRequest, getCrewById, getCrewMembership } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
 import { checkPermission } from "@/lib/rules/permission";
 import { strings } from "@/lib/strings";
@@ -27,6 +27,14 @@ import type { JoinRequestStatus } from "@/lib/types";
  * `requested→active`/`requested→rejected` 멤버십 전이를 `decideJoinRequest`와 같은
  * 트랜잭션에서 이미 끝낸다 — Mock 시절처럼 이 액션이 다시 호출하면 트리거가 이미 마친
  * 전이를 재시도하다 상태 불일치로 막힌다.
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사) — 진짜 결함을 막는다.** `disband_crew` RPC는
+ * `join_requests`를 건드리지 않아, 해산 직전에 들어온 대기 중 신청이 그대로 `pending`으로
+ * 남을 수 있다. RLS(`join_requests_update_requester_or_staff`)도 트리거
+ * (`join_requests_sync_membership_on_decision`)도 crew.status를 보지 않아, 오너가 이 신청을
+ * "승인"하면 **실제로 archived 크루에 새 active 멤버가 생겼다**(단순 문구 문제가 아니라
+ * 데이터 정합성 문제) — 이 액션이 최초 진입점이라 여기서 막는다. SQL 쪽 동급 방어(트리거
+ * 확장)는 이번 회차 범위 밖으로 별도 보고한다.
  */
 export interface DecideJoinRequestFormState {
   success?: boolean;
@@ -63,6 +71,11 @@ export async function decideJoinRequestAction(
   const permission = checkPermission({ role, action: "crew:approve_join_request" });
   if (!permission.allowed) {
     return { formError: strings.crew.members.requests.errors.notAllowed };
+  }
+
+  const crew = await getCrewById(crewId);
+  if (!crew || crew.status !== "active") {
+    return { formError: strings.crew.members.requests.errors.crewArchived };
   }
 
   const decided = await decideJoinRequest(joinRequestId, decisionRaw, session.profileId);

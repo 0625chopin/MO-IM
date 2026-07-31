@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { SnapshotVoterStatus } from "@/lib/types/poll.types";
+import type { EligibleVoterProgress, SnapshotVoterStatus } from "@/lib/types/poll.types";
 
 import {
   countQuorumEligibleVoters,
@@ -10,6 +10,15 @@ import {
 
 function voter(profileId: string, status: SnapshotVoterStatus["currentMembershipStatus"]) {
   return { profileId, currentMembershipStatus: status };
+}
+
+/** 34일차(I-089 후속) — `countRemainingVoters`가 익명 입력(`EligibleVoterProgress`)을 받도록
+ *  바뀌어(신원 제거) `voter()`가 아니라 이 헬퍼로 픽스처를 만든다. */
+function progress(
+  status: EligibleVoterProgress["currentMembershipStatus"],
+  hasVoted: boolean,
+): EligibleVoterProgress {
+  return { currentMembershipStatus: status, hasVoted };
 }
 
 /**
@@ -41,28 +50,26 @@ describe("countQuorumEligibleVoters", () => {
 
 describe("countRemainingVoters", () => {
   it("active이면서 아직 투표하지 않은 사람만 센다(D-022)", () => {
-    const voters = [voter("a", "active"), voter("b", "active"), voter("c", "left")];
-    const voted = new Set(["a"]);
-    // b(active, 미투표)만 남는다. c는 active가 아니라 애초에 제외.
-    expect(countRemainingVoters(voters, voted)).toBe(1);
+    const entries = [progress("active", false), progress("active", true), progress("left", false)];
+    // 1번째(active, 미투표)만 남는다. 2번째는 투표함, 3번째는 active가 아니라 애초에 제외.
+    expect(countRemainingVoters(entries)).toBe(1);
   });
 
   it("left·removed는 영원히 투표할 수 없어도 미투표자로 세지 않는다 — 트리거가 죽지 않게 하는 D-022의 핵심", () => {
-    const voters = [voter("a", "left"), voter("b", "removed")];
-    expect(countRemainingVoters(voters, new Set())).toBe(0);
+    const entries = [progress("left", false), progress("removed", false)];
+    expect(countRemainingVoters(entries)).toBe(0);
   });
 
   it("active 전원이 투표하면 0이다", () => {
-    const voters = [voter("a", "active"), voter("b", "active")];
-    const voted = new Set(["a", "b"]);
-    expect(countRemainingVoters(voters, voted)).toBe(0);
+    const entries = [progress("active", true), progress("active", true)];
+    expect(countRemainingVoters(entries)).toBe(0);
   });
 
   it("정족수 분모(countQuorumEligibleVoters)와 다른 집합을 센다는 것을 같은 스냅샷으로 대조한다", () => {
     // left 상태인 한 명만 있는 스냅샷: 분모에는 남지만(정족수), 트리거③ 미투표자로는 안 센다.
     const voters = [voter("a", "left")];
     expect(countQuorumEligibleVoters(voters)).toBe(1);
-    expect(countRemainingVoters(voters, new Set())).toBe(0);
+    expect(countRemainingVoters([progress("left", false)])).toBe(0);
   });
 });
 

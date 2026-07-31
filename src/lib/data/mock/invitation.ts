@@ -38,18 +38,28 @@ export async function getInvitationById(id: Id): Promise<Invitation | null> {
  * 제외한다 — 이미 응답이 끝난 상태를 조회할 때 만료로 걸러내면 과거 이력이 왜곡된다(이유는
  * Supabase 구현 쪽 주석 참고). ISO 8601 문자열은 사전식 비교가 시각 순서와 일치한다
  * (`invitation-response-eligibility.ts`와 같은 관례).
+ *
+ * **D-073 확장(32일차)**: archived 크루로 가는 pending 초대도 같은 방식으로 거른다 — Supabase
+ * 구현과 동일 규칙(NFR-035). 현재 Mock 픽스처에는 archived 크루가 없어(`fixtures.ts` 전수
+ * 확인) 이 분기가 오늘 실제로 걸리는 데이터는 없지만, 두 구현의 **계약**을 맞춰 둔다 — Mock에
+ * archived 크루가 추가되는 순간 바로 같은 동작을 하도록.
  */
 export async function listInvitationsForProfile(
   inviteeId: Id,
   status?: InvitationStatus,
 ): Promise<Invitation[]> {
   const nowIso = new Date().toISOString();
-  return store.invitations.filter(
+  const invitations = store.invitations.filter(
     (i) =>
       i.inviteeId === inviteeId &&
       (!status || i.status === status) &&
       (status !== "pending" || i.expiresAt > nowIso),
   );
+  if (status !== "pending") return invitations;
+  return invitations.filter((i) => {
+    const crew = store.crews.find((c) => c.id === i.crewId);
+    return crew?.status === "active";
+  });
 }
 
 export async function listInvitationsForCrew(

@@ -25,6 +25,17 @@ import { strings } from "@/lib/strings";
  * 실측) 그 함수 내부가 crew_memberships를 직접 만든다. Mock 시절에는 이 액션이 별도로
  * `initiateCrewMembership("request")`를 호출해야 했으나, 실 DB에서는 그 호출이 중복 처리가
  * 되므로 제거했다(`docs/decisions/write-path-realdata-032.md`).
+ *
+ * **31일차(CREW, archived 크루 쓰기 표면 감사) — 두 가지를 고쳤다.** ①
+ * `evaluateJoinRequestEligibility`는 crew.status를 보지 않으므로(공개 범위·멤버십만 판정)
+ * archived 공개 크루에도 "신청 가능"이 나올 수 있었다 — DB RPC(`create_join_request`)가
+ * `crew_status <> 'active'`를 이미 `reason_code='forbidden'`으로 막고 있어(SQL이 최종 경계,
+ * 데이터 정합성 문제는 아니었다) 여기서는 UX만 보정한다: 명시적으로 먼저 걸러 정확한 문구를
+ * 준다. ② `createJoinRequest` 실패 시 원인과 무관하게 항상 `errors.already_pending`을
+ * 반환하던 기존 버그를 고쳤다 — 이 지점에 도달했다는 것 자체가 이미
+ * `evaluateJoinRequestEligibility`를 통과했다는 뜻이라 "이미 대기 중"은 실제로는 발생할 수
+ * 없는 사유였다(경합으로 인한 `conflict`이거나 이번에 새로 걸러내는 `forbidden`(archived)
+ * 뿐이다). `created.error.code`로 분기해 실제 사유에 맞는 문구를 준다.
  */
 export interface RequestJoinCrewFormState {
   success?: boolean;
@@ -58,6 +69,10 @@ export async function requestToJoinCrewAction(
     return { formError: strings.crew.home.join.errors.notAllowed };
   }
 
+  if (crew.status !== "active") {
+    return { formError: strings.crew.home.join.errors.crewArchived };
+  }
+
   const eligibility = evaluateJoinRequestEligibility({
     crewVisibility: crew.visibility,
     membership,
@@ -72,7 +87,12 @@ export async function requestToJoinCrewAction(
     message: message.length > 0 ? message : null,
   });
   if (!created.ok) {
-    return { formError: strings.crew.home.join.errors.already_pending };
+    return {
+      formError:
+        created.error.code === "forbidden"
+          ? strings.crew.home.join.errors.crewArchived
+          : strings.crew.home.join.errors.failed,
+    };
   }
 
   refresh();

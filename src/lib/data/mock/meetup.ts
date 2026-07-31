@@ -185,68 +185,10 @@ export async function listMeetupScheduleChanges(meetupId: Id): Promise<MeetupSch
     .sort((a, b) => b.changedAt.localeCompare(a.changedAt));
 }
 
-export interface ApplyMeetupRescheduleInput {
-  meetupId: Id;
-  pollId: Id;
-  date: string;
-  startTime?: string | null;
-  place?: string | null;
-  capacity?: number | null;
-}
-
-/**
- * I-079/FR-065 AC2(26일차, CORE) — 일정 변경 투표 가결 반영. 실 DB에서는
- * `finalize_closed_poll`(DB AFTER UPDATE 트리거, SECURITY DEFINER)이 이 역할을 한다 —
- * Task 034(poll-pipeline-034.md)가 이미 남긴 전례대로 **Mock 쪽 poll 자동 종료
- * 파이프라인(`lib/actions/poll-auto-close.ts`)은 Meetup 생성/갱신을 자동으로 트리거하지
- * 않는다**(그 문서가 "createMeetupFromPoll을 아무도 호출하지 않는다"고 명시한 것과 같은
- * 이유 — 실제 프로덕션 경로는 DB 트리거뿐이다). 이 함수는 `/sample` QA 시뮬레이터나 수동
- * 호출용으로 남겨 둔다 — poll_id로 멱등(이미 같은 poll_id의 이력이 있으면 재적용하지
- * 않는다, 실 DB의 `meetup_schedule_changes.poll_id` UNIQUE + 사전 존재 확인과 동일 원칙).
- *
- * 새 Meetup INSERT가 아니라 **기존 행을 UPDATE**하고, 이전 값을 이력으로 남기고, 참석
- * 응답 전부를 무효화하고(팀장 결정), `attendingCount`를 0으로 되돌린다.
- */
-export async function applyMeetupReschedule(
-  input: ApplyMeetupRescheduleInput,
-): Promise<DataResult<Meetup>> {
-  const meetup = store.meetups.find((m) => m.id === input.meetupId);
-  if (!meetup) return err("not_found", `meetup ${input.meetupId} 를 찾을 수 없다.`);
-  if (meetup.status !== "confirmed") {
-    return err("conflict", `meetup ${input.meetupId} 는 이미 취소됐다.`);
-  }
-  if (store.meetupScheduleChanges.some((c) => c.pollId === input.pollId)) {
-    // 멱등 — 이미 이 투표로 반영된 변경이 있다(재시도 스윕과 같은 상황을 흉내낸다).
-    return ok(meetup);
-  }
-
-  store.meetupScheduleChanges.push({
-    id: generateId("meetup-schedule-change"),
-    meetupId: meetup.id,
-    pollId: input.pollId,
-    previousDate: meetup.date,
-    previousStartTime: meetup.startTime,
-    previousPlace: meetup.place,
-    previousCapacity: meetup.capacity,
-    newDate: input.date,
-    newStartTime: input.startTime ?? null,
-    newPlace: input.place ?? null,
-    newCapacity: input.capacity ?? null,
-    changedAt: new Date().toISOString(),
-  });
-
-  meetup.date = input.date;
-  meetup.startTime = input.startTime ?? null;
-  meetup.place = input.place ?? null;
-  meetup.capacity = input.capacity ?? null;
-  meetup.attendingCount = 0;
-
-  const now = new Date().toISOString();
-  for (const attendance of store.meetupAttendances) {
-    if (attendance.meetupId === meetup.id && attendance.invalidatedAt === null) {
-      attendance.invalidatedAt = now;
-    }
-  }
-
-  return ok(meetup);
-}
+// 33일차(팀장 발견 → CREW 처분, I-144와 같은 클래스) — 여기 있던 `ApplyMeetupRescheduleInput`·
+// `applyMeetupReschedule`(26일차 도입)을 완전히 삭제했다. `src/lib/data/index.ts`가 Task 032
+// (18일차)부터 meetup 도메인도 `./supabase/meetup`만 재노출하고 `./mock/*`는 재노출하지 않아,
+// 이 함수를 가리키는 import·호출이 저장소 전체에 0건이었다(정의 자체 3줄 제외). "crew 도메인에서
+// 사라진 5개 함수"(이 배럴 docstring)와 달리 트리거가 대신하는 것도 아니라 그냥 죽은 코드였다 —
+// I-144(`withdrawPendingCrewMembership`)가 31일차에 세운 선례(완전 삭제, 새 대칭 유지용 잔존
+// 목록에 없으면 지운다)를 그대로 따른다. 상세: `docs/ISSUES.md` I-144, 이번 회차 draft 이슈.

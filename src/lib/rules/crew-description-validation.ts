@@ -2,9 +2,12 @@
  * 크루 소개(description) 형식 검증 — 순수 함수 (NFR-036, R-015, Task 016B). FR-010 개설 폼의
  * "소개" 필드가 쓴다.
  *
- * **`CREW_DESCRIPTION_MAX_LENGTH`는 요구사항 문서에 값이 없는 잠정값이다** —
- * `bio-validation.ts`의 `BIO_MAX_LENGTH`(150자, I-034)보다 넉넉하게 잡았다(크루 소개는 자기소개
- * 한 줄보다 길게 쓰는 경우가 흔하다는 실용적 판단). **`docs/ISSUES.md` I-038에 등재**.
+ * **`CREW_DESCRIPTION_MAX_LENGTH`는 28일차 D-083으로 확정되고 29일차 DB CHECK
+ * (`crews_description_check`)로 승격됐다 — 더 이상 잠정값이 아니다**(`bio-validation.ts`의
+ * `BIO_MAX_LENGTH`, 150자보다 넉넉하게 잡은 값 그대로 확정됨). I-038의 나머지 범위(금칙어 목록·
+ * 우회 표기 정책)는 이 필드가 아니라 `crew-name-validation.ts`의 `BANNED_WORDS` 쪽 소관이며
+ * 34일차 팀 재량으로 A안(목록 동결) 확정됐다 — 상세는 그 파일 docstring·`docs/ISSUES.md`
+ * I-038(해결됨) 참고.
  */
 
 export const CREW_DESCRIPTION_MIN_LENGTH = 1;

@@ -1,5 +1,4 @@
-import type { Id } from "@/lib/types/common.types";
-import type { SnapshotVoterStatus } from "@/lib/types/poll.types";
+import type { EligibleVoterProgress, SnapshotVoterStatus } from "@/lib/types/poll.types";
 
 /**
  * 아래 두 함수는 `SnapshotVoterStatus`(투표 대상자 스냅샷 1인의 "현재" 멤버십
@@ -31,14 +30,23 @@ export function countQuorumEligibleVoters(voters: readonly SnapshotVoterStatus[]
  * 정족수 분모(`countQuorumEligibleVoters`, D-003)와는 **다른 집합**이다: 정족수는
  * `removed`만 빼고 `left`는 남기지만, 이 함수는 `active`가 아니면(= `left`·`removed`
  * 포함) 전부 뺀다. D-022는 D-003을 뒤집지 않고 이 트리거 하나만 보완한다.
+ *
+ * **34일차(I-089 후속) — 입력이 `EligibleVoterProgress[]`로 바뀌었다(신원 제거).** 이전엔
+ * `(voters: SnapshotVoterStatus[], votedProfileIds: ReadonlySet<Id>)`를 받아
+ * `voter.profileId`로 `votedProfileIds`를 조회해 매칭했다. 그런데 이 판정식이 실제로 쓰는
+ * 것은 "이 대상자가 투표했는가"라는 사실 하나뿐이다 — `profileId` 자체는 판정식에 관여하지
+ * 않았고 매칭 키로만 쓰였다. `cast-vote.ts`가 그 매칭을 신원 기반으로 하려면 대상자
+ * 명단(`poll_eligible_voters`)과 투표자 명단(`poll_votes`, 개인 선택 D-003)을 둘 다 신원과
+ * 함께 조회해야 하는데, `poll_vote_tally`(찬반기권 집계, 이미 크루원 전체 공개)와 결합하면
+ * 소규모 poll에서 상대의 선택이 역산되는 재식별 벡터가 된다(팀장 지적, 경위는
+ * `docs/DECISIONS.draft.BOARD.md`). 그래서 데이터 레이어가 매칭을 미리 끝내(신원 없는 익명
+ * RPC, `poll_eligible_voter_progress`) `hasVoted`를 붙여 주도록 바꿨다 — **판정식
+ * 자체(active AND NOT 투표함)는 한 글자도 안 바뀌었다**(NFR-036, 로직 이동이 아니라 입력
+ * 모양 변경).
  */
-export function countRemainingVoters(
-  voters: readonly SnapshotVoterStatus[],
-  votedProfileIds: ReadonlySet<Id>,
-): number {
-  return voters.filter(
-    (voter) =>
-      voter.currentMembershipStatus === "active" && !votedProfileIds.has(voter.profileId),
+export function countRemainingVoters(entries: readonly EligibleVoterProgress[]): number {
+  return entries.filter(
+    (entry) => entry.currentMembershipStatus === "active" && !entry.hasVoted,
   ).length;
 }
 
