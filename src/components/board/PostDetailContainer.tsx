@@ -72,6 +72,7 @@ export async function PostDetailContainer({ crewId, postId }: { crewId: Id; post
     createdAt: post.createdAt,
     editedAt: post.editedAt,
     meetupDate: post.meetupDate,
+    meetupEndDate: post.meetupEndDate,
     pollStatus: poll?.status ?? null,
     canEditTitleBody,
     canDelete: canDeleteOwn || canDeleteAny,

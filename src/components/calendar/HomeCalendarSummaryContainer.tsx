@@ -1,10 +1,13 @@
 import { getPostDetailHref } from "@/components/board/board-links";
 import type { UpcomingMeetupSummary } from "@/components/calendar/calendar-types";
-import { formatShortDayLabelKo, todayIsoUtc } from "@/components/calendar/date-grid";
+import { formatShortDateRangeLabelKo, todayIsoUtc } from "@/components/calendar/date-grid";
 import { HomeCalendarSummary } from "@/components/calendar/HomeCalendarSummary";
 import { isAuthenticated } from "@/components/shell/auth-session";
+import { CollapsibleSection } from "@/components/shell/CollapsibleSection";
 import { getAuthSession } from "@/components/shell/get-auth-session";
+import { getCollapsedSections } from "@/components/shell/section-collapse-cookie";
 import { getPollById, listCrewsByProfile, listMeetupsByCrews } from "@/lib/data";
+import { strings, t } from "@/lib/strings";
 
 
 /** 홈 대시보드에 보여줄 최대 항목 수 — 요구사항에 값이 없어 잠정으로 잡았다(보고에 남김). */
@@ -68,11 +71,31 @@ export async function HomeCalendarSummaryContainer() {
       crewName: crew?.name ?? "",
       colorIndex: crew?.colorKey ?? 0,
       title: meetup.title,
-      dateLabel: formatShortDayLabelKo(meetup.date),
+      dateLabel: formatShortDateRangeLabelKo(meetup.date, meetup.endDate),
       startTime: meetup.startTime,
+      endTime: meetup.endTime,
       postHref: poll ? getPostDetailHref(meetup.crewId, poll.postId) : null,
     };
   });
 
-  return <HomeCalendarSummary items={items} />;
+  const collapsed = await getCollapsedSections();
+
+  return (
+    <CollapsibleSection
+      sectionId="upcoming"
+      title={strings.home.dashboard.upcoming.title}
+      // 세는 대상은 화면에 남긴 5건이 아니라 **잘리기 전 전체 예정 건수**다 — 접힌 헤더가
+      // "예정 5건"이라고 말하는데 펴 보니 그게 상한이었다면 그 숫자는 거짓말이 된다.
+      summary={
+        meetups.length > 0
+          ? t((x) => x.home.dashboard.upcoming.summary, { count: meetups.length })
+          : strings.home.dashboard.upcoming.summaryEmpty
+      }
+      actionHref="/calendar"
+      actionLabel={strings.home.dashboard.upcoming.viewAll}
+      defaultOpen={!collapsed.has("upcoming")}
+    >
+      <HomeCalendarSummary items={items} hideHeading />
+    </CollapsibleSection>
+  );
 }

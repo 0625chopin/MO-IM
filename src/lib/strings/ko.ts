@@ -58,6 +58,15 @@ const common = {
     empty: "표시할 내용이 없어요",
     error: "문제가 발생했어요",
   },
+  /**
+   * 다일(기간) 모임 표시(2026-07-31). 캘린더 날짜별 패널·모임 상세·메인 "핫한 모임"이 같은
+   * 배지를 쓰므로 `common`에 둔다(§4 "같은 개념은 같은 값을 쓴다") — 모듈마다 "3일간"을
+   * 따로 적으면 표기를 바꿀 때 세 곳이 갈린다. `{days}`는 시작일·종료일을 **양끝 포함**으로
+   * 센 값이다(하루짜리면 이 배지 자체를 그리지 않는다).
+   */
+  meetup: {
+    multiDayBadge: "{days}일간",
+  },
   /** Task 011(DESIGN) — 명시적 테마 토글(`ThemeToggle`). `light`/`dark`/`system` 키는
    *  `Theme` 유니온과 정확히 일치해야 한다(`ThemeToggle`이 `theme[option]`으로 인덱싱한다).
    *  `toggleLabel`은 아이콘만 있는 트리거 버튼의 유일한 접근성 이름이다. */
@@ -168,6 +177,45 @@ export const ko = {
         empty: "예정된 모임이 없어요",
         errorTitle: "다가오는 모임을 불러오지 못했어요",
         errorDescription: "네트워크 상태를 확인한 뒤 다시 시도해 주세요.",
+        /** 섹션을 접었을 때 헤더에 남는 한 줄(아래 `section` 주석 참고). */
+        summary: "예정 {count}건",
+        summaryEmpty: "예정 없음",
+      },
+      /**
+       * SC-06 "소속 크루 카드 목록" + "소속 크루 0개 시 크루 탐색 유도 빈 상태"(PRD §6).
+       * 제목은 `nav.*`에 대응 항목이 없다 — 3일차에 삭제된 `nav.crews`("내 크루")와 같은
+       * 문구지만 그건 **헤더 내비 항목**이라 지운 것이고(§4), 이건 PRD가 SC-06 설명에서
+       * 실제로 쓰는 **섹션 이름**이다.
+       */
+      myCrews: {
+        title: "내 크루",
+        /** 헤더 액션 — 크루를 더 찾으러 가는 링크. 문구는 `crew.explore.title`("크루 검색·
+         *  탐색", 그 화면의 제목)과 다르다: 여기서는 화면 이름이 아니라 행동을 가리킨다. */
+        viewAll: "크루 더 찾기",
+        summary: "크루 {count}개",
+        /** PRD SC-06 "소속 크루 0개 → 크루 탐색 유도". 온보딩 직후 첫 로그인 사용자가 홈에서
+         *  처음 만나는 문장이라, 상태 설명이 아니라 다음 행동 두 가지를 준다. */
+        empty: {
+          title: "아직 속한 크루가 없어요",
+          description: "관심 있는 크루에 가입하거나, 직접 만들어 첫 모임을 제안해 보세요.",
+          exploreCta: "크루 둘러보기",
+          createCta: "크루 개설",
+        },
+        errorTitle: "내 크루를 불러오지 못했어요",
+        errorDescription: "잠시 후 다시 시도해 주세요.",
+      },
+      /**
+       * SC-06 "최근 알림 미리보기"(F039, FR-071). 알림 센터(`/notifications`)와 **같은 목록
+       * 컴포넌트**를 최근 몇 건만 잘라 쓴다 — 문구도 `notification.center.*`를 그대로 쓰고
+       * (빈 상태·모두 읽음 등) 여기에는 이 섹션에만 있는 것(제목·요약·전체 보기 링크)만 둔다.
+       */
+      recentNotifications: {
+        title: "최근 알림",
+        viewAll: "모든 알림 보기",
+        summaryUnread: "안 읽음 {count}",
+        summaryAllRead: "모두 읽음",
+        errorTitle: "알림을 불러오지 못했어요",
+        errorDescription: "잠시 후 다시 시도해 주세요.",
       },
     },
     /**
@@ -669,6 +717,12 @@ export const ko = {
          *  `status='confirmed'`로 실제 열렸던 일정이라 "취소됨"과 혼동되면 안 된다는 뜻에서
          *  독립된 문구로 뒀다. */
         archivedCrewBadge: "해산된 크루",
+        /**
+         * 다일 모임 배지(2026-07-31). 날짜별 패널은 "그 날짜"를 제목으로 열리는데, 기간 모임은
+         * 그 날짜에 시작하지 않았을 수 있다 — 배지와 아래 기간 문구가 없으면 사용자는 8/3
+         * 패널에 뜬 항목을 8/3에 시작하는 모임으로 읽는다.
+         */
+        multiDayBadge: common.meetup.multiDayBadge,
         /** `{count}`/`{capacity}` 정원 표시(FR-064 AC3 파생). */
         capacityLabel: "{count}/{capacity}명 참석",
         /** 정원 제한이 없는 Meetup(capacity === null). */
@@ -949,9 +1003,13 @@ export const ko = {
       fields: {
         title: "제목",
         description: "설명",
-        scheduledDate: "모임 예정일",
+        scheduledDate: "모임 시작일",
+        /** 다일 모임 지원(2026-07-31) — 비우면 하루짜리라는 것을 라벨에서 바로 알 수 있게 적는다. */
+        scheduledEndDate: "모임 종료일",
+        scheduledEndDateHint: "하루짜리 모임이면 비워 두세요",
         voteDeadline: "투표 마감 시각",
         startTime: "시작 시각",
+        endTime: "종료 시각",
         location: "장소",
         capacity: "정원",
       },
@@ -962,8 +1020,13 @@ export const ko = {
       validation: {
         titleRequired: "제목을 입력해 주세요",
         descriptionRequired: "설명을 입력해 주세요",
-        scheduledDateInPast: "모임 예정일은 오늘 이후여야 해요",
-        voteDeadlineAfterSchedule: "투표 마감은 모임 예정일 이전이어야 해요",
+        scheduledDateInPast: "모임 시작일은 오늘 이후여야 해요",
+        /** 다일 모임 검증(`lib/rules/meetup-proposal-schedule.ts`) 3종. */
+        scheduledEndDateBeforeStart: "모임 종료일은 시작일과 같거나 그 이후여야 해요",
+        scheduledEndDateTooLong: "모임 기간은 최대 30일이에요",
+        endTimeBeforeStartTime: "하루짜리 모임은 종료 시각이 시작 시각보다 뒤여야 해요",
+        endTimeWithoutStartTime: "종료 시각을 넣으려면 시작 시각도 함께 입력해 주세요",
+        voteDeadlineAfterSchedule: "투표 마감은 모임 시작일 이전이어야 해요",
         voteDeadlineInPast: "투표 마감은 현재 시각 이후여야 해요",
         /** D-003 투표 기한 허용 범위(1시간~14일) — `lib/rules/poll-timezone.ts`의
          *  `validatePollDuration`이 판정한다. FR-034 E1~E3에는 명시되지 않았지만
@@ -1112,6 +1175,8 @@ export const ko = {
       capacityLabel: "참석 {count} / 정원 {capacity}",
       noCapacityLabel: "참석 {count}명 (정원 제한 없음)",
       cancelledBadge: "취소됨",
+      /** 기간 모임 배지 — 캘린더 패널과 같은 값을 쓴다(`common.meetup` docstring 참고). */
+      multiDayBadge: common.meetup.multiDayBadge,
       participants: {
         title: "참석자",
         attending: "참석",

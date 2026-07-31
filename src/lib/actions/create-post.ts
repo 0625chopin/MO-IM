@@ -15,7 +15,11 @@ import {
 } from "@/lib/data";
 import { deriveUserRoleForPermissionCheck } from "@/lib/rules/crew-membership-transition";
 import { isMeetupAttendanceOpen } from "@/lib/rules/meetup-attendance-eligibility";
-import { validateMeetupProposalSchedule } from "@/lib/rules/meetup-proposal-schedule";
+import {
+  type MeetupProposalScheduleField,
+  type MeetupProposalScheduleReason,
+  validateMeetupProposalSchedule,
+} from "@/lib/rules/meetup-proposal-schedule";
 import { checkPermission } from "@/lib/rules/permission";
 import { validatePostContent } from "@/lib/rules/post-content-validation";
 import { strings } from "@/lib/strings";
@@ -69,8 +73,12 @@ export interface CreatePostActionInput {
   body: string;
   /** type='meetup_proposal'·'meetup_reschedule_proposal'일 때만 쓴다. */
   meetupDate?: string;
+  /** 모임 종료일(선택) — 비면 하루짜리 모임이다(다일 모임 지원, 2026-07-31). */
+  meetupEndDate?: string;
   voteDeadline?: string;
   startTime?: string;
+  /** 모임 종료 시각(선택). 시작 시각 없이 넣을 수 없다. */
+  endTime?: string;
   place?: string;
   capacity?: number | null;
   /** type='meetup_reschedule_proposal'일 때만 쓴다 — 대상 기존 Meetup의 id(I-079). */
@@ -81,6 +89,8 @@ export interface CreatePostFieldErrors {
   title?: string;
   body?: string;
   scheduledDate?: string;
+  scheduledEndDate?: string;
+  endTime?: string;
   voteDeadline?: string;
 }
 
@@ -112,14 +122,36 @@ export type CreatePostActionResult =
   | { ok: false; kind: "denied"; code: "forbidden" | "not_found" | "conflict" }
   | { ok: false; kind: "denied"; code: "duplicate_proposal"; conflictingPostId: Id };
 
-const VOTE_DEADLINE_MESSAGES: Record<
-  "in_past" | "after_schedule_date" | "too_short" | "too_long",
-  string
+/**
+ * 일정 검증 위반(필드 × 사유) → 사용자 문구.
+ *
+ * **필드 키가 {@link CreatePostFieldErrors}의 키와 같은 이름이라 그대로 대입한다** — 위반 하나가
+ * 어느 입력 칸에 붙어야 하는지를 판정 쪽(`MeetupProposalScheduleField`)이 이미 정하고 있어서,
+ * 여기서 다시 분기로 옮겨 적을 이유가 없다. 안쪽이 `Partial`인 이유는 사유 유니온이 네 필드
+ * 전체의 합집합이기 때문이다(예: `too_short`는 `voteDeadline`에만 온다) — 판정 함수가 그 필드에
+ * 낼 수 없는 사유는 여기 없고, 없으면 아래 루프가 조용히 건너뛴다.
+ */
+const SCHEDULE_VIOLATION_MESSAGES: Record<
+  MeetupProposalScheduleField,
+  Partial<Record<MeetupProposalScheduleReason, string>>
 > = {
-  in_past: strings.board.write.validation.voteDeadlineInPast,
-  after_schedule_date: strings.board.write.validation.voteDeadlineAfterSchedule,
-  too_short: strings.board.write.validation.voteDeadlineTooShort,
-  too_long: strings.board.write.validation.voteDeadlineTooLong,
+  scheduledDate: {
+    in_past: strings.board.write.validation.scheduledDateInPast,
+  },
+  scheduledEndDate: {
+    before_schedule_date: strings.board.write.validation.scheduledEndDateBeforeStart,
+    duration_too_long: strings.board.write.validation.scheduledEndDateTooLong,
+  },
+  endTime: {
+    before_start_time: strings.board.write.validation.endTimeBeforeStartTime,
+    start_time_missing: strings.board.write.validation.endTimeWithoutStartTime,
+  },
+  voteDeadline: {
+    in_past: strings.board.write.validation.voteDeadlineInPast,
+    after_schedule_date: strings.board.write.validation.voteDeadlineAfterSchedule,
+    too_short: strings.board.write.validation.voteDeadlineTooShort,
+    too_long: strings.board.write.validation.voteDeadlineTooLong,
+  },
 };
 
 export async function createPostAction(
@@ -200,21 +232,24 @@ export async function createPostAction(
 
   const nowIso = new Date().toISOString();
   const meetupDate = input.meetupDate ?? "";
+  const meetupEndDate = input.meetupEndDate ?? "";
+  const startTime = input.startTime ?? "";
+  const endTime = input.endTime ?? "";
   const voteDeadline = input.voteDeadline ?? "";
 
   if (isProposalType) {
     const scheduleViolations = validateMeetupProposalSchedule({
       scheduledDate: meetupDate,
+      scheduledEndDate: meetupEndDate,
+      startTime,
+      endTime,
       voteDeadline,
       nowIso,
     });
     for (const violation of scheduleViolations) {
-      if (violation.field === "scheduledDate" && !fieldErrors.scheduledDate) {
-        fieldErrors.scheduledDate = strings.board.write.validation.scheduledDateInPast;
-      }
-      if (violation.field === "voteDeadline" && !fieldErrors.voteDeadline) {
-        fieldErrors.voteDeadline = VOTE_DEADLINE_MESSAGES[violation.reason];
-      }
+      if (fieldErrors[violation.field] !== undefined) continue;
+      const message = SCHEDULE_VIOLATION_MESSAGES[violation.field][violation.reason];
+      if (message) fieldErrors[violation.field] = message;
     }
   }
 
@@ -229,7 +264,14 @@ export async function createPostAction(
     title: input.title.trim(),
     body: input.body.trim(),
     meetupDate: isProposalType ? meetupDate : null,
+    // 종료일이 시작일과 같으면 null로 저장한다 — DB에서 "하루짜리"는 `meetup_end_date is null`과
+    // `= meetup_date` 둘 다로 표현될 수 있는데, 두 표현이 섞이면 "기간 모임인가"를 판정하는
+    // 코드가 두 갈래가 된다. 입력 시점에 하나로 정규화한다(가결 시 coalesce가 어차피 같은
+    // 값을 만든다).
+    meetupEndDate:
+      isProposalType && meetupEndDate && meetupEndDate !== meetupDate ? meetupEndDate : null,
     startTime: isProposalType ? (input.startTime || null) : null,
+    endTime: isProposalType ? (input.endTime || null) : null,
     place: isProposalType ? (input.place || null) : null,
     // 0·음수 정원은 저장하지 않는다 — D-019의 조건부 UPDATE(`attendingCount < capacity`)가
     // 0 이하를 받으면 "정원 있음 + 항상 마감"이 되어 D-013 "정원 미지정 = 무제한"과 구분이

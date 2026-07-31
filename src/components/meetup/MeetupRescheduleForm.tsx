@@ -7,7 +7,7 @@ import { useState, useTransition } from "react";
 import { getPostDetailHref } from "@/components/board/board-links";
 import { MeetupRescheduleConflict } from "@/components/meetup/MeetupRescheduleConflict";
 import { Button } from "@/components/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { createPostAction, type CreatePostFieldErrors } from "@/lib/actions/create-post";
@@ -75,8 +75,10 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [meetupDate, setMeetupDate] = useState("");
+  const [meetupEndDate, setMeetupEndDate] = useState("");
   const [voteDeadline, setVoteDeadline] = useState(defaultVoteDeadline);
   const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [place, setPlace] = useState("");
   const [capacity, setCapacity] = useState("");
 
@@ -98,8 +100,10 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
         title,
         body,
         meetupDate,
+        meetupEndDate: meetupEndDate || undefined,
         voteDeadline: voteDeadline ? new Date(voteDeadline).toISOString() : undefined,
         startTime: startTime || undefined,
+        endTime: endTime || undefined,
         place: place || undefined,
         capacity: parsedCapacity !== null && !Number.isNaN(parsedCapacity) ? parsedCapacity : null,
       });
@@ -190,6 +194,33 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
             )}
           </Field>
 
+          <Field data-invalid={Boolean(fieldErrors.scheduledEndDate)}>
+            <FieldLabel htmlFor="meetup-reschedule-end-date">
+              {strings.board.write.fields.scheduledEndDate}
+            </FieldLabel>
+            <Input
+              id="meetup-reschedule-end-date"
+              type="date"
+              min={meetupDate || undefined}
+              value={meetupEndDate}
+              onChange={(event) => setMeetupEndDate(event.target.value)}
+              disabled={pending}
+              aria-invalid={Boolean(fieldErrors.scheduledEndDate)}
+              aria-describedby={
+                fieldErrors.scheduledEndDate
+                  ? "meetup-reschedule-end-date-error"
+                  : "meetup-reschedule-end-date-hint"
+              }
+            />
+            {fieldErrors.scheduledEndDate ? (
+              <FieldError id="meetup-reschedule-end-date-error">{fieldErrors.scheduledEndDate}</FieldError>
+            ) : (
+              <FieldDescription id="meetup-reschedule-end-date-hint">
+                {strings.board.write.fields.scheduledEndDateHint}
+              </FieldDescription>
+            )}
+          </Field>
+
           <Field data-invalid={Boolean(fieldErrors.voteDeadline)}>
             <FieldLabel htmlFor="meetup-reschedule-vote-deadline">
               {strings.board.write.fields.voteDeadline}
@@ -217,6 +248,22 @@ export function MeetupRescheduleForm({ crewId, targetMeetupId, currentSchedule }
               onChange={(event) => setStartTime(event.target.value)}
               disabled={pending}
             />
+          </Field>
+
+          <Field data-invalid={Boolean(fieldErrors.endTime)}>
+            <FieldLabel htmlFor="meetup-reschedule-end-time">{strings.board.write.fields.endTime}</FieldLabel>
+            <Input
+              id="meetup-reschedule-end-time"
+              type="time"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
+              disabled={pending}
+              aria-invalid={Boolean(fieldErrors.endTime)}
+              aria-describedby={fieldErrors.endTime ? "meetup-reschedule-end-time-error" : undefined}
+            />
+            {fieldErrors.endTime && (
+              <FieldError id="meetup-reschedule-end-time-error">{fieldErrors.endTime}</FieldError>
+            )}
           </Field>
 
           <Field>

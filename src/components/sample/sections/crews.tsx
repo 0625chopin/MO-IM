@@ -22,6 +22,8 @@ import { InviteMemberDialog } from "@/components/crews/InviteMemberDialog";
 import { JoinRequestButton } from "@/components/crews/JoinRequestButton";
 import { JoinRequestPanel } from "@/components/crews/JoinRequestPanel";
 import { MemberList } from "@/components/crews/MemberList";
+import { MyCrewsSection } from "@/components/crews/MyCrewsSection";
+import { MyCrewsSectionSkeleton } from "@/components/crews/MyCrewsSectionSkeleton";
 import { PrivateCrewNotice } from "@/components/crews/PrivateCrewNotice";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import { PreviewFrame } from "@/components/sample/PreviewFrame";
@@ -65,6 +67,13 @@ const SAMPLE_CREW_CARDS: CrewCardViewModel[] = [
     isMember: false,
     unreadMessageCount: 0,
   },
+];
+
+/** 홈 대시보드 "내 크루" 섹션용 — 이 목록은 정의상 **전부 소속 크루**라 `isMember`가 모두
+ *  true다(위 `SAMPLE_CREW_CARDS`는 탐색 결과라 소속·비소속이 섞여 있다). */
+const SAMPLE_MY_CREW_CARDS: CrewCardViewModel[] = [
+  SAMPLE_CREW_CARDS[0],
+  { ...SAMPLE_CREW_CARDS[2], isMember: true, unreadMessageCount: 0 },
 ];
 
 /** `MemberList` 데모용 고정 데이터(Task 017A) — 오너가 보는 기본 목록. 오너(본인, 탈퇴 불가
@@ -602,6 +611,40 @@ export const crewsSection = defineSection({
           <PreviewFrame height={160}>
             <div className="p-4">
               <ErrorState title={strings.crew.settings.disband.errors.nameMismatch} />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "홈 대시보드 — 내 크루 (MyCrewsSection)",
+      note: "PRD SC-06 \"소속 크루 카드 목록\"입니다. `/crews`의 `CrewCard`를 그대로 재사용하고 열 수만 다릅니다(홈 본문이 좁아 최대 2열) — 프레임 폭을 줄여 1열로 접히는지 확인해 주세요(컨테이너 쿼리 `@md:`). \"빈 상태\"가 이 섹션의 본래 목적 절반입니다: PRD가 \"소속 크루 0개 시 크루 탐색 유도\"를 명시하고, 온보딩 직후 첫 로그인 사용자가 홈에서 처음 만나는 화면이 바로 이것입니다. 실제 홈에서는 이 목록이 접기 셸(아래 '앱 셸' 섹션의 CollapsibleSection) 안에 들어갑니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={260} resizable>
+            <div className="p-4">
+              <MyCrewsSection items={SAMPLE_MY_CREW_CARDS} />
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={260} resizable>
+            <div className="p-4">
+              <MyCrewsSectionSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={260}>
+            <div className="p-4">
+              <MyCrewsSection items={[]} />
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={160}>
+            <div className="p-4">
+              <MyCrewsSection items={[]} error />
             </div>
           </PreviewFrame>
         ),

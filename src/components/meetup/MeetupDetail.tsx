@@ -1,7 +1,11 @@
 import Link from "next/link";
 
 import { CrewLegend } from "@/components/calendar/CrewLegend";
-import { formatStartTimeKo } from "@/components/calendar/date-grid";
+import {
+  countMeetupDays,
+  formatTimeRangeKo,
+  isMultiDayMeetup,
+} from "@/components/calendar/date-grid";
 import type {
   MeetupDetailViewModel,
   MeetupParticipantGroupsView,
@@ -46,7 +50,7 @@ export interface MeetupDetailProps {
  * 플래그로 그 자식을 통째로 숨기지 않는다).
  */
 export function MeetupDetail({ meetup, participants, attendanceState }: MeetupDetailProps) {
-  const timeLabel = formatStartTimeKo(meetup.startTime);
+  const timeLabel = formatTimeRangeKo(meetup.startTime, meetup.endTime);
   const capacityLabel =
     meetup.capacity !== null
       ? t((s) => s.meetup.detail.capacityLabel, {
@@ -63,6 +67,15 @@ export function MeetupDetail({ meetup, participants, attendanceState }: MeetupDe
           <CrewLegend crewName={meetup.crewName} colorIndex={meetup.crewColorIndex} />
           {meetup.isCancelled && (
             <Badge variant="secondary">{strings.meetup.detail.cancelledBadge}</Badge>
+          )}
+          {/* 다일 모임이면 기간 길이를 배지로 함께 보여준다 — 아래 날짜 줄이 이미
+              "8월 1일 토요일 ~ 8월 3일 월요일"로 나오지만, 며칠짜리인지는 배지 쪽이 빠르다. */}
+          {isMultiDayMeetup(meetup.date, meetup.endDate) && (
+            <Badge variant="outline">
+              {t((s) => s.meetup.detail.multiDayBadge, {
+                days: countMeetupDays(meetup.date, meetup.endDate),
+              })}
+            </Badge>
           )}
           {!meetup.isCancelled && (
             <Badge variant={isFull ? "outline" : "secondary"}>

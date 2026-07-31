@@ -1,4 +1,7 @@
-import { formatShortDayLabelKo, formatStartTimeKo } from "@/components/calendar/date-grid";
+import {
+  formatShortDateRangeLabelKo,
+  formatTimeRangeKo,
+} from "@/components/calendar/date-grid";
 import { getCrewHomeHref } from "@/components/crews/crew-links";
 import type { HotMeetupItem } from "@/components/meetup/hot-meetup-types";
 import { HotMeetupList } from "@/components/meetup/HotMeetupList";
@@ -25,7 +28,14 @@ const HOT_MEETUP_LIMIT = 5;
  * 항목이 최댓값이다 — 다시 정렬하지 않는다(정렬 규칙을 두 곳에 두지 않는다, NFR-036과 같은
  * 이유).
  */
-export async function HotMeetupsContainer({ showBrowseCta }: { showBrowseCta?: boolean }) {
+export async function HotMeetupsContainer({
+  showBrowseCta,
+  hideHeading,
+}: {
+  showBrowseCta?: boolean;
+  /** 홈에서는 접기 셸이 제목을 갖는다 — `HotMeetupList`의 같은 prop으로 그대로 흘려보낸다. */
+  hideHeading?: boolean;
+}) {
   let items: HotMeetupItem[];
 
   try {
@@ -42,16 +52,18 @@ export async function HotMeetupsContainer({ showBrowseCta }: { showBrowseCta?: b
       crewCategory: row.crewCategory,
       colorIndex: row.crewColorKey,
       title: row.title,
-      dateLabel: formatShortDayLabelKo(row.date),
-      timeLabel: formatStartTimeKo(row.startTime),
+      // 기간 모임이면 "8월 4일(화) ~ 8월 6일(목)"로 나온다(2026-07-31). RPC가
+      // `end_date >= current_date`로 거르므로 이 목록에는 진행 중인 기간 모임도 들어온다.
+      dateLabel: formatShortDateRangeLabelKo(row.date, row.endDate),
+      timeLabel: formatTimeRangeKo(row.startTime, row.endTime),
       attendingCount: row.attendingCount,
       capacity: row.capacity,
       intensity: row.activityScore / topScore,
     }));
   } catch (error) {
     console.error("[home] failed to load hot public meetups", error);
-    return <HotMeetupList items={[]} error showBrowseCta={showBrowseCta} />;
+    return <HotMeetupList items={[]} error showBrowseCta={showBrowseCta} hideHeading={hideHeading} />;
   }
 
-  return <HotMeetupList items={items} showBrowseCta={showBrowseCta} />;
+  return <HotMeetupList items={items} showBrowseCta={showBrowseCta} hideHeading={hideHeading} />;
 }

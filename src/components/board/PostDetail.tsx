@@ -58,6 +58,16 @@ export function PostDetail({ crewId, post }: { crewId: Id; post: PostDetailViewM
             <time dateTime={post.meetupDate} className="tnum">
               {post.meetupDate}
             </time>
+            {/* 기간 제안이면 종료일까지 보여준다 — 투표자가 "며칠짜리 모임인지" 모른 채
+                찬반을 고르면 안 된다(다일 모임 지원, 2026-07-31). null이면 하루짜리다. */}
+            {post.meetupEndDate && (
+              <>
+                <span aria-hidden="true">~</span>
+                <time dateTime={post.meetupEndDate} className="tnum">
+                  {post.meetupEndDate}
+                </time>
+              </>
+            )}
             {post.meetupDateLocked && (
               <span className="ml-auto flex items-center gap-1 text-xs">
                 <LockIcon aria-hidden="true" className="size-3.5" />

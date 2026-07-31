@@ -38,16 +38,25 @@ export interface HotMeetupListProps {
    * 보는 화면이라 같은 유도가 겉돈다.
    */
   showBrowseCta?: boolean;
+  /**
+   * 제목만 숨기고 부제는 남긴다 — 홈에서는 접기 셸(`CollapsibleSection`)이 제목을 갖지만,
+   * "왜 이 다섯 개인가"를 밝히는 부제는 목록 바로 위에 그대로 있어야 한다(그게 없으면 근거
+   * 없는 랭킹이 된다 — `strings.home.hotMeetups` 주석 참고). 랜딩(`/`)은 셸이 없어 기본값
+   * (false)대로 제목까지 그린다.
+   */
+  hideHeading?: boolean;
   className?: string;
 }
 
-export function HotMeetupList({ items, error, showBrowseCta, className }: HotMeetupListProps) {
+export function HotMeetupList({ items, error, showBrowseCta, hideHeading, className }: HotMeetupListProps) {
   const s = strings.home.hotMeetups;
 
   return (
     <section className={cn("flex flex-col gap-3", className)}>
       <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-base font-medium text-foreground">{s.title}</h2>
+        {!hideHeading && (
+          <h2 className="font-heading text-base font-medium text-foreground">{s.title}</h2>
+        )}
         <p className="text-xs leading-relaxed text-muted-foreground">{s.subtitle}</p>
       </div>
 

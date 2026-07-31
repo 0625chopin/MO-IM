@@ -96,6 +96,7 @@ const SAMPLE_POST_DETAIL: PostDetailViewModel = {
   createdAt: "2026-07-22T10:00:00.000Z",
   editedAt: "2026-07-22T11:30:00.000Z",
   meetupDate: "2026-08-01",
+  meetupEndDate: null,
   pollStatus: "open",
   canEditTitleBody: true,
   canDelete: true,

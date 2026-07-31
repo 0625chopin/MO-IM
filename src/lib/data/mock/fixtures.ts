@@ -181,7 +181,9 @@ function createSeed() {
       title: "이번 주 코스 공지",
       body: "이번 주는 반포 코스로 변경합니다.",
       meetupDate: null,
+      meetupEndDate: null,
       startTime: null,
+      endTime: null,
       place: null,
       capacity: null,
       targetMeetupId: null,
@@ -197,7 +199,9 @@ function createSeed() {
       title: "8/1(토) 아침 러닝 어때요?",
       body: "다음 주 토요일 아침 7시 한강공원에서 뛰어요.",
       meetupDate: "2026-08-01",
+      meetupEndDate: null,
       startTime: "07:00",
+      endTime: "10:00",
       place: "한강공원 반포지구",
       capacity: null,
       targetMeetupId: null,
@@ -213,6 +217,7 @@ function createSeed() {
       title: "지난주 러닝 후기",
       body: "지난주 모임 정산글입니다.",
       meetupDate: "2026-07-18",
+      meetupEndDate: null,
       // 아래 poll-2가 가결(closed_passed)되어 만든 meetup-1은 startTime "07:00"·place·capacity 10을
       // 갖는다(D-013) — 이 post-3은 그와 다르게 셋 다 null이다. 실제 복사 파이프라인
       // (`createMeetupFromPoll`, Task 034 몫)이 아직 없어 손으로 각각 채운 고정 값이라 그렇다 —
@@ -220,6 +225,7 @@ function createSeed() {
       // 버그가 아니다(7일차 CORE 교차검증 지적). Task 034가 실제 파이프라인을 만들면 이 시드도
       // 그 파이프라인으로 재생성해 값을 맞추는 편이 낫다.
       startTime: null,
+      endTime: null,
       place: null,
       capacity: null,
       targetMeetupId: null,
@@ -244,7 +250,9 @@ function createSeed() {
       title: "크루2 정기 모임 안내",
       body: "이번 달 정기 모임은 다음 주 토요일입니다.",
       meetupDate: null,
+      meetupEndDate: null,
       startTime: null,
+      endTime: null,
       place: null,
       capacity: null,
       targetMeetupId: null,
@@ -319,7 +327,9 @@ function createSeed() {
       title: "지난주 러닝",
       description: null,
       date: "2026-07-18",
+      endDate: "2026-07-18",
       startTime: "07:00",
+      endTime: "09:00",
       place: "한강공원 반포지구",
       capacity: 10,
       attendingCount: 1,

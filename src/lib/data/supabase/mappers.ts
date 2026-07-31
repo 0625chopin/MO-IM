@@ -44,14 +44,17 @@ import type { Database, Tables } from "./database.types";
  * 실제로는 셋 다 null이 올 수 있다(`meetups.capacity`는 D-013 "정원 없음",
  * `meetups.start_time`은 시간 미정, `crews.category`는 스키마상 NOT NULL이지만 RPC 시그니처가
  * 보장하지 않는다). 생성 타입을 그대로 믿으면 `capacity`가 null인 모임에서 런타임에만 터진다.
+ * `end_time`(다일 모임 지원, 2026-07-31)도 같은 이유로 여기 목록에 있다 — 반면
+ * `meetup_end_date`는 `meetups.end_date`가 NOT NULL이라 실제로도 non-null이므로 덮지 않는다.
  */
 type HotMeetupRow = Omit<
   Database["public"]["Functions"]["hot_public_meetups"]["Returns"][number],
-  "capacity" | "crew_category" | "start_time"
+  "capacity" | "crew_category" | "start_time" | "end_time"
 > & {
   capacity: number | null;
   crew_category: string | null;
   start_time: string | null;
+  end_time: string | null;
 };
 
 /**
@@ -77,7 +80,9 @@ export function toPost(row: Tables<"posts">): Post {
     title: row.title,
     body: row.body,
     meetupDate: row.meetup_date,
+    meetupEndDate: row.meetup_end_date,
     startTime: row.start_time,
+    endTime: row.end_time,
     place: row.place,
     capacity: row.capacity,
     targetMeetupId: row.target_meetup_id,
@@ -174,7 +179,9 @@ export function toMeetup(row: Tables<"meetups">): Meetup {
     title: row.title,
     description: row.description,
     date: row.date,
+    endDate: row.end_date,
     startTime: row.start_time,
+    endTime: row.end_time,
     place: row.place,
     capacity: row.capacity,
     attendingCount: row.attending_count,
@@ -200,7 +207,9 @@ export function toHotMeetup(row: HotMeetupRow): HotMeetup {
     crewColorKey: row.crew_color_key,
     title: row.title,
     date: row.meetup_date,
+    endDate: row.meetup_end_date,
     startTime: row.start_time,
+    endTime: row.end_time,
     attendingCount: row.attending_count,
     capacity: row.capacity,
     activityScore: row.activity_score,
@@ -224,11 +233,15 @@ export function toMeetupScheduleChange(row: Tables<"meetup_schedule_changes">): 
     meetupId: row.meetup_id,
     pollId: row.poll_id,
     previousDate: row.previous_date,
+    previousEndDate: row.previous_end_date,
     previousStartTime: row.previous_start_time,
+    previousEndTime: row.previous_end_time,
     previousPlace: row.previous_place,
     previousCapacity: row.previous_capacity,
     newDate: row.new_date,
+    newEndDate: row.new_end_date,
     newStartTime: row.new_start_time,
+    newEndTime: row.new_end_time,
     newPlace: row.new_place,
     newCapacity: row.new_capacity,
     changedAt: row.changed_at,

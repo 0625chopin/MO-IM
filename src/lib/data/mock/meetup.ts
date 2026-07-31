@@ -43,15 +43,22 @@ export interface ListMeetupsQuery {
   includeCancelled?: boolean;
 }
 
-/** 캘린더 월간 뷰 + 크루 필터(FR-061). 기본은 취소된 Meetup을 제외한다({@link ListMeetupsQuery.includeCancelled}). */
+/**
+ * 캘린더 월간 뷰 + 크루 필터(FR-061). 기본은 취소된 Meetup을 제외한다({@link ListMeetupsQuery.includeCancelled}).
+ *
+ * **조회 구간과의 관계는 "포함"이 아니라 "겹침"이다**(다일 모임 지원, 2026-07-31) — 조회 창
+ * 이전에 시작해 창 안까지 이어지는 모임을 빠뜨리지 않기 위한 조건이며, 실데이터 구현
+ * (`lib/data/supabase/meetup.ts`)의 `lte("date", to).gte("end_date", from)`과 같은 판정이다
+ * (NFR-035 — 두 구현은 같은 결과를 내야 한다).
+ */
 export async function listMeetupsByCrews(opts: ListMeetupsQuery): Promise<Meetup[]> {
   const crewIdSet = new Set(opts.crewIds);
   return store.meetups.filter(
     (m) =>
       (opts.includeCancelled || m.status === "confirmed") &&
       crewIdSet.has(m.crewId) &&
-      m.date >= opts.from &&
-      m.date <= opts.to,
+      m.date <= opts.to &&
+      m.endDate >= opts.from,
   );
 }
 
@@ -61,7 +68,10 @@ export interface CreateMeetupFromPollInput {
   title: string;
   description?: string | null;
   date: string;
+  /** 생략하면 `date`와 같은 값(하루짜리)으로 저장한다 — `Meetup.endDate`는 non-null이다. */
+  endDate?: string | null;
   startTime?: string | null;
+  endTime?: string | null;
   place?: string | null;
   capacity?: number | null;
 }
@@ -78,7 +88,9 @@ export async function createMeetupFromPoll(input: CreateMeetupFromPollInput): Pr
     title: input.title,
     description: input.description ?? null,
     date: input.date,
+    endDate: input.endDate ?? input.date,
     startTime: input.startTime ?? null,
+    endTime: input.endTime ?? null,
     place: input.place ?? null,
     capacity: input.capacity ?? null,
     attendingCount: 0,

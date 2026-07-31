@@ -77,7 +77,9 @@ export async function getMeetupById(id: Id): Promise<Meetup | null> {
     title: "",
     description: null,
     date: "",
+    endDate: "",
     startTime: null,
+    endTime: null,
     place: null,
     capacity: null,
     attendingCount: 0,
@@ -104,7 +106,14 @@ export interface ListMeetupsQuery {
   includeCancelled?: boolean;
 }
 
-/** 캘린더 월간 뷰 + 크루 필터(FR-061). 기본은 취소된 Meetup을 제외한다. */
+/**
+ * 캘린더 월간 뷰 + 크루 필터(FR-061). 기본은 취소된 Meetup을 제외한다.
+ *
+ * **조회 조건은 "포함"이 아니라 "겹침"이다**(다일 모임 지원, 2026-07-31) — `date >= from and
+ * date <= to`(시작일이 창 안에 있는가)로 두면 7/28~8/3짜리 모임을 8월 화면에서 조회할 때
+ * 시작일이 창 밖이라 사라진다. `date <= to and end_date >= from`(구간 교차)이 정확한 조건이며,
+ * 하루짜리 모임(`end_date = date`)에서는 기존 조건과 결과가 같다.
+ */
 export async function listMeetupsByCrews(opts: ListMeetupsQuery): Promise<Meetup[]> {
   if (opts.crewIds.length === 0) return [];
   const supabase = await createSupabaseServerClient();
@@ -112,8 +121,8 @@ export async function listMeetupsByCrews(opts: ListMeetupsQuery): Promise<Meetup
     .from("meetups")
     .select("*")
     .in("crew_id", opts.crewIds)
-    .gte("date", opts.from)
-    .lte("date", opts.to);
+    .lte("date", opts.to)
+    .gte("end_date", opts.from);
   if (!opts.includeCancelled) query = query.eq("status", "confirmed");
   const { data, error } = await query;
   if (error) throw error;
@@ -137,7 +146,10 @@ export interface CreateMeetupFromPollInput {
   title: string;
   description?: string | null;
   date: string;
+  /** 종료일. 생략하면 `date`와 같은 값(하루짜리)으로 저장한다 — `meetups.end_date`는 NOT NULL이다. */
+  endDate?: string | null;
   startTime?: string | null;
+  endTime?: string | null;
   place?: string | null;
   capacity?: number | null;
 }
@@ -173,7 +185,9 @@ export async function createMeetupFromPoll(input: CreateMeetupFromPollInput): Pr
       title: input.title,
       description: input.description ?? null,
       date: input.date,
+      end_date: input.endDate ?? input.date,
       start_time: input.startTime ?? null,
+      end_time: input.endTime ?? null,
       place: input.place ?? null,
       capacity: input.capacity ?? null,
     })

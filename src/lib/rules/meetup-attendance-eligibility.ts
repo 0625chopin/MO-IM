@@ -22,11 +22,15 @@ export function isMeetupFull(meetup: Pick<Meetup, "capacity" | "attendingCount">
 /**
  * FR-066 사전조건 "Meetup이 확정(confirmed) 상태이고 예정일이 지나지 않았다" — FR-067 E1의
  * "예정일 경과 → 취소 불가"도 같은 판정을 공유한다. 날짜(YYYY-MM-DD) 문자열 사전순 비교이므로
- * `meetup.date >= todayIso`면 아직 열려 있다(모임 당일까지는 응답 가능).
+ * `>= todayIso`면 아직 열려 있다(모임 당일까지는 응답 가능).
+ *
+ * **기준은 시작일이 아니라 종료일이다**(다일 모임 지원, 2026-07-31) — 8/1~8/5짜리 모임이
+ * 8/2에 닫히면 아직 진행 중인 모임의 참석 응답·취소·일정 변경 제안이 전부 막힌다. 하루짜리
+ * 모임에서는 `endDate === date`라 판정 결과가 이전과 같다.
  */
 export function isMeetupAttendanceOpen(
-  meetup: Pick<Meetup, "status" | "date">,
+  meetup: Pick<Meetup, "status" | "endDate">,
   todayIso: ISODateString,
 ): boolean {
-  return meetup.status === "confirmed" && meetup.date >= todayIso;
+  return meetup.status === "confirmed" && meetup.endDate >= todayIso;
 }

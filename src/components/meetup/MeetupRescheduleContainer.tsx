@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { formatDayLabelKo, formatStartTimeKo, todayIsoUtc } from "@/components/calendar/date-grid";
+import {
+  formatDateRangeLabelKo,
+  formatTimeRangeKo,
+  todayIsoUtc,
+} from "@/components/calendar/date-grid";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import { MeetupRescheduleConflict } from "@/components/meetup/MeetupRescheduleConflict";
 import { MeetupRescheduleForm } from "@/components/meetup/MeetupRescheduleForm";
@@ -91,8 +95,8 @@ export async function MeetupRescheduleContainer({ meetupId }: MeetupRescheduleCo
       crewId={meetup.crewId}
       targetMeetupId={meetup.id}
       currentSchedule={{
-        dateLabel: formatDayLabelKo(meetup.date),
-        startTimeLabel: formatStartTimeKo(meetup.startTime),
+        dateLabel: formatDateRangeLabelKo(meetup.date, meetup.endDate),
+        startTimeLabel: formatTimeRangeKo(meetup.startTime, meetup.endTime),
         place: meetup.place,
         capacity: meetup.capacity,
       }}

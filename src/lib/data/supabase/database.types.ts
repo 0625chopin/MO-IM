@@ -603,11 +603,15 @@ export type Database = {
           meetup_id: string
           new_capacity: number | null
           new_date: string
+          new_end_date: string
+          new_end_time: string | null
           new_place: string | null
           new_start_time: string | null
           poll_id: string
           previous_capacity: number | null
           previous_date: string
+          previous_end_date: string
+          previous_end_time: string | null
           previous_place: string | null
           previous_start_time: string | null
         }
@@ -617,11 +621,15 @@ export type Database = {
           meetup_id: string
           new_capacity?: number | null
           new_date: string
+          new_end_date: string
+          new_end_time?: string | null
           new_place?: string | null
           new_start_time?: string | null
           poll_id: string
           previous_capacity?: number | null
           previous_date: string
+          previous_end_date: string
+          previous_end_time?: string | null
           previous_place?: string | null
           previous_start_time?: string | null
         }
@@ -631,11 +639,15 @@ export type Database = {
           meetup_id?: string
           new_capacity?: number | null
           new_date?: string
+          new_end_date?: string
+          new_end_time?: string | null
           new_place?: string | null
           new_start_time?: string | null
           poll_id?: string
           previous_capacity?: number | null
           previous_date?: string
+          previous_end_date?: string
+          previous_end_time?: string | null
           previous_place?: string | null
           previous_start_time?: string | null
         }
@@ -664,6 +676,8 @@ export type Database = {
           crew_id: string
           date: string
           description: string | null
+          end_date: string
+          end_time: string | null
           id: string
           place: string | null
           poll_id: string
@@ -678,6 +692,8 @@ export type Database = {
           crew_id: string
           date: string
           description?: string | null
+          end_date: string
+          end_time?: string | null
           id?: string
           place?: string | null
           poll_id: string
@@ -692,6 +708,8 @@ export type Database = {
           crew_id?: string
           date?: string
           description?: string | null
+          end_date?: string
+          end_time?: string | null
           id?: string
           place?: string | null
           poll_id?: string
@@ -925,8 +943,10 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           edited_at: string | null
+          end_time: string | null
           id: string
           meetup_date: string | null
+          meetup_end_date: string | null
           place: string | null
           start_time: string | null
           target_meetup_id: string | null
@@ -941,8 +961,10 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
+          end_time?: string | null
           id?: string
           meetup_date?: string | null
+          meetup_end_date?: string | null
           place?: string | null
           start_time?: string | null
           target_meetup_id?: string | null
@@ -957,8 +979,10 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           edited_at?: string | null
+          end_time?: string | null
           id?: string
           meetup_date?: string | null
+          meetup_end_date?: string | null
           place?: string | null
           start_time?: string | null
           target_meetup_id?: string | null
@@ -1269,8 +1293,10 @@ export type Database = {
           crew_color_key: number
           crew_id: string
           crew_name: string
+          end_time: string
           id: string
           meetup_date: string
+          meetup_end_date: string
           start_time: string
           title: string
         }[]

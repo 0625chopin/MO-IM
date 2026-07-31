@@ -165,3 +165,82 @@ export function formatStartTimeKo(startTime: string | null): string | null {
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   return `${period} ${hour12}:${String(minute).padStart(2, "0")}`;
 }
+
+// ---- 기간(다일) 모임 표시 (2026-07-31) --------------------------------------
+//
+// 아래 세 함수의 구분자 "~"와 "일간" 같은 조각은 위 `formatShortDayLabelKo`가 이미 "월"·"일"을
+// 직접 쓰는 것과 같은 자리에 있다(Intl 산출물에 인접한 날짜 표기 가공) — `ko.ts` 하드코딩
+// 금지(NFR-023)의 대상은 화면 문구이고, 여기는 날짜 포맷터다. 새 문구가 필요해지면(예: "종일")
+// 그것은 `ko.ts`로 간다.
+
+/** 시작일 ≠ 종료일이면 기간(다일) 모임이다. `endDate`는 non-null 규약(`Meetup.endDate`)이지만
+ *  방어적으로 빈 값도 하루짜리로 본다. */
+export function isMultiDayMeetup(startIso: ISODateString, endIso: ISODateString | null): boolean {
+  return Boolean(endIso) && endIso !== startIso;
+}
+
+/** 며칠에 걸치는지(양끝 포함). 하루짜리면 1. */
+export function countMeetupDays(startIso: ISODateString, endIso: ISODateString | null): number {
+  if (!isMultiDayMeetup(startIso, endIso)) return 1;
+  const MS_PER_DAY = 86_400_000;
+  const diff = Date.parse(`${endIso}T00:00:00Z`) - Date.parse(`${startIso}T00:00:00Z`);
+  return Math.max(1, Math.round(diff / MS_PER_DAY) + 1);
+}
+
+/**
+ * 시작일부터 종료일까지의 ISO 날짜를 **양끝 포함**으로 전개한다. 하루짜리면 원소 1개.
+ *
+ * 기간 모임을 "걸치는 날짜마다" 인덱싱해야 하는 곳(`MonthCalendarContainer`의 날짜별 상세
+ * 패널)이 쓴다. 종료일이 시작일보다 앞서는 비정상 입력은 시작일 하루만 돌려준다 — 목록 화면이
+ * 잘못된 데이터 하나 때문에 빈 배열이나 무한 루프로 무너지지 않게 하는 방어다.
+ */
+export function eachDateIso(
+  startIso: ISODateString,
+  endIso: ISODateString | null,
+): ISODateString[] {
+  if (!isMultiDayMeetup(startIso, endIso) || endIso! < startIso) return [startIso];
+  const result: ISODateString[] = [];
+  const cursor = new Date(`${startIso}T00:00:00Z`);
+  const last = Date.parse(`${endIso}T00:00:00Z`);
+  while (cursor.getTime() <= last) {
+    result.push(
+      formatIsoDate(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, cursor.getUTCDate()),
+    );
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return result;
+}
+
+/** 상세 화면용 날짜 문구 — 하루짜리면 {@link formatDayLabelKo}와 같은 결과다. */
+export function formatDateRangeLabelKo(
+  startIso: ISODateString,
+  endIso: ISODateString | null,
+): string {
+  if (!isMultiDayMeetup(startIso, endIso)) return formatDayLabelKo(startIso);
+  return `${formatDayLabelKo(startIso)} ~ ${formatDayLabelKo(endIso!)}`;
+}
+
+/** 목록·요약용 짧은 날짜 문구 — 하루짜리면 {@link formatShortDayLabelKo}와 같은 결과다. */
+export function formatShortDateRangeLabelKo(
+  startIso: ISODateString,
+  endIso: ISODateString | null,
+): string {
+  if (!isMultiDayMeetup(startIso, endIso)) return formatShortDayLabelKo(startIso);
+  return `${formatShortDayLabelKo(startIso)} ~ ${formatShortDayLabelKo(endIso!)}`;
+}
+
+/**
+ * 시각 문구 — 시작만 있으면 "오전 7:00", 둘 다 있으면 "오전 7:00 ~ 오전 9:00".
+ * 시작 시각이 없으면 종료 시각도 표시하지 않는다(`null`) — 데이터 계약상 그 조합은
+ * 만들어질 수 없고(DB CHECK), 만에 하나 들어와도 "언제부터인지 모르는 종료 시각"은
+ * 사용자에게 의미가 없다.
+ */
+export function formatTimeRangeKo(
+  startTime: string | null,
+  endTime: string | null,
+): string | null {
+  const start = formatStartTimeKo(startTime);
+  if (!start) return null;
+  const end = formatStartTimeKo(endTime);
+  return end ? `${start} ~ ${end}` : start;
+}

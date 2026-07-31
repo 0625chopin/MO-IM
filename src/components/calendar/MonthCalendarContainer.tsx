@@ -5,6 +5,7 @@ import { CrewFilterPanel } from "@/components/calendar/CrewFilterPanel";
 import {
   addMonths,
   currentYearMonthUtc,
+  eachDateIso,
   formatIsoDate,
   getMonthRangeIso,
   parseMonthParam,
@@ -101,36 +102,63 @@ export async function MonthCalendarContainer({ monthParam }: MonthCalendarContai
     );
   });
 
-  // 날짜별 그룹핑(사전 인덱싱).
+  // 날짜별 그룹핑(사전 인덱싱). **기간 모임은 걸치는 모든 날짜에 등록한다**(다일 모임 지원,
+  // 2026-07-31) — 8/1~8/5 모임의 8/3 셀을 눌렀을 때 그 날짜 패널(FR-063)에 이 모임이 없으면
+  // 사용자에게는 "진행 중인데 안 보이는" 상태가 된다. 격자 막대는 이와 별개로 이벤트 하나만
+  // 만든다(아래) — Schedule-X가 start~end를 여러 셀에 걸친 하나의 막대로 그린다.
   const meetupsByDate = new Map<string, Meetup[]>();
   for (const meetup of windowMeetups) {
-    const list = meetupsByDate.get(meetup.date);
-    if (list) list.push(meetup);
-    else meetupsByDate.set(meetup.date, [meetup]);
+    for (const iso of eachDateIso(meetup.date, meetup.endDate)) {
+      const list = meetupsByDate.get(iso);
+      if (list) list.push(meetup);
+      else meetupsByDate.set(iso, [meetup]);
+    }
   }
 
   const events: ScheduleXEventInput[] = [];
   const detailsByDate: Record<string, CalendarMeetupDetail[]> = {};
 
-  for (const [iso, dayMeetupsRaw] of meetupsByDate) {
+  // D-026 충돌 회피 결과를 **Meetup 단위로** 고정한다. 기간 모임은 여러 날짜 셀에 걸치는데
+  // 색을 날짜마다 다시 뽑으면 하나의 막대가 날짜에 따라 다른 색을 요구하게 되어 모순이다.
+  // 아래 루프를 날짜 오름차순으로 돌면서 "이미 색이 정해진(= 이전 날짜에 시작한) 모임"의 색을
+  // 먼저 점유시키므로, 나중에 시작하는 모임은 그 색을 피해 배정된다.
+  const colorIndexByMeetupId = new Map<string, number>();
+  const sortedDateIsos = [...meetupsByDate.keys()].sort();
+
+  for (const iso of sortedDateIsos) {
     // 시작 시각 → id 순 정렬(매 렌더 같은 결과).
-    const dayMeetups = dayMeetupsRaw
+    const dayMeetups = meetupsByDate
+      .get(iso)!
       .slice()
       .sort(
         (a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? "") || a.id.localeCompare(b.id),
       );
 
-    // D-026 같은 날짜 셀 충돌 회피 — 날짜마다 새로 계산한다. 크루당 한 번만 판정하고(같은
-    // 크루의 여러 Meetup은 항상 같은 색), 취소분도 순회에 포함시켜 격자(확정)와 패널(전체)이
-    // 크루당 같은 색을 쓰게 한다.
+    // 1단계 — 이 날짜에 걸쳐 있으면서 이미 색이 확정된 모임의 색을 점유로 등록한다.
     const occupiedIndices: number[] = [];
     const colorIndexByCrewId = new Map<string, number>();
     for (const meetup of dayMeetups) {
-      if (colorIndexByCrewId.has(meetup.crewId)) continue;
+      const fixed = colorIndexByMeetupId.get(meetup.id);
+      if (fixed === undefined) continue;
+      occupiedIndices.push(fixed);
+      colorIndexByCrewId.set(meetup.crewId, fixed);
+    }
+
+    // 2단계 — 이 날짜에 처음 등장하는 모임에 색을 배정한다. 크루당 한 번만 판정하고(같은
+    // 크루의 여러 Meetup은 항상 같은 색), 취소분도 순회에 포함시켜 격자(확정)와 패널(전체)이
+    // 크루당 같은 색을 쓰게 한다.
+    for (const meetup of dayMeetups) {
+      if (colorIndexByMeetupId.has(meetup.id)) continue;
+      const sameCrewIndex = colorIndexByCrewId.get(meetup.crewId);
+      if (sameCrewIndex !== undefined) {
+        colorIndexByMeetupId.set(meetup.id, sameCrewIndex);
+        continue;
+      }
       const baseIndex = crewById.get(meetup.crewId)?.colorKey ?? 0;
       const resolved = resolveCrewColorCollision(baseIndex, occupiedIndices);
       occupiedIndices.push(resolved);
       colorIndexByCrewId.set(meetup.crewId, resolved);
+      colorIndexByMeetupId.set(meetup.id, resolved);
     }
 
     // 패널용: 전체(취소 포함).
@@ -139,8 +167,11 @@ export async function MonthCalendarContainer({ monthParam }: MonthCalendarContai
       crewId: meetup.crewId,
       crewName: crewById.get(meetup.crewId)?.name ?? "",
       title: meetup.title,
-      colorIndex: colorIndexByCrewId.get(meetup.crewId) ?? 0,
+      colorIndex: colorIndexByMeetupId.get(meetup.id) ?? 0,
+      date: meetup.date,
+      endDate: meetup.endDate,
       startTime: meetup.startTime,
+      endTime: meetup.endTime,
       place: meetup.place,
       attendingCount: meetup.attendingCount,
       capacity: meetup.capacity,
@@ -150,19 +181,22 @@ export async function MonthCalendarContainer({ monthParam }: MonthCalendarContai
       isArchivedCrew: crewById.get(meetup.crewId)?.status === "archived",
       postHref: postHrefByMeetupId.get(meetup.id) ?? null,
     }));
+  }
 
-    // 격자용: 확정만(기존 바 규칙과 동일 — archived 크루 여부와 무관하게 이 필터는 그대로
-    // 둔다. 미래 Meetup은 해산 시 `cancelled`로 전이되므로 이 필터 하나로 계속 숨는다).
-    for (const meetup of dayMeetups) {
-      if (meetup.status !== "confirmed") continue;
-      events.push({
-        id: meetup.id,
-        iso,
-        title: meetup.title,
-        crewName: crewById.get(meetup.crewId)?.name ?? "",
-        colorIndex: colorIndexByCrewId.get(meetup.crewId) ?? 0,
-      });
-    }
+  // 격자용: 확정만, **Meetup당 이벤트 하나**(기존 바 규칙과 동일 — archived 크루 여부와
+  // 무관하게 이 필터는 그대로 둔다. 미래 Meetup은 해산 시 `cancelled`로 전이되므로 이 필터
+  // 하나로 계속 숨는다). 날짜별 루프 밖에 둔 이유는 기간 모임이 날짜 수만큼 중복 등록되면
+  // 안 되기 때문이다.
+  for (const meetup of windowMeetups) {
+    if (meetup.status !== "confirmed") continue;
+    events.push({
+      id: meetup.id,
+      iso: meetup.date,
+      endIso: meetup.endDate,
+      title: meetup.title,
+      crewName: crewById.get(meetup.crewId)?.name ?? "",
+      colorIndex: colorIndexByMeetupId.get(meetup.id) ?? 0,
+    });
   }
 
   const initialDateIso = formatIsoDate(year, month, 1);

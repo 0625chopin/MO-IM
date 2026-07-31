@@ -146,12 +146,30 @@ function PostWriteFormFields({ crewId, initialValues, draftRestored }: PostWrite
     setDuplicateWarning(false);
   }
 
-  function handleMeetupDateBlur() {
-    if (values.type !== "meetup_proposal" || !values.meetupDate) return;
+  /**
+   * FR-034 E4 비차단 중복 확인. **기간 모임이면 기간 전체가 확인 범위다**(2026-07-31) —
+   * 종료일 칸에서도 같은 확인을 돌리는 이유이며(`handleMeetupEndDateChange`), 시작일만 보면
+   * "8/1~8/5 제안 vs 8/3 확정 모임"을 놓친다.
+   */
+  function runDuplicateCheck(date: string, endDate: string) {
+    if (values.type !== "meetup_proposal" || !date) return;
     startDuplicateCheck(async () => {
-      const result = await checkDuplicateMeetupDateAction({ crewId, date: values.meetupDate });
+      const result = await checkDuplicateMeetupDateAction({ crewId, date, endDate });
       setDuplicateWarning(result.duplicate);
     });
+  }
+
+  function handleMeetupDateBlur() {
+    runDuplicateCheck(values.meetupDate, values.meetupEndDate);
+  }
+
+  function handleMeetupEndDateChange(value: string) {
+    updateField("meetupEndDate", value);
+    setDuplicateWarning(false);
+  }
+
+  function handleMeetupEndDateBlur() {
+    runDuplicateCheck(values.meetupDate, values.meetupEndDate);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -169,8 +187,10 @@ function PostWriteFormFields({ crewId, initialValues, draftRestored }: PostWrite
         title: values.title,
         body: values.body,
         meetupDate: isProposal ? values.meetupDate : undefined,
+        meetupEndDate: isProposal ? values.meetupEndDate : undefined,
         voteDeadline: isProposal && values.voteDeadline ? new Date(values.voteDeadline).toISOString() : undefined,
         startTime: isProposal ? values.startTime : undefined,
+        endTime: isProposal ? values.endTime : undefined,
         place: isProposal ? values.place : undefined,
         capacity: isProposal && parsedCapacity !== null && !Number.isNaN(parsedCapacity) ? parsedCapacity : null,
       });
@@ -284,6 +304,38 @@ function PostWriteFormFields({ crewId, initialValues, draftRestored }: PostWrite
               )}
             </Field>
 
+            <Field data-invalid={Boolean(fieldErrors.scheduledEndDate)}>
+              <FieldLabel htmlFor="post-write-meetup-end-date">
+                {strings.board.write.fields.scheduledEndDate}
+              </FieldLabel>
+              <Input
+                id="post-write-meetup-end-date"
+                type="date"
+                // 브라우저 날짜 선택기가 시작일 이전을 아예 못 고르게 한다 — 검증(Server
+                // Action·DB CHECK)은 그대로 두고 입력 단계에서 실수를 줄이는 힌트다.
+                min={values.meetupDate || undefined}
+                value={values.meetupEndDate}
+                onChange={(event) => handleMeetupEndDateChange(event.target.value)}
+                onBlur={handleMeetupEndDateBlur}
+                disabled={pending}
+                aria-invalid={Boolean(fieldErrors.scheduledEndDate)}
+                aria-describedby={
+                  fieldErrors.scheduledEndDate
+                    ? "post-write-meetup-end-date-error"
+                    : "post-write-meetup-end-date-hint"
+                }
+              />
+              {fieldErrors.scheduledEndDate ? (
+                <FieldError id="post-write-meetup-end-date-error">
+                  {fieldErrors.scheduledEndDate}
+                </FieldError>
+              ) : (
+                <FieldDescription id="post-write-meetup-end-date-hint">
+                  {strings.board.write.fields.scheduledEndDateHint}
+                </FieldDescription>
+              )}
+            </Field>
+
             <Field data-invalid={Boolean(fieldErrors.voteDeadline)}>
               <FieldLabel htmlFor="post-write-vote-deadline">
                 {strings.board.write.fields.voteDeadline}
@@ -311,6 +363,22 @@ function PostWriteFormFields({ crewId, initialValues, draftRestored }: PostWrite
                 onChange={(event) => updateField("startTime", event.target.value)}
                 disabled={pending}
               />
+            </Field>
+
+            <Field data-invalid={Boolean(fieldErrors.endTime)}>
+              <FieldLabel htmlFor="post-write-end-time">{strings.board.write.fields.endTime}</FieldLabel>
+              <Input
+                id="post-write-end-time"
+                type="time"
+                value={values.endTime}
+                onChange={(event) => updateField("endTime", event.target.value)}
+                disabled={pending}
+                aria-invalid={Boolean(fieldErrors.endTime)}
+                aria-describedby={fieldErrors.endTime ? "post-write-end-time-error" : undefined}
+              />
+              {fieldErrors.endTime && (
+                <FieldError id="post-write-end-time-error">{fieldErrors.endTime}</FieldError>
+              )}
             </Field>
 
             <Field>

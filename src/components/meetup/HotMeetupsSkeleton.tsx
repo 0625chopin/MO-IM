@@ -7,12 +7,15 @@ import { Skeleton } from "@/components/ui/skeleton";
  * 실제 `HotMeetupList`의 모양을 흉내 낸다: 제목+부제 두 줄, 그리고 행 3개(각 행은 본문 +
  * 잔물결 막대라 실제보다 살짝 높다). 5개를 다 그리지 않는 이유는 스켈레톤이 화면을 가득
  * 채우면 로딩이 더 길게 느껴지기 때문이다.
+ *
+ * `hideHeading`은 `HotMeetupList`의 같은 이름 prop과 짝이다 — 홈에서는 접기 셸이 이미 진짜
+ * 제목을 그려 두므로, 그 아래 제목 스켈레톤이 한 줄 더 깜빡이면 제목이 둘로 보인다.
  */
-export function HotMeetupsSkeleton() {
+export function HotMeetupsSkeleton({ hideHeading }: { hideHeading?: boolean } = {}) {
   return (
     <div className="flex flex-col gap-3" aria-busy="true">
       <div className="flex flex-col gap-1.5">
-        <Skeleton className="h-5 w-32" />
+        {!hideHeading && <Skeleton className="h-5 w-32" />}
         <Skeleton className="h-3 w-64 max-w-full" />
       </div>
       <div className="flex flex-col gap-1.5">

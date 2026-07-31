@@ -23,6 +23,13 @@ export interface Post {
   /** 모임 제안글(type='meetup_proposal'·'meetup_reschedule_proposal')에서만 의미 있다. */
   meetupDate: ISODateString | null;
   /**
+   * 모임 종료일 — **선택 입력이라 nullable이며, null이면 하루짜리 제안이다**(`Meetup.endDate`가
+   * non-null인 것과 의도적으로 다르다. 제안글은 "입력하지 않았다"를 표현해야 하고, Meetup은
+   * 확정된 기간을 표현한다). 가결 시 `finalize_closed_poll`이
+   * `coalesce(meetup_end_date, meetup_date)`로 `meetups.end_date`에 담는다.
+   */
+  meetupEndDate: ISODateString | null;
+  /**
    * 모임 제안글의 선택 입력 3종(D-013) — 시작 시각·장소·정원. `meetupDate`와 같은 이유로
    * `general` 게시글에서는 항상 null이다. 가결(closed_passed) 시 Task 034의 판정 파이프라인이
    * 이 값들을 그대로 `createMeetupFromPoll`(`lib/data/mock/meetup.ts`)의 입력으로 옮긴다 —
@@ -32,6 +39,8 @@ export interface Post {
    * 가리키는 기존 Meetup 행을 UPDATE한다(새 Meetup INSERT 아님, I-079).
    */
   startTime: string | null;
+  /** 모임 종료 시각(선택). `startTime`이 없으면 이 값도 없다(DB CHECK). */
+  endTime: string | null;
   place: string | null;
   capacity: number | null;
   /**

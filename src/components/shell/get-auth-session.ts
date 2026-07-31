@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { getSupabaseAuthUser } from "@/lib/auth";
 import { countUnreadNotifications, getProfileById } from "@/lib/data";
 import { evaluateDeactivationGracePeriod } from "@/lib/rules/auth-credentials";
@@ -36,8 +38,24 @@ import type { AuthSession } from "./auth-session";
  * `forbidden`과 분리해 `reason: "deactivated"`로 반환한다. `(app)/layout.tsx`가 이 reason만
  * `/account/restore`로 보내 AC3(복구) 진입점을 제공한다 — 상세는 `docs/decisions/
  * account-lifecycle-039.md` 참고.
+ *
+ * ## `React.cache`로 요청 단위 메모이즈 (2026-07-31)
+ *
+ * **한 요청 안에서 이 함수를 몇 번 부르든 조회는 한 번만 일어난다.** 그 전에는 부르는 만큼
+ * `supabase.auth.getUser()`(= Supabase Auth 서버 왕복) + 프로필 조회 + 안읽음 카운트가 그대로
+ * 반복됐다 — 레이아웃 둘과 헤더 벨이 이미 각자 부르고 있었고, 홈 대시보드에 섹션 컨테이너가
+ * 늘면서 한 페이지에서 대여섯 번이 되자 **Supabase Auth가 429(`over_request_rate_limit`)로
+ * 거절해 `/home`이 500으로 떨어졌다**(실측). 컨테이너를 줄여 호출 수를 관리하는 방식은 컨테이너가
+ * 늘 때마다 같은 문제가 재발하므로, 호출 쪽이 아니라 여기서 막는다.
+ *
+ * `cache`는 **현재 요청 스코프**다 — 요청마다 새 메모 테이블이라 사용자 간 세션이 섞이지
+ * 않는다(Next.js `fetching-data` 문서 "React.cache is scoped to the current request only").
+ * Next.js 인증 가이드(`02-guides/authentication.md`)가 세션 조회(`verifySession`)에 정확히 이
+ * 패턴을 권장한다. 여기서 캐시되는 것은 **읽기 판정**뿐이고 로그인·로그아웃 같은 쓰기는
+ * `lib/auth`에 그대로 있다 — 쓰기 후에는 새 요청이 시작되므로 이 메모가 오래된 세션을
+ * 되돌려 주지 않는다.
  */
-export async function getAuthSession(): Promise<AuthSession> {
+export const getAuthSession = cache(async function getAuthSession(): Promise<AuthSession> {
   const authUser = await getSupabaseAuthUser();
   if (!authUser) {
     return { status: "guest" };
@@ -75,4 +93,4 @@ export async function getAuthSession(): Promise<AuthSession> {
     unreadNotificationCount,
     isSystemAdmin: profile.isSystemAdmin,
   };
-}
+});

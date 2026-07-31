@@ -11,7 +11,22 @@ export interface Meetup {
   title: string;
   description: string | null;
   date: ISODateString;
+  /**
+   * 종료일. **하루짜리 모임이면 `date`와 같은 값이며 null이 되지 않는다** — "하루짜리"는
+   * 별도 표현이 아니라 기간이 하루인 경우다(DB `meetups.end_date`도 NOT NULL). null을
+   * "하루짜리"로 쓰지 않은 이유는 캘린더 겹침 조회가 매번 `endDate ?? date`를 타야 하고,
+   * 그 폴백을 한 곳이라도 빠뜨리면 진행 중인 기간 모임이 목록에서 조용히 사라지기 때문이다.
+   * 반대로 **제안글(`Post.meetupEndDate`)에서는 nullable이다** — 그쪽은 "입력하지 않았다"를
+   * 표현해야 하고, 가결 시 `coalesce(meetupEndDate, meetupDate)`로 이 필드에 담긴다.
+   */
+  endDate: ISODateString;
   startTime: string | null;
+  /**
+   * 종료 시각(선택, D-013). `startTime`이 없으면 이 값도 없다(DB CHECK
+   * `meetups_end_time_requires_start_time_check`). 같은 날 끝나는 모임이면 `startTime`보다
+   * 뒤여야 하지만, 날짜를 넘기면 그 제약이 없다 — "22:00 시작 → 다음 날 02:00 종료"는 정상이다.
+   */
+  endTime: string | null;
   place: string | null;
   /** 정원(선택, D-013). null이면 정원 제한 없음 — 조건부 UPDATE 판정을 거치지 않는다. */
   capacity: number | null;
@@ -54,11 +69,17 @@ export interface MeetupScheduleChange {
   /** 이 변경을 가결시킨 "일정 변경 투표"의 pollId — Meetup을 최초로 만든 poll과는 다른 poll이다. */
   pollId: Id;
   previousDate: ISODateString;
+  /** 변경 전 종료일. `Meetup.endDate`와 같은 이유로 non-null(하루짜리면 `previousDate`와 같다). */
+  previousEndDate: ISODateString;
   previousStartTime: string | null;
+  previousEndTime: string | null;
   previousPlace: string | null;
   previousCapacity: number | null;
   newDate: ISODateString;
+  /** 변경 후 종료일. non-null — 하루짜리면 `newDate`와 같다. */
+  newEndDate: ISODateString;
   newStartTime: string | null;
+  newEndTime: string | null;
   newPlace: string | null;
   newCapacity: number | null;
   changedAt: ISODateTimeString;
@@ -109,7 +130,10 @@ export interface HotMeetup {
   crewColorKey: number;
   title: string;
   date: ISODateString;
+  /** `Meetup.endDate`와 같은 규약 — 하루짜리면 `date`와 같다. */
+  endDate: ISODateString;
   startTime: string | null;
+  endTime: string | null;
   attendingCount: number;
   /** null이면 정원 제한 없음(D-013). */
   capacity: number | null;

@@ -2,7 +2,11 @@ import { notFound } from "next/navigation";
 
 import { getPostDetailHref } from "@/components/board/board-links";
 import { formatPostDate } from "@/components/board/format-post-date";
-import { formatDayLabelKo, formatStartTimeKo, todayIsoUtc } from "@/components/calendar/date-grid";
+import {
+  formatDateRangeLabelKo,
+  formatTimeRangeKo,
+  todayIsoUtc,
+} from "@/components/calendar/date-grid";
 import { RouteErrorBoundary } from "@/components/errors/RouteErrorBoundary";
 import type { MeetupScheduleChangeView } from "@/components/meetup/meetup-view-models";
 import { MeetupDetail } from "@/components/meetup/MeetupDetail";
@@ -166,12 +170,14 @@ export async function MeetupDetailContainer({ meetupId }: MeetupDetailContainerP
     // 재사용한다 — "일정 변경 이력"의 changedAt도 서버 렌더 시각 고정값이라 같은 이유
     // (상대 시각을 쓰지 않는다, NFR-025)로 같은 함수가 맞다.
     changedAtLabel: formatPostDate(change.changedAt),
-    previousDateLabel: formatDayLabelKo(change.previousDate),
-    previousStartTimeLabel: formatStartTimeKo(change.previousStartTime),
+    // 다일 모임(2026-07-31) — 이력도 기간·시각 범위로 보여준다. 하루짜리 변경이면
+    // 이전과 같은 문구가 나온다(`formatDateRangeLabelKo`가 그때는 `formatDayLabelKo`와 같다).
+    previousDateLabel: formatDateRangeLabelKo(change.previousDate, change.previousEndDate),
+    previousStartTimeLabel: formatTimeRangeKo(change.previousStartTime, change.previousEndTime),
     previousPlace: change.previousPlace,
     previousCapacity: change.previousCapacity,
-    newDateLabel: formatDayLabelKo(change.newDate),
-    newStartTimeLabel: formatStartTimeKo(change.newStartTime),
+    newDateLabel: formatDateRangeLabelKo(change.newDate, change.newEndDate),
+    newStartTimeLabel: formatTimeRangeKo(change.newStartTime, change.newEndTime),
     newPlace: change.newPlace,
     newCapacity: change.newCapacity,
   }));
@@ -186,8 +192,10 @@ export async function MeetupDetailContainer({ meetupId }: MeetupDetailContainerP
         crewName: crew.name,
         crewColorIndex: crew.colorKey,
         date: meetup.date,
-        dateLabel: formatDayLabelKo(meetup.date),
+        endDate: meetup.endDate,
+        dateLabel: formatDateRangeLabelKo(meetup.date, meetup.endDate),
         startTime: meetup.startTime,
+        endTime: meetup.endTime,
         place: meetup.place,
         capacity: meetup.capacity,
         attendingCount: meetup.attendingCount,

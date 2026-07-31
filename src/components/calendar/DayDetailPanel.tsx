@@ -4,7 +4,12 @@ import Link from "next/link";
 
 import type { CalendarMeetupDetail } from "@/components/calendar/calendar-types";
 import { CrewLegend } from "@/components/calendar/CrewLegend";
-import { formatStartTimeKo } from "@/components/calendar/date-grid";
+import {
+  countMeetupDays,
+  formatShortDateRangeLabelKo,
+  formatTimeRangeKo,
+  isMultiDayMeetup,
+} from "@/components/calendar/date-grid";
 import { getMeetupDetailHref } from "@/components/meetup/meetup-links";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -138,7 +143,14 @@ function DayDetailSkeletonRows() {
 }
 
 function DayDetailMeetupRow({ meetup }: { meetup: CalendarMeetupDetail }) {
-  const timeLabel = formatStartTimeKo(meetup.startTime) ?? strings.calendar.month.detail.timeUnset;
+  const timeLabel =
+    formatTimeRangeKo(meetup.startTime, meetup.endTime) ?? strings.calendar.month.detail.timeUnset;
+  // 기간 모임이면 "어느 날짜의 패널인지"와 별개로 모임 자체의 기간을 함께 보여준다 —
+  // 이 항목은 시작일이 아닌 날짜의 패널에도 등장한다(`calendar-types.ts`의 `date` docstring).
+  const isMultiDay = isMultiDayMeetup(meetup.date, meetup.endDate);
+  const dateRangeLabel = isMultiDay
+    ? formatShortDateRangeLabelKo(meetup.date, meetup.endDate)
+    : null;
   const capacityLabel =
     meetup.capacity !== null
       ? t((s) => s.calendar.month.detail.capacityLabel, {
@@ -156,6 +168,13 @@ function DayDetailMeetupRow({ meetup }: { meetup: CalendarMeetupDetail }) {
          *  혼동되면 안 되므로 독립 문구를 쓴다(calendar-types.ts의 `isArchivedCrew`
          *  docstring 참고). */}
         <div className="flex shrink-0 items-center gap-1">
+          {isMultiDay && (
+            <Badge variant="outline">
+              {t((s) => s.calendar.month.detail.multiDayBadge, {
+                days: countMeetupDays(meetup.date, meetup.endDate),
+              })}
+            </Badge>
+          )}
           {meetup.isArchivedCrew && (
             <Badge variant="secondary">{strings.calendar.month.detail.archivedCrewBadge}</Badge>
           )}
@@ -166,7 +185,7 @@ function DayDetailMeetupRow({ meetup }: { meetup: CalendarMeetupDetail }) {
       </div>
       <p className="truncate text-sm font-medium text-foreground">{meetup.title}</p>
       <p className="tnum text-xs text-muted-foreground">
-        {[timeLabel, meetup.place, capacityLabel].filter(Boolean).join(" · ")}
+        {[dateRangeLabel, timeLabel, meetup.place, capacityLabel].filter(Boolean).join(" · ")}
       </p>
     </div>
   );

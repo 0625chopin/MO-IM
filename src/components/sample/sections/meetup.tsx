@@ -62,8 +62,10 @@ const DEMO_MEETUP: MeetupDetailViewModel = {
   crewName: "새벽 러닝 크루",
   crewColorIndex: 5,
   date: "2026-08-14",
+  endDate: "2026-08-14",
   dateLabel: "8월 14일 금요일",
   startTime: "07:00",
+  endTime: "09:00",
   place: "한강공원 반포지구",
   capacity: 20,
   attendingCount: 12,
@@ -266,6 +268,31 @@ export const meetupSection = defineSection({
           <PreviewFrame height={640}>
             <div className="mx-auto w-full max-w-md p-4">
               <MeetupDetailSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "MeetupDetail — 기간(다일) 모임",
+      note: "모임 일정이 하루로 끝나지 않는 경우입니다(2026-07-31). 날짜 줄이 '8월 14일 금요일 ~ 8월 16일 일요일'로, 시각이 '오전 9:00 ~ 오후 5:00'로 나오고 '3일간' 배지가 붙습니다 — 하루짜리(위 기본 항목)에서는 배지도 '~'도 나타나지 않습니다(endDate === date). 참석 응답은 시작일이 아니라 종료일까지 열려 있습니다(isMeetupAttendanceOpen).",
+      panels: {
+        default: (
+          <PreviewFrame height={640}>
+            <div className="mx-auto w-full max-w-md p-4">
+              <MeetupDetail
+                meetup={{
+                  ...DEMO_MEETUP,
+                  id: "sample-meetup-detail-multi-day",
+                  title: "지리산 종주 2박 3일",
+                  endDate: "2026-08-16",
+                  dateLabel: "8월 14일 금요일 ~ 8월 16일 일요일",
+                  startTime: "09:00",
+                  endTime: "17:00",
+                }}
+                participants={DEMO_PARTICIPANTS}
+                attendanceState={{ kind: "open" }}
+              />
             </div>
           </PreviewFrame>
         ),

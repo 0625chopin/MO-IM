@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import type { UpcomingMeetupSummary } from "@/components/calendar/calendar-types";
 import { CrewLegend } from "@/components/calendar/CrewLegend";
-import { formatStartTimeKo } from "@/components/calendar/date-grid";
+import { formatTimeRangeKo } from "@/components/calendar/date-grid";
 import { ErrorState } from "@/components/ui/error-state";
 import { strings } from "@/lib/strings";
 import { cn } from "@/lib/utils";
@@ -24,23 +24,31 @@ export interface HomeCalendarSummaryProps {
   /** 오류 상태(FR-061 E3와 같은 종류의 일반 조회 실패) — Mock 단계엔 실제로 발생하지 않지만
    *  `/sample` 4상태 등록 대상이라 자리를 둔다(D-030 ③). */
   error?: boolean;
+  /**
+   * 제목 줄(제목 + "캘린더에서 모두 보기")을 그리지 않는다 — 홈에서는 접기 셸
+   * (`CollapsibleSection`)이 같은 자리에 제목과 링크를 이미 갖고 있어 두 벌이 된다.
+   * 기본값(false)은 `/sample`처럼 셸 없이 이 컴포넌트만 놓는 자리를 위한 것이다.
+   */
+  hideHeading?: boolean;
   className?: string;
 }
 
-export function HomeCalendarSummary({ items, error, className }: HomeCalendarSummaryProps) {
+export function HomeCalendarSummary({ items, error, hideHeading, className }: HomeCalendarSummaryProps) {
   return (
     <section className={cn("flex flex-col gap-3", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-base font-semibold text-foreground">
-          {strings.home.dashboard.upcoming.title}
-        </h2>
-        <Link
-          href="/calendar"
-          className="inline-flex items-center py-1 text-sm text-primary hover:underline"
-        >
-          {strings.home.dashboard.upcoming.viewAll}
-        </Link>
-      </div>
+      {!hideHeading && (
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-foreground">
+            {strings.home.dashboard.upcoming.title}
+          </h2>
+          <Link
+            href="/calendar"
+            className="inline-flex items-center py-1 text-sm text-primary hover:underline"
+          >
+            {strings.home.dashboard.upcoming.viewAll}
+          </Link>
+        </div>
+      )}
 
       {error ? (
         <ErrorState
@@ -65,7 +73,7 @@ export function HomeCalendarSummary({ items, error, className }: HomeCalendarSum
 }
 
 function HomeCalendarSummaryRow({ item }: { item: UpcomingMeetupSummary }) {
-  const timeLabel = formatStartTimeKo(item.startTime);
+  const timeLabel = formatTimeRangeKo(item.startTime, item.endTime);
   const row = (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
       <div className="flex min-w-0 flex-col gap-0.5">

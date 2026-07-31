@@ -28,7 +28,9 @@ export type MeetupAttendanceButtonState =
   | { kind: "open" };
 
 export interface MeetupAttendanceButtonStateInput {
-  meetup: Pick<Meetup, "status" | "date" | "capacity" | "attendingCount">;
+  // `date`가 아니라 `endDate`를 받는다 — 참석 응답 마감 판정(`isMeetupAttendanceOpen`)이
+  // 기간 모임의 마지막 날을 기준으로 하기 때문이다(다일 모임 지원, 2026-07-31).
+  meetup: Pick<Meetup, "status" | "endDate" | "capacity" | "attendingCount">;
   todayIso: ISODateString;
   /** 조회자 본인의 현재 응답. 아직 응답하지 않았으면 `null`. */
   viewerAttendanceStatus: AttendanceStatus | null;

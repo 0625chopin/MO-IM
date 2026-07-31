@@ -65,6 +65,11 @@ export function generatePosts(
     const createdAt = addDays(SEED_NOW, -randomInt(rng, 1, 150));
     const template = pick(rng, MEETUP_PROPOSAL_TEMPLATES);
     const meetupDate = toDateOnly(addDays(createdAt, randomInt(rng, 3, 14)));
+    // 다일 모임 지원(2026-07-31) — 제안 4건 중 1건꼴로 2~4일짜리 기간 모임을 만든다.
+    // 하루짜리만 있으면 캘린더의 스팬 렌더링·겹침 조회가 시드 데이터로는 한 번도 실행되지
+    // 않아, 격자에서 깨지는 것을 실데이터를 넣기 전까지 발견하지 못한다.
+    const meetupEndDate =
+      rng() < 0.25 ? toDateOnly(addDays(`${meetupDate}T00:00:00.000Z`, randomInt(rng, 1, 3))) : null;
     const post: Post = {
       id: generateId("post"),
       boardId,
@@ -73,10 +78,12 @@ export function generatePosts(
       title: template.title,
       body: template.body,
       meetupDate,
-      // 시드 데이터는 선택 입력 3종(D-013)까지 채우지 않는다 — 정원·시작 시각·장소는
-      // Task 018B(글쓰기)가 실제로 입력받는 경로를 시연하는 목적이 아니라 Poll/Meetup
-      // 파이프라인(FR-060) 실증이 이 생성기의 목표라 필수값(meetupDate)만 채운다.
+      meetupEndDate,
+      // 시드 데이터는 선택 입력(D-013)까지 채우지 않는다 — 정원·시각·장소는 Task 018B
+      // (글쓰기)가 실제로 입력받는 경로를 시연하는 목적이 아니라 Poll/Meetup 파이프라인
+      // (FR-060) 실증이 이 생성기의 목표라 필수값(meetupDate)과 위 기간만 채운다.
       startTime: null,
+      endTime: null,
       place: null,
       capacity: null,
       targetMeetupId: null,
@@ -130,7 +137,9 @@ export function generatePosts(
         title: template.title,
         body: template.body,
         meetupDate: null,
+        meetupEndDate: null,
         startTime: null,
+        endTime: null,
         place: null,
         capacity: null,
         targetMeetupId: null,

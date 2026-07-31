@@ -8,8 +8,14 @@ import type { Id } from "@/lib/types";
 
 export interface CheckDuplicateMeetupDateInput {
   crewId: Id;
-  /** ISODateString(YYYY-MM-DD). */
+  /** 모임 시작일 ISODateString(YYYY-MM-DD). */
   date: string;
+  /**
+   * 모임 종료일(선택). 비면 하루짜리로 보고 `date`만 확인한다. 값이 있으면 **그 기간과
+   * 하루라도 겹치는** 확정 모임이 있는지 본다(다일 모임 지원, 2026-07-31) — 기간 제안에서
+   * 시작일만 비교하면 "8/1~8/5 제안 vs 8/3 확정 모임"을 놓친다.
+   */
+  endDate?: string | null;
 }
 
 /**
@@ -37,10 +43,13 @@ export async function checkDuplicateMeetupDateAction(
     return { duplicate: false };
   }
 
+  // 종료일이 시작일보다 앞서는 잘못된 입력이면 조회 구간이 뒤집혀 항상 0건이 된다 —
+  // 그 경우는 하루짜리로 좁혀 확인한다(어차피 등록 시점에 `scheduledEndDate` 검증이 막는다).
+  const to = input.endDate && input.endDate >= input.date ? input.endDate : input.date;
   const meetups = await listMeetupsByCrews({
     crewIds: [input.crewId],
     from: input.date,
-    to: input.date,
+    to,
   });
   return { duplicate: meetups.length > 0 };
 }

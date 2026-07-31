@@ -27,8 +27,14 @@ import type { CSSProperties } from "react";
  *  Temporal 변환은 클라이언트에서 한다(Temporal 인스턴스는 서버→클라이언트로 직렬화 불가). */
 export interface ScheduleXEventInput {
   id: string;
-  /** YYYY-MM-DD. */
+  /** 시작일 YYYY-MM-DD. */
   iso: string;
+  /**
+   * 종료일 YYYY-MM-DD. 하루짜리면 `iso`와 같다(다일 모임 지원, 2026-07-31).
+   * Schedule-X는 `start`/`end`가 다른 종일 이벤트를 여러 셀에 걸친 하나의 막대로 그리므로,
+   * 기간 모임은 날짜마다 이벤트를 복제하지 않고 **이벤트 하나**로 넘긴다.
+   */
+  endIso: string;
   title: string;
   crewName: string;
   /** 이 날짜 셀에서 D-026 충돌 회피까지 끝난 팔레트 인덱스. */
@@ -114,7 +120,7 @@ export function ScheduleXCalendarView({
     events: events.map((e) => ({
       id: e.id,
       start: Temporal.PlainDate.from(e.iso),
-      end: Temporal.PlainDate.from(e.iso),
+      end: Temporal.PlainDate.from(e.endIso),
       title: e.title,
       // 커스텀 필드 — 이벤트 칩(MonthGridEvent)이 조회한다.
       crewName: e.crewName,

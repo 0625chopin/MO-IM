@@ -184,11 +184,15 @@ export interface CreatePostInput {
   title: string;
   body: string;
   /**
-   * 아래 4개 필드는 전부 type='meetup_proposal'·'meetup_reschedule_proposal'일 때만 의미
+   * 아래 6개 필드는 전부 type='meetup_proposal'·'meetup_reschedule_proposal'일 때만 의미
    * 있다(FR-034, D-013). 일정 변경 제안에서는 "새로 제안하는" 값이다.
+   * `meetupEndDate`·`endTime`은 다일 모임 지원(2026-07-31)으로 더해진 선택 입력이며,
+   * 비면 하루짜리 제안이다.
    */
   meetupDate?: string | null;
+  meetupEndDate?: string | null;
   startTime?: string | null;
+  endTime?: string | null;
   place?: string | null;
   capacity?: number | null;
   /**
@@ -221,7 +225,9 @@ export async function createPost(input: CreatePostInput): Promise<DataResult<Pos
       title: input.title,
       body: input.body,
       meetup_date: isProposal ? (input.meetupDate ?? null) : null,
+      meetup_end_date: isProposal ? (input.meetupEndDate ?? null) : null,
       start_time: isProposal ? (input.startTime ?? null) : null,
+      end_time: isProposal ? (input.endTime ?? null) : null,
       place: isProposal ? (input.place ?? null) : null,
       capacity: isProposal ? (input.capacity ?? null) : null,
       target_meetup_id: isReschedule ? (input.targetMeetupId ?? null) : null,

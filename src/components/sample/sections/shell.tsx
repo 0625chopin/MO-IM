@@ -1,11 +1,14 @@
+import { MyCrewsSectionSkeleton } from "@/components/crews/MyCrewsSectionSkeleton";
 import { PreviewFrame } from "@/components/sample/PreviewFrame";
 import { defineSection } from "@/components/sample/showcase-types";
 import { AppShell } from "@/components/shell/AppShell";
 import type { AuthSession } from "@/components/shell/auth-session";
+import { CollapsibleSection } from "@/components/shell/CollapsibleSection";
 import { HeaderNav } from "@/components/shell/HeaderNav";
 import { MobileTabBar } from "@/components/shell/MobileTabBar";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/error-state";
 import { strings } from "@/lib/strings";
 
 /* ── 앱 셸 ─────────────────────────────────────────────────────────────── */
@@ -168,6 +171,72 @@ export const shellSection = defineSection({
               status="error"
               errorMessage={strings.meetup.attendance.full}
             />
+          </PreviewFrame>
+        ),
+      },
+    },
+    {
+      name: "CollapsibleSection",
+      note: "홈 대시보드(SC-06)의 섹션 4개가 공유하는 접기/펴기 셸입니다. 제목 줄 전체가 토글 버튼이고(Tab으로 이동해 Enter·Space로 열고 닫히는지, 포커스 링이 보이는지 확인해 주세요) 오른쪽 링크는 버튼 **밖**에 있습니다 — 중첩하면 두 인터랙션이 겹칩니다. 접었을 때만 헤더에 요약이 남습니다(\"크루 4개\") — 접기가 정보를 지우는 게 아니라 밀도만 낮추게 하는 장치입니다. 실제 홈에서는 토글 결과가 쿠키에 저장돼 다음 방문까지 유지되지만, 이 쇼케이스는 `persist={false}`라 여기서 접어 봐도 여러분의 홈은 그대로입니다. 4상태는 셸 자신이 아니라 셸이 감싸는 내용의 상태입니다 — 셸은 조회를 하지 않습니다.",
+      panels: {
+        default: (
+          <PreviewFrame height={220}>
+            <div className="p-4">
+              <CollapsibleSection
+                sectionId="crews"
+                title={strings.home.dashboard.myCrews.title}
+                summary="크루 4개"
+                actionHref="/crews"
+                actionLabel={strings.home.dashboard.myCrews.viewAll}
+                defaultOpen
+                persist={false}
+              >
+                <p className="text-sm text-muted-foreground">
+                  섹션 내용이 여기 들어갑니다. 제목을 눌러 접어 보세요 — 접으면 헤더 오른쪽에
+                  요약만 남습니다.
+                </p>
+              </CollapsibleSection>
+            </div>
+          </PreviewFrame>
+        ),
+        loading: (
+          <PreviewFrame height={220}>
+            <div className="p-4">
+              <MyCrewsSectionSkeleton />
+            </div>
+          </PreviewFrame>
+        ),
+        empty: (
+          <PreviewFrame height={160}>
+            <div className="p-4">
+              <CollapsibleSection
+                sectionId="hot"
+                title={strings.home.hotMeetups.title}
+                defaultOpen={false}
+                persist={false}
+              >
+                <p className="text-sm text-muted-foreground">접힌 채로 시작한 섹션입니다.</p>
+              </CollapsibleSection>
+            </div>
+          </PreviewFrame>
+        ),
+        error: (
+          <PreviewFrame height={220}>
+            <div className="p-4">
+              <CollapsibleSection
+                sectionId="notifications"
+                title={strings.home.dashboard.recentNotifications.title}
+                actionHref="/notifications"
+                actionLabel={strings.home.dashboard.recentNotifications.viewAll}
+                defaultOpen
+                persist={false}
+              >
+                <ErrorState
+                  title={strings.home.dashboard.recentNotifications.errorTitle}
+                  description={strings.home.dashboard.recentNotifications.errorDescription}
+                />
+              </CollapsibleSection>
+            </div>
           </PreviewFrame>
         ),
       },

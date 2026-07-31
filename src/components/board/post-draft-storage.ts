@@ -20,11 +20,14 @@ export interface PostDraftValue {
   type: PostType;
   title: string;
   body: string;
-  /** 아래 4개는 문자열 그대로 보관한다 — input 값 그대로 왕복시키는 것이 목적이라
-   *  숫자·날짜로 파싱해 되돌리는 변환 비용을 들일 이유가 없다. */
+  /** 아래 6개는 문자열 그대로 보관한다 — input 값 그대로 왕복시키는 것이 목적이라
+   *  숫자·날짜로 파싱해 되돌리는 변환 비용을 들일 이유가 없다. 빈 문자열이 곧 "미입력"이다
+   *  (`meetupEndDate`가 비면 하루짜리 모임, `endTime`이 비면 종료 시각 미정). */
   meetupDate: string;
+  meetupEndDate: string;
   voteDeadline: string;
   startTime: string;
+  endTime: string;
   place: string;
   capacity: string;
 }
@@ -34,8 +37,10 @@ export const EMPTY_POST_DRAFT: PostDraftValue = {
   title: "",
   body: "",
   meetupDate: "",
+  meetupEndDate: "",
   voteDeadline: "",
   startTime: "",
+  endTime: "",
   place: "",
   capacity: "",
 };

@@ -50,8 +50,18 @@ export interface CalendarMeetupDetail {
   title: string;
   /** 이 날짜 셀에서 D-026 충돌 회피까지 끝난 팔레트 인덱스 — 취소된 Meetup도 같은 규칙을 쓴다. */
   colorIndex: number;
+  /**
+   * 모임 시작일·종료일(다일 모임 지원, 2026-07-31). **패널이 열린 날짜와 다를 수 있다** —
+   * 기간 모임은 걸치는 날짜마다 이 목록에 등장하므로, 8/3 패널에 있는 항목의 `date`가 8/1일
+   * 수 있다. 패널은 이 둘로 "8월 1일 ~ 8월 5일" 기간 문구를 만든다(`formatShortDateRangeLabelKo`).
+   * 하루짜리면 둘이 같다.
+   */
+  date: string;
+  endDate: string;
   /** "HH:MM" 24시간제 원본. 표시용 가공(오전/오후)은 `date-grid.ts`의 `formatStartTimeKo`. */
   startTime: string | null;
+  /** 종료 시각 "HH:MM"(선택). `startTime`이 없으면 이 값도 없다. */
+  endTime: string | null;
   place: string | null;
   attendingCount: number;
   /** null이면 정원 제한 없음. */
@@ -132,9 +142,11 @@ export interface UpcomingMeetupSummary {
   crewName: string;
   colorIndex: number;
   title: string;
-  /** `formatShortDayLabelKo`가 만든 "8월 14일(금)" 같은 완성 문구. */
+  /** `formatShortDateRangeLabelKo`가 만든 "8월 14일(금)" 또는 기간 모임의
+   *  "8월 14일(금) ~ 8월 16일(일)" 완성 문구. */
   dateLabel: string;
-  /** "HH:MM" 원본 — 표시 가공은 `date-grid.ts`의 `formatStartTimeKo`. */
+  /** "HH:MM" 원본 — 표시 가공은 `date-grid.ts`의 `formatTimeRangeKo`. */
   startTime: string | null;
+  endTime: string | null;
   postHref: string | null;
 }

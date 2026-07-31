@@ -15,12 +15,18 @@ export interface MeetupDetailViewModel {
   crewName: string;
   crewColorIndex: number;
   date: ISODateString;
-  /** 사람이 읽는 날짜 문구(`formatDayLabelKo` 결과) — 컨테이너가 이미 만들어 내려준다. */
+  /** 종료일(다일 모임, 2026-07-31). 하루짜리면 `date`와 같다 — `<time>` 요소의 기간 표기와
+   *  "N일간" 배지 판정에 쓴다. */
+  endDate: ISODateString;
+  /** 사람이 읽는 날짜 문구(`formatDateRangeLabelKo` 결과 — 기간이면 "…~…") — 컨테이너가
+   *  이미 만들어 내려준다. */
   dateLabel: string;
   /** "HH:MM" 원본. FR-064 AC1 — 값이 없으면 컴포넌트가 그 줄 자체를 생략한다("시각 미정" 같은
    *  플레이스홀더를 쓰지 않는다, `calendar.month.detail`과의 차이는 `ko.ts`의 `meetup` 모듈
    *  docstring 참고). 표시 가공(오전/오후)은 `date-grid.ts`의 `formatStartTimeKo`. */
   startTime: string | null;
+  /** 종료 시각 "HH:MM"(선택). 표시 가공은 `formatTimeRangeKo`가 `startTime`과 함께 한다. */
+  endTime: string | null;
   place: string | null;
   capacity: number | null;
   attendingCount: number;

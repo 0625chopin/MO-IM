@@ -48,6 +48,9 @@ export interface PostDetailViewModel {
   /** `type === "meetup_proposal"` 또는 `"meetup_reschedule_proposal"`에서만 값이 있다
    *  (I-079/FR-065 AC2, 26일차). */
   meetupDate: ISODateString | null;
+  /** 제안한 모임의 종료일 — **null이면 하루짜리 제안이다**(`Post.meetupEndDate`와 같은 규약,
+   *  `Meetup.endDate`가 non-null인 것과 다르다). 값이 있을 때만 "시작일 ~ 종료일"로 표시한다. */
+  meetupEndDate: ISODateString | null;
   pollStatus: PollStatus | null;
   /** `post:update_own` 판정 결과 — 제목·본문 수정 가능 여부. */
   canEditTitleBody: boolean;
